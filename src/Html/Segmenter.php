@@ -26,7 +26,8 @@ use WeakMap;
  * - Whitespace-only text and comments at the edges of a run stay in the DOM and out of the unit.
  * - A run that is a single inline element with content is unwrapped (`<li><a>Link</a></li>` → "Link");
  *   the element is then a container, so translate="yes" inside a lone translate="no" element is honoured.
- * - The tree is walked top-down: element rules prune subtrees, the translate state is carried down,
+ * - The tree is walked top-down: element rules prune content and subtrees (the element's own attributes still
+ *   become units), the translate state is carried down,
  *   and below a non-translating container elements are still visited, so translate="yes" re-enables them.
  * - Attribute units of an element come before its content; those of inline elements follow their run.
  */
@@ -102,14 +103,15 @@ final readonly class Segmenter
 
     private function visitContainer(Element $container, bool $parentTranslates, SegmentationContext $context): void
     {
-        if ($context->rules->skipsSubtree($container)) {
-            return;
-        }
-
         $translates = $context->rules->translates($container, $parentTranslates);
 
+        // Element rules exclude content, not the element's own interface attributes (svg aria-label, textarea placeholder).
         if ($translates) {
             $this->addAttributeUnits($container, $context);
+        }
+
+        if ($context->rules->skipsSubtree($container)) {
+            return;
         }
 
         if ($this->isDocumentTitle($container)) {

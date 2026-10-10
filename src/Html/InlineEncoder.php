@@ -17,7 +17,8 @@ use HtmlTranslator\Domain\UnitText;
  *
  * - element with content → <gN>…</gN>; void element → <xN/>
  * - skipped element (element rule or translate state "no") and comment → opaque <xN/>; nothing inside is sent,
- *   even a descendant with translate="yes" (splitting the sentence around it would be worse)
+ *   even a descendant with translate="yes" (splitting the sentence around it would be worse); an element-rule
+ *   element still offers its own attributes for attribute units, a translate="no" element does not
  * - text → escaped &, <, >
  *
  * Numbers follow opening order and restart for every run.
@@ -71,9 +72,23 @@ final readonly class InlineEncoder
         $number = \count($inlineTags) + 1;
         $tagNodes[$number] = $node;
 
-        if ($node instanceof Comment || $rules->skipsSubtree($node) || !$rules->translates($node, true)) {
-            $inlineTags[] = InlineTag::of($number, InlineTagKind::Opaque);
-            $text .= \sprintf('<x%d/>', $number);
+        if ($node instanceof Comment) {
+            $this->appendOpaque($number, $text, $inlineTags);
+
+            return;
+        }
+
+        if (!$rules->translates($node, true)) {
+            // translate="no" covers the element's attributes too (HTML spec).
+            $this->appendOpaque($number, $text, $inlineTags);
+
+            return;
+        }
+
+        if ($rules->skipsSubtree($node)) {
+            // Element rules exclude content only; the element's own attributes stay candidates.
+            $attributeCandidates[] = $node;
+            $this->appendOpaque($number, $text, $inlineTags);
 
             return;
         }
@@ -95,5 +110,16 @@ final readonly class InlineEncoder
         }
 
         $text .= \sprintf('</g%d>', $number);
+    }
+
+    /**
+     * @param list<InlineTag> $inlineTags
+     *
+     * @param-out list<InlineTag> $inlineTags
+     */
+    private function appendOpaque(int $number, string &$text, array &$inlineTags): void
+    {
+        $inlineTags[] = InlineTag::of($number, InlineTagKind::Opaque);
+        $text .= \sprintf('<x%d/>', $number);
     }
 }

@@ -11,8 +11,10 @@ use HtmlTranslator\Exception\InvalidArgumentException;
  * Decides whether an element's text is excluded from translation.
  *
  * Two kinds of rules, deliberately different:
- * - Element rules (script, code, svg, …) are absolute: the element and its whole subtree are skipped,
- *   even below translate="yes". Remove the element with withoutElement() to translate it.
+ * - Element rules (script, code, svg, textarea, …) are absolute: the element's content and its whole subtree
+ *   are skipped, even below translate="yes". Remove the element with withoutElement() to translate it.
+ *   Translatable attributes of the skipped element itself (svg aria-label, textarea placeholder) are interface
+ *   text and still translated; the Segmenter handles that.
  * - The translate attribute and skip classes are inherited as in the HTML spec: the nearest ancestor-or-self
  *   with translate="yes"/"no" (case-insensitive, empty = yes) or a skip class (= no) decides; an unknown
  *   translate value inherits. On one element the translate attribute wins over a class.
@@ -35,7 +37,8 @@ final readonly class SkipRules
     public static function defaults(): self
     {
         return new self(
-            ['script', 'style', 'code', 'pre', 'kbd', 'samp', 'var', 'svg', 'math', 'template'],
+            // textarea content is a form field's default value, i.e. data (interface text lives in placeholder).
+            ['script', 'style', 'code', 'pre', 'kbd', 'samp', 'var', 'svg', 'math', 'template', 'textarea'],
             ['notranslate'],
         );
     }
@@ -115,6 +118,7 @@ final readonly class SkipRules
 
     /**
      * Convenience check for a single element: walks all its ancestors, so do not call it for every node of a tree.
+     * Decides about text only; the element's own attributes under an element rule are decided by the Segmenter.
      */
     public function excludes(Element $element): bool
     {

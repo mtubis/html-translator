@@ -25,6 +25,12 @@ final class TranslatableAttributesTest extends TestCase
     {
         yield 'alt' => ['<img id="target" src="a.png" alt="Logo">', ['alt']];
         yield 'title on any element' => ['<span id="target" title="Hint">x</span>', ['title']];
+        // On these elements title is not text for people: on style/link it names a stylesheet set (default-style matches it).
+        yield 'title on style names a stylesheet set' => ['<style id="target" title="Dark">p{}</style>', []];
+        yield 'title on link names a stylesheet set' => ['<link id="target" rel="alternate stylesheet" title="Dark" href="d.css">', []];
+        yield 'title on script' => ['<script id="target" title="S">x</script>', []];
+        yield 'title on template' => ['<template id="target" title="T"></template>', []];
+        yield 'other attributes on link still count' => ['<link id="target" rel="icon" href="i.png" aria-label="Icon">', ['aria-label']];
         yield 'placeholder' => ['<input id="target" placeholder="Your name">', ['placeholder']];
         yield 'aria-label' => ['<button id="target" aria-label="Close">×</button>', ['aria-label']];
         yield 'aria-description' => ['<div id="target" aria-description="Details">x</div>', ['aria-description']];
@@ -56,7 +62,12 @@ final class TranslatableAttributesTest extends TestCase
         yield 'input type is case-insensitive' => ['<input id="target" type="SUBMIT" value="Send">', ['value']];
         yield 'input text value' => ['<input id="target" type="text" value="typed">', []];
         yield 'input without type' => ['<input id="target" value="typed">', []];
-        yield 'input reset value' => ['<input id="target" type="reset" value="Reset">', []];
+        yield 'input reset value' => ['<input id="target" type="reset" value="Reset">', ['value']];
+        yield 'input reset type is case-insensitive' => ['<input id="target" type="RESET" value="Reset">', ['value']];
+        yield 'input button value with name' => ['<input id="target" type="button" name="b" value="Click">', ['value']];
+        yield 'input submit value with name is submitted data' => ['<input id="target" type="submit" name="action" value="Delete">', []];
+        yield 'input submit value with empty name is submitted data' => ['<input id="target" type="submit" name="" value="Delete">', []];
+        yield 'input hidden value' => ['<input id="target" type="hidden" value="token">', []];
         yield 'value on button element' => ['<button id="target" value="v">Send</button>', []];
         yield 'value with placeholder' => ['<input id="target" type="submit" placeholder="P" value="Send">', ['placeholder', 'value']];
     }

@@ -174,8 +174,17 @@ final class SegmenterTest extends TestCase
             '<figure><img src="a.png" alt="Chart"><figcaption>Sales <b>2026</b></figcaption></figure>',
             [['a1', 'Attribute', 'Chart'], ['u1', 'Block', 'Sales <g1>2026</g1>']],
         ];
-        yield 'no attribute units inside an opaque element' => ['<p>See <code title="T">x</code></p>', [['u1', 'Block', 'See <x1/>']]];
-        yield 'no attribute units in skipped subtrees' => ['<pre title="T">x</pre><svg><a title="S"></a></svg>', []];
+        yield 'attributes of an inline skipped element' => ['<p>See <code title="T">x</code></p>', [['u1', 'Block', 'See <x1/>'], ['a1', 'Attribute', 'T']]];
+        yield 'no attribute units inside an inline skipped element' => ['<p>See <code><b title="T">x</b></code></p>', [['u1', 'Block', 'See <x1/>']]];
+        yield 'no attribute units on an inline translate=no element' => ['<p>See <span translate="no" title="T">x</span></p>', [['u1', 'Block', 'See <x1/>']]];
+        yield 'attributes of a skipped element, not of its descendants' => ['<pre title="T">x <b title="B">y</b></pre><svg aria-label="Close"><a title="S"></a></svg>', [['a1', 'Attribute', 'T'], ['a2', 'Attribute', 'Close']]];
+        yield 'skipped element with translate=yes below no' => ['<div translate="no"><svg translate="yes" aria-label="A"></svg></div>', [['a1', 'Attribute', 'A']]];
+        yield 'head metadata titles are not translated' => [
+            '<!DOCTYPE html><html><head><title>Page</title><style title="Dark">p{}</style><link rel="alternate stylesheet" title="Dark" href="d.css">'
+            . '<script title="S">x</script><template title="Tpl"><p>t</p></template><meta name="description" content="About"></head><body></body></html>',
+            [['u1', 'Title', 'Page'], ['a1', 'Attribute', 'About']],
+        ];
+        yield 'no attribute units on a skipped element with translate=no' => ['<code translate="no" title="T">x</code>', []];
         yield 'no attribute units on translate=no elements' => ['<img src="a.png" alt="Logo" translate="no">', []];
         yield 'attribute with translate=yes under no' => ['<div translate="no"><img src="a.png" alt="A" translate="yes"></div>', [['a1', 'Attribute', 'A']]];
         yield 'attribute text is escaped' => ['<img src="a.png" alt="Tom &amp; Jerry <3">', [['a1', 'Attribute', 'Tom &amp; Jerry &lt;3']]];
@@ -196,6 +205,60 @@ final class SegmenterTest extends TestCase
     public function it_segments_attribute_and_title_units(string $html, array $expected): void
     {
         self::assertSame($expected, $this->triples($this->segment($html)));
+    }
+
+    /**
+     * Interface text of forms is translated, form data (field values, submitted button values) is not.
+     *
+     * @return iterable<string, array{string, list<array{string, string, string}>}>
+     */
+    public static function formControls(): iterable
+    {
+        yield 'textarea content is data' => ['<div><textarea name="m">Default text</textarea></div>', []];
+        yield 'textarea in a sentence is opaque' => ['<p>Write <textarea name="m">Default</textarea> here</p>', [['u1', 'Block', 'Write <x1/> here']]];
+        yield 'textarea placeholder and title are interface' => [
+            '<textarea name="m" placeholder="Your message" title="Message">Default</textarea>',
+            [['a1', 'Attribute', 'Your message'], ['a2', 'Attribute', 'Message']],
+        ];
+        yield 'textarea with placeholder in a sentence' => ['<p>Type <textarea name="m" placeholder="P">D</textarea> here</p>', [['u1', 'Block', 'Type <x1/> here'], ['a1', 'Attribute', 'P']]];
+        yield 'button content is interface, its value is data' => ['<button name="action" value="delete">Delete</button>', [['u1', 'Block', 'Delete']]];
+        yield 'full form' => [
+            '<form><fieldset><legend>Account</legend>'
+            . '<label for="e">E-mail</label> <input id="e" name="email" type="email" placeholder="you@example.com" value="kept@example.com">'
+            . '<select name="c" aria-label="Country"><option value="pl">Poland</option></select>'
+            . '<input type="text" name="q" value="kept query">'
+            . '<input type="submit" name="action" value="Save">'
+            . '<input type="submit" value="Send">'
+            . '<input type="reset" value="Clear">'
+            . '</fieldset></form>',
+            [
+                ['u1', 'Block', 'Account'],
+                ['u2', 'Block', '<g1>E-mail</g1> <x2/>'],
+                ['a1', 'Attribute', 'you@example.com'],
+                ['a2', 'Attribute', 'Country'],
+                ['u3', 'Block', 'Poland'],
+                ['a3', 'Attribute', 'Send'],
+                ['a4', 'Attribute', 'Clear'],
+            ],
+        ];
+    }
+
+    /**
+     * @param list<array{string, string, string}> $expected
+     */
+    #[Test]
+    #[DataProvider('formControls')]
+    public function it_translates_form_interface_but_not_form_data(string $html, array $expected): void
+    {
+        self::assertSame($expected, $this->triples($this->segment($html)));
+    }
+
+    #[Test]
+    public function it_translates_textarea_content_when_opted_in(): void
+    {
+        $segmented = $this->segment('<div><textarea name="m">Default text</textarea></div>', SkipRules::defaults()->withoutElement('textarea'));
+
+        self::assertSame([['u1', 'Block', 'Default text']], $this->triples($segmented));
     }
 
     #[Test]
@@ -249,7 +312,7 @@ final class SegmenterTest extends TestCase
         yield 'skipped blocks' => ['<pre>SKIPPED</pre><script>SKIPPED</script><style>SKIPPED{}</style><template><p>SKIPPED</p></template><p>Text</p>'];
         yield 'foreign content' => ['<p>Icon <svg><text>SKIPPED</text><title>SKIPPED</title></svg> and <math><mi>SKIPPED</mi></math></p>'];
         yield 'translate=no' => ['<p translate="no">SKIPPED</p><p>Use <span translate="no">SKIPPED <b>SKIPPED</b></span> and <span class="notranslate">SKIPPED</span></p>'];
-        yield 'skipped attributes' => ['<p translate="no" title="SKIPPED"><img alt="SKIPPED"></p><code title="SKIPPED">x</code><p>Text</p>'];
+        yield 'skipped attributes' => ['<p translate="no" title="SKIPPED"><img alt="SKIPPED"></p><code><b title="SKIPPED">x</b></code><p>Text</p>'];
         yield 'comments' => ['<p>a <!-- SKIPPED --> b</p><!-- SKIPPED -->'];
     }
 

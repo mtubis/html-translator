@@ -23,7 +23,7 @@ final class SkipRulesTest extends TestCase
      */
     public static function defaultElements(): iterable
     {
-        foreach (['script', 'style', 'code', 'pre', 'kbd', 'samp', 'var', 'template'] as $name) {
+        foreach (['script', 'style', 'code', 'pre', 'kbd', 'samp', 'var', 'template', 'textarea'] as $name) {
             yield $name => [$name];
         }
     }

@@ -106,7 +106,8 @@ final class InlineEncoderTest extends TestCase
             SkipRules::defaults(),
         );
 
-        self::assertSame(['1', '2', '6'], array_map(static fn(Element $element): ?string => $element->getAttribute('id'), $encoded->attributeCandidates));
+        // Element rules exclude content, not the element's own attributes; translate="no" excludes both.
+        self::assertSame(['1', '2', '3', '6'], array_map(static fn(Element $element): ?string => $element->getAttribute('id'), $encoded->attributeCandidates));
     }
 
     #[Test]
