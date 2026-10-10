@@ -3,6 +3,7 @@ parameters:
     paths:
         - src
         - tests
+        - scripts
     tmpDir: var/phpstan
     checkUninitializedProperties: true
     checkImplicitMixed: true

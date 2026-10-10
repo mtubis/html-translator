@@ -177,7 +177,9 @@ src/
   Cache/                        UnitCache, CacheKey
   Exception/                    TranslatorException (interface), InvalidHtmlException, ProviderException, StructureValidationException, InvalidArgumentException
 tests/
-  Unit/  Integration/  Contract/  Fixtures/ (html in/out pairs)  Support/
+  Unit/  Integration/  Contract/  Support/
+  Fixtures/<name>/              input.html, expected.pseudo.html, README.md, options.json? (golden fixtures)
+  Fixtures/roundtrip/           loader round-trip inputs (no input.html, so not a golden fixture)
 tools/eval/                     manual quality evaluation against real models (not shipped)
 ```
 
@@ -193,9 +195,9 @@ Dependency rule (checked by the `architecture-reviewer` agent and later by a PHP
 | Layer | What | Runs |
 |---|---|---|
 | Unit | Value objects, encoder, validator, prompt builder, parser | always |
-| Fixture (golden) | `tests/Fixtures/*.html` through the full pipeline with `PseudoLocalizationProvider` | always |
+| Fixture (golden) | `tests/Fixtures/<name>/input.html` through the full pipeline with `PseudoLocalizationProvider`, compared with `expected.pseudo.html` (`tests/Integration/GoldenFixturesTest`, no group; regenerate with `composer fixtures:update -- <name>`) | always |
 | Contract | `TranslationProviderContractTestCase` / `ChatModelContractTestCase` every adapter must pass | always (with fake HTTP) |
-| Integration | Real APIs, `#[Group('integration')]`, needs env vars | manual / nightly |
+| Integration | Real APIs, `#[Group('integration')]`, needs env vars (tests in `tests/Integration` without that group, such as the golden fixtures, run always) | manual / nightly |
 | Mutation | Infection on `src/` | CI, MSI threshold |
 | Eval | `tools/eval` — real models × fixtures × profiles, structural pass-rate report | manual |
 

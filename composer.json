@@ -55,6 +55,7 @@
         "rector": "rector process --dry-run",
         "rector:fix": "rector process",
         "infection": "infection --threads=max --show-mutations",
+        "fixtures:update": "php scripts/update-fixtures.php",
         "check": [
             "@cs",
             "@rector",
@@ -63,7 +64,8 @@
         ]
     },
     "scripts-descriptions": {
-        "check": "Run everything CI runs: code style, rector dry-run, PHPStan and tests."
+        "check": "Run everything CI runs: code style, rector dry-run, PHPStan and tests.",
+        "fixtures:update": "Regenerate expected.pseudo.html of golden fixtures (all, or the names after --). Review the result by hand."
     },
     "minimum-stability": "stable",
     "prefer-stable": true
