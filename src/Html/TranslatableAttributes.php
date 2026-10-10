@@ -10,9 +10,12 @@ use HtmlTranslator\Exception\InvalidArgumentException;
 /**
  * Decides which attributes of an element become attribute units (ARCHITECTURE §6.2).
  *
- * - Listed attributes (alt, title, …) are translatable on any element.
+ * - Listed attributes (alt, title, …) are translatable on any element, except title on link, style, script
+ *   and template, where it is not text for people (it names stylesheet sets).
  * - <meta content> is translatable when the meta's name or property is listed (case-insensitive).
- * - <input type="submit|button" value> is translatable; this rule is fixed.
+ * - <input value> is translatable only where it is a visible label and not form data: always for
+ *   type="button" and type="reset" (never submitted), for type="submit" only without a name attribute
+ *   (with a name, the value is submitted and backends often compare it). This rule is fixed.
  *
  * Whether the element itself is excluded (translate="no", skipped subtree) is not checked here;
  * the Segmenter combines this with SkipRules. Elements are matched by local name regardless of
@@ -24,7 +27,13 @@ final readonly class TranslatableAttributes
 
     private const string HTML_WHITESPACE = " \t\n\f\r";
 
-    private const array VALUE_INPUT_TYPES = ['submit', 'button'];
+    private const array LABEL_INPUT_TYPES = ['button', 'reset'];
+
+    /**
+     * Elements whose title is not text for people: on style/link it names a stylesheet set
+     * (matched by <meta http-equiv="default-style">), on script/template it is never shown.
+     */
+    private const array NON_TEXT_TITLE_ELEMENTS = ['link', 'script', 'style', 'template'];
 
     /**
      * @param list<string> $attributes lower-case attribute names
@@ -96,12 +105,20 @@ final readonly class TranslatableAttributes
     private function isTranslatable(Element $element, string $attribute): bool
     {
         return match (true) {
+            'title' === $attribute && \in_array($element->localName, self::NON_TEXT_TITLE_ELEMENTS, true) => false,
             \in_array($attribute, $this->attributes, true) => true,
             'content' === $attribute => 'meta' === $element->localName && $this->hasListedMetaName($element),
-            'value' === $attribute => 'input' === $element->localName
-                && \in_array(strtolower($element->getAttribute('type') ?? ''), self::VALUE_INPUT_TYPES, true),
+            'value' === $attribute => 'input' === $element->localName && $this->isInputLabel($element),
             default => false,
         };
+    }
+
+    private function isInputLabel(Element $input): bool
+    {
+        $type = strtolower($input->getAttribute('type') ?? '');
+
+        return \in_array($type, self::LABEL_INPUT_TYPES, true)
+            || ('submit' === $type && !$input->hasAttribute('name'));
     }
 
     /**
