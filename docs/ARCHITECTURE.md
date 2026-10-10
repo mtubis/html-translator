@@ -25,7 +25,7 @@ The library is framework-agnostic. It depends only on PHP and PSR interfaces. Sy
 | Term | Meaning |
 |---|---|
 | **Document** | The HTML input: a full document (`<!DOCTYPE html>…`) or a fragment. |
-| **Translation unit** (`TranslationUnit`) | The smallest piece of text sent to the model: the inline content of one block element, or one translatable attribute value. Has a stable id within a document. |
+| **Translation unit** (`TranslationUnit`) | The smallest piece of text sent to the model: one run of inline content inside a block element, the document `<title>`, or one translatable attribute value. Has a stable id within a document. |
 | **Inline tag** (`InlineTag`) | An inline element inside a unit, replaced by a numbered pseudo-tag before translation (see [ADR-0003](adr/0003-inline-markup-as-numbered-pseudo-tags.md)). |
 | **Skip rule** (`SkipRules`) | A rule deciding that text is not translated. *Element rules* (`script`, `style`, `code`, `pre`, `kbd`, `samp`, `var`, `svg`, `math`, `template`) skip the whole subtree. The `translate` attribute and skip classes (`.notranslate`) are inherited per the HTML spec, so a descendant with `translate="yes"` is translated again. Configurable. |
 | **Locale / LocalePair** | BCP 47 language tags for source and target. Source may be "auto". |
@@ -118,9 +118,10 @@ Adapters are written on **PSR-18 / PSR-17**, not vendor SDKs ([ADR-0002](adr/000
 
 ### 6.2 Segmentation
 - Walk the tree top-down. Prune only subtrees of skipped elements (`SkipRules::skipsSubtree()`); for everything else carry the inherited translate state (`SkipRules::translates($element, $parentTranslates)`), because `translate="yes"` below `translate="no"` or `.notranslate` re-enables translation.
-- A **block unit** is the inline content of the nearest block-level ancestor that directly contains non-whitespace text.
+- A **block unit** is a maximal run of inline content (text and inline elements) directly inside a block container that holds translatable text. Blocks split runs, so `<div>Intro <p>Para</p> outro</div>` yields three units and nested blocks yield units only at the innermost text-bearing level. Unknown and custom elements are inline; an inline element that contains a block acts as a container. Whitespace-only text and comments at the edges of a run stay outside the unit. A run that is a single inline element with content is unwrapped (`<li><a>Link</a></li>` → `Link`). Nesting deeper than 1024 levels is rejected with `InvalidHtmlException`.
 - Inline elements inside a unit are encoded as numbered pseudo-tags: paired `<g1>…</g1>`, void `<x2/>`. Attributes are **never** sent with them ([ADR-0003](adr/0003-inline-markup-as-numbered-pseudo-tags.md)). The `TranslationUnit` keeps only the tag numbers and kinds (`InlineTag`); the mapping unit id + tag number → original DOM node is owned by the `Html` layer (`SegmentedDocument`, built by the `Segmenter`, consumed by the `Reassembler`) and never leaves it ([ADR-0007](adr/0007-inline-tag-mapping-lives-in-html-layer.md)).
-- Inline elements matched by skip rules (e.g. `<code>` inside a sentence) become opaque void placeholders — their content is not sent and cannot be changed.
+- Inline elements matched by skip rules (e.g. `<code>` inside a sentence), inline elements whose translate state is "no" (`translate="no"`, `.notranslate`) and comments inside a run become opaque void placeholders — their content is not sent and cannot be changed, even a descendant with `translate="yes"` (splitting the sentence around it would be worse).
+- Unit text is escaped like XML character data (`&amp;`, `&lt;`, `&gt;`), so pseudo-tags are the only unescaped `<`…`>` ([ADR-0008](adr/0008-unit-text-escaping.md)).
 - **Attribute units**: translatable attributes (`alt`, `title`, `placeholder`, `aria-label`, `aria-description`, `<meta name="description|keywords" content>`, `og:title`, `og:description`, `<input type="submit|button" value>`) become separate plain-text units. Configurable.
 - `<title>` and `lang` / `dir` attributes: `<title>` is a unit; `<html lang>` is updated to the target locale; `dir` is set for RTL targets.
 - Whitespace: leading/trailing whitespace of a unit is stripped before sending and restored after.
