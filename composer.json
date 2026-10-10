@@ -18,6 +18,16 @@
         "psr/http-factory": "^1.1",
         "psr/log": "^3.0"
     },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.95",
+        "infection/infection": "^0.35.6",
+        "phpstan/extension-installer": "^1.4",
+        "phpstan/phpstan": "^2.3",
+        "phpstan/phpstan-phpunit": "^2.1",
+        "phpstan/phpstan-strict-rules": "^2.1",
+        "phpunit/phpunit": "^13.4",
+        "rector/rector": "^2.7"
+    },
     "autoload": {
         "psr-4": {
             "HtmlTranslator\\": "src/"
