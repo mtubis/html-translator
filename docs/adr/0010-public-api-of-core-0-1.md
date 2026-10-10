@@ -1,6 +1,6 @@
 # 0010. Public API shape of Core 0.1
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-11
 
 ## Context
