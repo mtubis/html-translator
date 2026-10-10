@@ -1,6 +1,6 @@
 # 0003. Inline markup sent as numbered pseudo-tags
 
-- Status: accepted; mapping clause superseded by [0007](0007-inline-tag-mapping-lives-in-html-layer.md) (proposed)
+- Status: accepted; mapping clause superseded by [0007](0007-inline-tag-mapping-lives-in-html-layer.md)
 - Date: 2026-10-10
 
 ## Context
