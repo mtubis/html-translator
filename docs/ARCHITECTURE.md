@@ -47,8 +47,10 @@ $translator = new HtmlTranslator(
     cache: $psr6Pool,                    // ?CacheItemPoolInterface
     logger: $psr3Logger,                 // ?LoggerInterface
     // optional collaborators with sensible defaults:
-    // segmenter, reassembler, validator, skipRules, clock
+    // loader, segmenter, validator, reassembler, skipRules, translatableAttributes, clock
 );
+// Named arguments beyond `provider`; positional order is not part of the API (ADR-0010).
+// cache, clock and profile arrive in 0.3/0.4.
 
 $result = $translator->translate(
     html: $html,
@@ -60,6 +62,7 @@ $result = $translator->translate(
             ->withGlossary(Glossary::fromArray(['pull request' => 'pull request'])),
         fallback: FallbackStrategy::KeepOriginal,
         maxCorrectiveRetries: 2,
+        batchSize: 20,                             // provisional until the token-based Batcher (0.4)
         onProgress: static function (Progress $p): void { /* … */ },
     ),
 );
@@ -72,14 +75,14 @@ $result->stats();         // TranslationStats: units, batches, cache hits, token
 
 Rules:
 
-- `translate()` **does not throw for partial failures**. They become `Issue`s and the configured `FallbackStrategy` is applied. It throws only for unusable input (`InvalidHtmlException`), unrecoverable provider errors after retries (`ProviderException`), or when `FallbackStrategy::Throw` is selected (`StructureValidationException`). See [ADR-0004](adr/0004-result-object-for-partial-failures.md).
+- `translate()` **does not throw for partial failures**. They become `Issue`s and the configured `FallbackStrategy` is applied. It throws only for unusable input (`InvalidHtmlException`; `InvalidArgumentException` when source and target are the same), a provider that cannot handle a batch's first call (`ProviderException`), or when `FallbackStrategy::Throw` is selected (`StructureValidationException` for invalid structure, `ProviderException` for refused or missing units). See [ADR-0004](adr/0004-result-object-for-partial-failures.md) and [ADR-0010](adr/0010-public-api-of-core-0-1.md).
 - Everything public is `final` or an interface. Value objects are `readonly` and validated in the constructor / named constructor.
 
 ### FallbackStrategy
 
-| Case | Behaviour for a unit that keeps failing structural validation |
+| Case | Behaviour for a unit without a valid translation after corrective retries (invalid structure, refused or missing) |
 |---|---|
-| `TextNodesOnly` | Translate text nodes separately without inline markup context, keep the original inline structure. |
+| `TextNodesOnly` | Translate text nodes separately without inline markup context, keep the original inline structure. Text nodes that still fail keep their source text. |
 | `KeepOriginal` | Leave the unit untranslated. |
 | `Throw` | Abort with `StructureValidationException`. |
 
