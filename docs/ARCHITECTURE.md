@@ -119,7 +119,7 @@ Adapters are written on **PSR-18 / PSR-17**, not vendor SDKs ([ADR-0002](adr/000
 ### 6.2 Segmentation
 - Walk the tree; skip subtrees matched by `SkipRules`.
 - A **block unit** is the inline content of the nearest block-level ancestor that directly contains non-whitespace text.
-- Inline elements inside a unit are encoded as numbered pseudo-tags: paired `<g1>…</g1>`, void `<x2/>`. Attributes are **never** sent with them; the mapping id → original element lives in the `TranslationUnit` ([ADR-0003](adr/0003-inline-markup-as-numbered-pseudo-tags.md)).
+- Inline elements inside a unit are encoded as numbered pseudo-tags: paired `<g1>…</g1>`, void `<x2/>`. Attributes are **never** sent with them ([ADR-0003](adr/0003-inline-markup-as-numbered-pseudo-tags.md)). The `TranslationUnit` keeps only the tag numbers and kinds (`InlineTag`); the mapping unit id + tag number → original DOM node is owned by the `Html` layer (`SegmentedDocument`, built by the `Segmenter`, consumed by the `Reassembler`) and never leaves it ([ADR-0007](adr/0007-inline-tag-mapping-lives-in-html-layer.md)).
 - Inline elements matched by skip rules (e.g. `<code>` inside a sentence) become opaque void placeholders — their content is not sent and cannot be changed.
 - **Attribute units**: translatable attributes (`alt`, `title`, `placeholder`, `aria-label`, `aria-description`, `<meta name="description|keywords" content>`, `og:title`, `og:description`, `<input type="submit|button" value>`) become separate plain-text units. Configurable.
 - `<title>` and `lang` / `dir` attributes: `<title>` is a unit; `<html lang>` is updated to the target locale; `dir` is set for RTL targets.
