@@ -33,12 +33,17 @@ final readonly class LoadedDocument
     /**
      * @param Element $container element whose children are the fragment's nodes; it is never serialized itself
      *
-     * @throws InvalidArgumentException when the container belongs to another document
+     * @throws InvalidArgumentException when the container belongs to another document or is not attached to it
      */
     public static function fragment(HTMLDocument $document, Element $container): self
     {
         if ($container->ownerDocument !== $document) {
             throw new InvalidArgumentException('The fragment container must belong to the given document.');
+        }
+
+        if (!$container->isConnected) {
+            // Detached nodes would be rejected later by the Reassembler as "no longer part of the document".
+            throw new InvalidArgumentException('The fragment container must be attached to the document.');
         }
 
         return new self($document, $container, true);
@@ -50,6 +55,14 @@ final readonly class LoadedDocument
     public function root(): Element
     {
         return $this->root;
+    }
+
+    /**
+     * The underlying document, e.g. to create nodes in it. Fragments live in it too.
+     */
+    public function htmlDocument(): HTMLDocument
+    {
+        return $this->document;
     }
 
     public function isFragment(): bool

@@ -216,6 +216,29 @@ final class SkipRulesTest extends TestCase
         self::assertTrue($rules->excludes($this->target('<div class="no-i18n"><p id="target">x</p></div>')));
     }
 
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function rawTextElements(): iterable
+    {
+        foreach (['script', 'style', 'xmp', 'iframe', 'noembed', 'noframes', 'noscript', 'plaintext', 'template'] as $name) {
+            yield $name => [$name];
+        }
+    }
+
+    /**
+     * Raw-text elements serialize their text unescaped, so translated text in them could become markup;
+     * template content is not reachable as children, so it cannot be translated in place.
+     */
+    #[Test]
+    #[DataProvider('rawTextElements')]
+    public function it_always_skips_raw_text_elements(string $name): void
+    {
+        $rules = SkipRules::defaults()->withoutElement($name);
+
+        self::assertTrue($rules->skipsSubtree($this->target(\sprintf('<p><%s id="target">x</%1$s></p>', $name))));
+    }
+
     #[Test]
     public function it_is_immutable(): void
     {
