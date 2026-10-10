@@ -6,7 +6,7 @@ use Rector\Config\RectorConfig;
 use Rector\PHPUnit\CodeQuality\Rector\Class_\PreferPHPUnitThisCallRector;
 
 return RectorConfig::configure()
-    ->withPaths([__DIR__ . '/src', __DIR__ . '/tests'])
+    ->withPaths([__DIR__ . '/src', __DIR__ . '/tests', __DIR__ . '/scripts'])
     ->withCache(__DIR__ . '/var/rector')
     ->withPhpSets()
     ->withPreparedSets(
