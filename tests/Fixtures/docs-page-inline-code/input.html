@@ -1,0 +1,6 @@
+<h1>Installation</h1>
+<p>Run <code>composer require mtubis/html-translator</code> and press <kbd>Enter</kbd>.</p>
+<p>Then create the translator with <code>new HtmlTranslator($provider)</code>; <var>$provider</var> is any provider.</p>
+<pre><code>$result = $translator->translate($html, Locale::fromString('pl'));
+echo $result->html();</code></pre>
+<p>The output of <samp>composer check</samp> must be green.</p>
