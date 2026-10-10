@@ -90,11 +90,24 @@ final class PseudoLocalizationProviderTest extends TestCase
         );
     }
 
+    /**
+     * @return iterable<string, array{Correction}>
+     */
+    public static function corrections(): iterable
+    {
+        yield 'broken translation' => [new Correction('[!! ç <g1>ð !!]', '- Close <g1> with </g1>.')];
+        yield 'missing from the answer' => [Correction::forMissingUnit()];
+    }
+
+    /**
+     * Only the presence of a correction matters (it marks a retry); its content is ignored.
+     */
     #[Test]
-    public function it_translates_corrupted_units_correctly_when_retried(): void
+    #[DataProvider('corrections')]
+    public function it_translates_corrupted_units_correctly_when_retried(Correction $correction): void
     {
         $provider = PseudoLocalizationProvider::corruptingEvery(2);
-        $retry = $this->batch([$this->unit('u2', 'c <g1>d</g1>')], ['u2' => new Correction('[!! ç <g1>ð !!]', '- Close <g1> with </g1>.')]);
+        $retry = $this->batch([$this->unit('u2', 'c <g1>d</g1>')], ['u2' => $correction]);
 
         self::assertSame(['u2' => '[!! ç <g1>ð</g1> !!]'], $provider->translate($retry)->translations);
     }

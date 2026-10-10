@@ -109,7 +109,8 @@ final readonly class HtmlTranslator
     }
 
     /**
-     * Sends the units, then sends the failed ones again (with feedback for invalid ones) up to $maxRetries times.
+     * Sends the units, then sends the failed ones again up to $maxRetries times, with feedback for invalid and
+     * missing ones (refused units are re-sent without feedback).
      * A ProviderException on the first call propagates; on a retry it turns the pending units into provider
      * failures, so translations that already succeeded are kept (ADR-0004).
      *
@@ -152,10 +153,15 @@ final readonly class HtmlTranslator
             foreach ($pending as $id => $unit) {
                 $translated = $result->translations[$id] ?? null;
 
+                if (isset($result->failures[$id])) {
+                    $failures[$id] = [$unit, IssueType::ProviderFailure, $result->failures[$id]];
+
+                    continue;
+                }
+
                 if (null === $translated) {
-                    $failures[$id] = isset($result->failures[$id])
-                        ? [$unit, IssueType::ProviderFailure, $result->failures[$id]]
-                        : [$unit, IssueType::MissingTranslation, ''];
+                    $failures[$id] = [$unit, IssueType::MissingTranslation, ''];
+                    $corrections[$id] = Correction::forMissingUnit();
 
                     continue;
                 }

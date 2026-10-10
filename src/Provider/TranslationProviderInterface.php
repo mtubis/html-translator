@@ -17,11 +17,11 @@ use HtmlTranslator\Exception\ProviderException;
  * - no other markup; attribute and title units (UnitKind::Attribute, UnitKind::Title) get no tags at all;
  * - not empty, no added surrounding whitespace;
  * - &, < and > escaped as &amp;, &lt;, &gt; (decoding is lenient, ADR-0009, but must not be relied on).
- * The core validates every translation and re-sends broken units with a Correction, up to the configured number of
- * corrective retries.
+ * The core validates every translation and re-sends broken units, and units missing from the answer, with a
+ * Correction, up to the configured number of corrective retries.
  *
- * Failures: a unit the provider cannot translate goes into BatchResult::$failures with a reason; it is re-sent like
- * a broken unit, so a refusal that will not change on retry still costs those calls. When the whole batch cannot be
+ * Failures: a unit the provider cannot translate goes into BatchResult::$failures with a reason; it is re-sent without
+ * a Correction, so a refusal that will not change on retry still costs those calls. When the whole batch cannot be
  * handled (service down after transport retries, unsupported locale pair, authentication), throw ProviderException,
  * and wrap transport and decoding errors in it: callers rely on every exception implementing TranslatorException.
  */

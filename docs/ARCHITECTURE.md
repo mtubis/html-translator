@@ -141,7 +141,7 @@ Adapters are written on **PSR-18 / PSR-17**, not vendor SDKs ([ADR-0002](adr/000
 
 ### 6.5 Validation and corrective retries
 - `StructureValidator` compares, per unit: the multiset of pseudo-tags, pairing/nesting, no unknown tags, no raw HTML, non-empty result. Plain-text units: no tags at all. Model output is decoded leniently by `Domain\UnitText::tokenize()` ([ADR-0009](adr/0009-lenient-decoding-of-model-output.md)); violation messages tell the model what to fix, because they are sent back in corrective retries.
-- Failed units are re-sent (only them) together with a precise error description, up to `maxCorrectiveRetries`. Then the `FallbackStrategy` applies and an `Issue` is recorded.
+- Failed units are re-sent (only them) together with a precise error description (`Correction`; units missing from the answer get one too, refused units do not), up to `maxCorrectiveRetries`. Then the `FallbackStrategy` applies and an `Issue` is recorded.
 
 ### 6.6 Reassembly
 - `Reassembler::apply()` is called once per segmented document with the complete map (replaced nodes leave the document). It checks every translation against its unit first (tags exactly once, in their form, properly nested); a mismatch throws and leaves the DOM untouched. Validation with retries happens before, in the orchestration.
