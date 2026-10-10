@@ -25,6 +25,8 @@ final class LocaleTest extends TestCase
         yield 'three-letter language' => ['fil', 'fil'];
         yield 'language and region' => ['pt-BR', 'pt-BR'];
         yield 'lower-case region is canonicalized' => ['de-ch', 'de-CH'];
+        yield 'upper-case language is canonicalized' => ['PL', 'pl'];
+        yield 'upper-case script is title-cased' => ['sr-LATN', 'sr-Latn'];
         yield 'underscore separator is accepted' => ['en_GB', 'en-GB'];
         yield 'script is title-cased' => ['zh-hant-tw', 'zh-Hant-TW'];
         yield 'numeric region' => ['es-419', 'es-419'];
