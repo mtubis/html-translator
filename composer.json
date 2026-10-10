@@ -1,5 +1,5 @@
 {
-    "name": "your-vendor/html-translator",
+    "name": "mtubis/html-translator",
     "description": "Translate HTML with LLMs (OpenAI, Anthropic, Gemini, Ollama, …) while preserving markup, semantics and document validity.",
     "type": "library",
     "license": "MIT",
