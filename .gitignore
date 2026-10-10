@@ -1,0 +1,9 @@
+/vendor/
+/var/
+/.phpunit.cache/
+/composer.lock
+/.env
+/.env.*
+!/.env.dist
+/.claude/settings.local.json
+/tools/eval/out/
