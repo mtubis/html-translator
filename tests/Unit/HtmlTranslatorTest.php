@@ -359,6 +359,41 @@ final class HtmlTranslatorTest extends TestCase
     }
 
     #[Test]
+    public function it_tells_the_provider_which_units_it_left_out(): void
+    {
+        $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => [] === $batch->corrections
+            ? new BatchResult(['u2' => '[!! Ɓ !!]'])
+            : new PseudoLocalizationProvider()->translate($batch));
+
+        $result = new HtmlTranslator($provider)->translate('<p>A</p><p>B</p>', Locale::fromString('pl'));
+
+        self::assertSame('<p>[!! Á !!]</p><p>[!! Ɓ !!]</p>', $result->html());
+        self::assertSame([], $result->issues());
+
+        $retry = $provider->batches[1] ?? self::fail('No retry.');
+        self::assertSame(['u1'], array_map(static fn(TranslationUnit $unit): string => $unit->id->toString(), $retry->units));
+        $correction = $retry->corrections['u1'] ?? self::fail('No correction for the missing unit.');
+        self::assertSame('', $correction->previousTranslation);
+        self::assertSame('- Translate the text; it was missing from your previous answer.', $correction->problems);
+    }
+
+    #[Test]
+    public function it_gives_corrections_to_missing_and_broken_units_but_not_to_refused_ones(): void
+    {
+        $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => [] === $batch->corrections
+            ? new BatchResult(['u3' => '[!! Ç <g1>ð !!]'], ['u1' => 'content policy'])
+            : new PseudoLocalizationProvider()->translate($batch));
+
+        new HtmlTranslator($provider)->translate('<p>A</p><p>B</p><p>C <b>d</b></p>', Locale::fromString('pl'));
+
+        $retry = $provider->batches[1] ?? self::fail('No retry.');
+        self::assertSame(['u1', 'u2', 'u3'], array_map(static fn(TranslationUnit $unit): string => $unit->id->toString(), $retry->units));
+        self::assertSame(['u2', 'u3'], array_keys($retry->corrections));
+        self::assertEquals(Correction::forMissingUnit(), $retry->corrections['u2'] ?? null);
+        self::assertSame('[!! Ç <g1>ð !!]', ($retry->corrections['u3'] ?? null)?->previousTranslation);
+    }
+
+    #[Test]
     public function it_reports_progress_once_per_batch(): void
     {
         $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => new PseudoLocalizationProvider()->translate($batch));
