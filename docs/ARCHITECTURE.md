@@ -27,7 +27,7 @@ The library is framework-agnostic. It depends only on PHP and PSR interfaces. Sy
 | **Document** | The HTML input: a full document (`<!DOCTYPE html>…`) or a fragment. |
 | **Translation unit** (`TranslationUnit`) | The smallest piece of text sent to the model: the inline content of one block element, or one translatable attribute value. Has a stable id within a document. |
 | **Inline tag** (`InlineTag`) | An inline element inside a unit, replaced by a numbered pseudo-tag before translation (see [ADR-0003](adr/0003-inline-markup-as-numbered-pseudo-tags.md)). |
-| **Skip rule** | A rule deciding that an element (and its subtree) is not translated: `script`, `style`, `code`, `pre`, `kbd`, `samp`, `var`, `[translate="no"]`, `.notranslate`, configurable. |
+| **Skip rule** (`SkipRules`) | A rule deciding that text is not translated. *Element rules* (`script`, `style`, `code`, `pre`, `kbd`, `samp`, `var`, `svg`, `math`, `template`) skip the whole subtree. The `translate` attribute and skip classes (`.notranslate`) are inherited per the HTML spec, so a descendant with `translate="yes"` is translated again. Configurable. |
 | **Locale / LocalePair** | BCP 47 language tags for source and target. Source may be "auto". |
 | **Translation profile** (`TranslationProfile`) | Everything that steers *how* text is translated: domain, register/formality, term policy, glossary, do-not-translate terms, free-form instructions. |
 | **Term policy** (`TermPolicy`) | Enum controlling loan words: `TranslateAll`, `PreferOriginalTechnicalTerms`, `KeepOriginal`… |
@@ -117,7 +117,7 @@ Adapters are written on **PSR-18 / PSR-17**, not vendor SDKs ([ADR-0002](adr/000
 - Round-trip guarantee: `serialize(load($html))` must be structurally identical to `$html` for every fixture when nothing is translated (tested).
 
 ### 6.2 Segmentation
-- Walk the tree; skip subtrees matched by `SkipRules`.
+- Walk the tree top-down. Prune only subtrees of skipped elements (`SkipRules::skipsSubtree()`); for everything else carry the inherited translate state (`SkipRules::translates($element, $parentTranslates)`), because `translate="yes"` below `translate="no"` or `.notranslate` re-enables translation.
 - A **block unit** is the inline content of the nearest block-level ancestor that directly contains non-whitespace text.
 - Inline elements inside a unit are encoded as numbered pseudo-tags: paired `<g1>…</g1>`, void `<x2/>`. Attributes are **never** sent with them ([ADR-0003](adr/0003-inline-markup-as-numbered-pseudo-tags.md)). The `TranslationUnit` keeps only the tag numbers and kinds (`InlineTag`); the mapping unit id + tag number → original DOM node is owned by the `Html` layer (`SegmentedDocument`, built by the `Segmenter`, consumed by the `Reassembler`) and never leaves it ([ADR-0007](adr/0007-inline-tag-mapping-lives-in-html-layer.md)).
 - Inline elements matched by skip rules (e.g. `<code>` inside a sentence) become opaque void placeholders — their content is not sent and cannot be changed.
