@@ -1,6 +1,6 @@
 # 0008. Unit text escapes &, < and >
 
-- Status: accepted
+- Status: accepted; decoding paragraph superseded by [0009](0009-lenient-decoding-of-model-output.md)
 - Date: 2026-10-10
 
 ## Context
@@ -13,7 +13,7 @@ Alternatives considered:
 ## Decision
 The text of every translation unit (block, attribute, title) is escaped like XML character data: `&` → `&amp;`, `<` → `&lt;`, `>` → `&gt;`. Pseudo-tags are the only unescaped `<`…`>` in unit text. The Segmenter (`InlineEncoder`) escapes; nothing else in the text is changed.
 
-When decoding model output (validator, reassembler): `&amp;`, `&lt;` and `&gt;` are the only recognised entities. A bare `&` or `>` is taken literally (models often unescape them). A bare `<` that does not start a valid pseudo-tag is a structure violation ("raw markup") and triggers a corrective retry. Decoded text is inserted as text nodes (ADR-0003), so escaping is about unambiguous parsing, not about injection.
+(Superseded by ADR-0009.) When decoding model output (validator, reassembler): `&amp;`, `&lt;` and `&gt;` are the only recognised entities. A bare `&` or `>` is taken literally (models often unescape them). A bare `<` that does not start a valid pseudo-tag is a structure violation ("raw markup") and triggers a corrective retry. Decoded text is inserted as text nodes (ADR-0003), so escaping is about unambiguous parsing, not about injection.
 
 ## Consequences
 - Units that talk about markup round-trip exactly.
