@@ -5,5 +5,13 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
-- Project skeleton, architecture documentation and ADRs 0001–0006.
-- `Locale` value object.
+- Project skeleton, architecture documentation and ADRs 0001–0010.
+- Domain value objects: `Locale`, `LocalePair`, `UnitId`, `InlineTag`, `TranslationUnit`, `UnitText`.
+- HTML pipeline: `HtmlLoader`, `SkipRules`, `TranslatableAttributes`, `Segmenter`, `InlineEncoder`, `Reassembler`.
+- `StructureValidator` with model-facing violation messages.
+- Provider port (`TranslationProviderInterface`, `TranslationBatch`, `BatchResult`, `Correction`) and
+  `PseudoLocalizationProvider`.
+- `HtmlTranslator` orchestration with corrective retries, fallback strategies, issues, stats and progress.
+- Golden fixture harness and seed corpus.
+- `BatchResult::$permanentFailures` for units that must not be retried; `ProviderException::fromHttpResponse()` with
+  `statusCode` and `vendorCode`.

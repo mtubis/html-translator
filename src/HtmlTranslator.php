@@ -33,6 +33,8 @@ use Psr\Log\LoggerInterface;
  *
  * Pipeline: load → segment → batches → provider → validation with corrective retries → fallback → reassembly.
  * Partial failures do not throw (ADR-0004): they become issues on the result, resolved by the FallbackStrategy.
+ *
+ * @phpstan-type Failure array{unit: TranslationUnit, type: IssueType, detail: string, permanent: bool, cause: ?ProviderException}
  */
 final readonly class HtmlTranslator
 {
@@ -110,14 +112,14 @@ final readonly class HtmlTranslator
 
     /**
      * Sends the units, then sends the failed ones again up to $maxRetries times, with feedback for invalid and
-     * missing ones (refused units are re-sent without feedback).
+     * missing ones; refused units are re-sent without feedback, permanently refused ones are not re-sent at all.
      * A ProviderException on the first call propagates; on a retry it turns the pending units into provider
-     * failures, so translations that already succeeded are kept (ADR-0004).
+     * failures (keeping the exception as their cause), so translations that already succeeded are kept (ADR-0004).
      *
      * @param list<TranslationUnit> $units
      *
-     * @return array{array<string, string>, array<string, array{TranslationUnit, IssueType, string}>, int}
-     *                                                                                                     valid translations, last failure per unit (unit, type, detail), units retried
+     * @return array{array<string, string>, array<string, Failure>, int} valid translations, the last failure of
+     *                                                                   each failed unit in document order, units retried
      */
     private function translateWithRetries(LocalePair $locales, array $units, int $maxRetries): array
     {
@@ -128,6 +130,7 @@ final readonly class HtmlTranslator
 
         $translations = [];
         $failures = [];
+        $permanent = [];
         $corrections = [];
         $retries = 0;
 
@@ -143,24 +146,30 @@ final readonly class HtmlTranslator
                     throw $exception;
                 }
 
-                $failures = array_map(static fn(TranslationUnit $unit): array => [$unit, IssueType::ProviderFailure, $exception->getMessage()], $pending);
+                $failures = array_map(fn(TranslationUnit $unit): array => $this->failure($unit, IssueType::ProviderFailure, $exception->getMessage(), cause: $exception), $pending);
 
                 break;
             }
+
             $corrections = [];
             $failures = [];
 
             foreach ($pending as $id => $unit) {
-                $translated = $result->translations[$id] ?? null;
-
-                if (isset($result->failures[$id])) {
-                    $failures[$id] = [$unit, IssueType::ProviderFailure, $result->failures[$id]];
+                if (isset($result->permanentFailures[$id])) {
+                    $permanent[$id] = $this->failure($unit, IssueType::ProviderFailure, $result->permanentFailures[$id], permanent: true);
 
                     continue;
                 }
 
+                if (isset($result->failures[$id])) {
+                    $failures[$id] = $this->failure($unit, IssueType::ProviderFailure, $result->failures[$id]);
+
+                    continue;
+                }
+
+                $translated = $result->translations[$id] ?? null;
                 if (null === $translated) {
-                    $failures[$id] = [$unit, IssueType::MissingTranslation, ''];
+                    $failures[$id] = $this->failure($unit, IssueType::MissingTranslation, '');
                     $corrections[$id] = Correction::forMissingUnit();
 
                     continue;
@@ -173,18 +182,35 @@ final readonly class HtmlTranslator
                     continue;
                 }
 
-                $failures[$id] = [$unit, IssueType::InvalidStructure, $validation->describe()];
+                $failures[$id] = $this->failure($unit, IssueType::InvalidStructure, $validation->describe());
                 $corrections[$id] = new Correction($translated, $validation->describe());
             }
 
             $pending = array_intersect_key($pending, $failures);
         }
 
-        return [$translations, $failures, $retries];
+        $failed = [];
+        foreach ($units as $unit) {
+            $id = $unit->id->toString();
+            $failure = $permanent[$id] ?? $failures[$id] ?? null;
+            if (null !== $failure) {
+                $failed[$id] = $failure;
+            }
+        }
+
+        return [$translations, $failed, $retries];
     }
 
     /**
-     * @param array<string, array{TranslationUnit, IssueType, string}> $failures
+     * @return Failure
+     */
+    private function failure(TranslationUnit $unit, IssueType $type, string $detail, bool $permanent = false, ?ProviderException $cause = null): array
+    {
+        return ['unit' => $unit, 'type' => $type, 'detail' => $detail, 'permanent' => $permanent, 'cause' => $cause];
+    }
+
+    /**
+     * @param array<string, Failure> $failures
      *
      * @return array{array<string, string>, list<Issue>, bool} translations, issues, whether every unit is translated
      */
@@ -193,19 +219,20 @@ final readonly class HtmlTranslator
         $issues = [];
         $failedUnits = [];
 
-        foreach ($failures as $id => [$unit, $type, $detail]) {
-            $message = $this->failureMessage($id, $type, $detail, $options->maxCorrectiveRetries);
+        foreach ($failures as $id => $failure) {
+            $message = $this->failureMessage($id, $failure['type'], $failure['detail'], $failure['permanent'], $options->maxCorrectiveRetries);
 
             if (FallbackStrategy::Throw === $options->fallback) {
-                throw IssueType::InvalidStructure === $type ? new StructureValidationException($message) : new ProviderException($message);
+                // The provider's own exception (status, vendor code) stays reachable as the previous one.
+                throw IssueType::InvalidStructure === $failure['type'] ? new StructureValidationException($message) : new ProviderException($message, 0, $failure['cause']);
             }
 
             if (FallbackStrategy::TextNodesOnly === $options->fallback) {
                 $message .= "\nIts text nodes were sent for translation separately.";
             }
 
-            $issues[] = new Issue($unit->id, $type, $message);
-            $failedUnits[] = $unit;
+            $issues[] = new Issue($failure['unit']->id, $failure['type'], $message);
+            $failedUnits[] = $failure['unit'];
         }
 
         if (FallbackStrategy::KeepOriginal === $options->fallback) {
@@ -217,10 +244,10 @@ final readonly class HtmlTranslator
         return [$translations, [...$issues, ...$partialIssues], [] === $partialIssues];
     }
 
-    private function failureMessage(string $id, IssueType $type, string $detail, int $maxRetries): string
+    private function failureMessage(string $id, IssueType $type, string $detail, bool $permanent, int $maxRetries): string
     {
         return match ($type) {
-            IssueType::ProviderFailure => \sprintf('The provider could not translate unit "%s": %s', $id, $detail),
+            IssueType::ProviderFailure => \sprintf('The provider could not translate unit "%s"%s: %s', $id, $permanent ? ' (permanent failure)' : '', $detail),
             IssueType::MissingTranslation => \sprintf('The provider returned no translation for unit "%s".', $id),
             IssueType::InvalidStructure, IssueType::PartiallyTranslated => \sprintf(
                 "The translation of unit \"%s\" is still invalid after %d corrective %s:\n%s",
@@ -288,7 +315,7 @@ final readonly class HtmlTranslator
                 $pieceId = $piece->id->toString();
                 $translated = $result?->translations[$pieceId] ?? null;
                 $reason = null === $translated
-                    ? ($result?->failures[$pieceId] ?? $providerError)
+                    ? ($result?->failures[$pieceId] ?? $result?->permanentFailures[$pieceId] ?? $providerError)
                     : ($this->validator->validate($piece, $translated)->isValid() ? null : 'invalid translation');
 
                 if (null === $reason) {

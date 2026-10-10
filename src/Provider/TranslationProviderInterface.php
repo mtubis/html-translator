@@ -20,10 +20,18 @@ use HtmlTranslator\Exception\ProviderException;
  * The core validates every translation and re-sends broken units, and units missing from the answer, with a
  * Correction, up to the configured number of corrective retries.
  *
- * Failures: a unit the provider cannot translate goes into BatchResult::$failures with a reason; it is re-sent without
- * a Correction, so a refusal that will not change on retry still costs those calls. When the whole batch cannot be
- * handled (service down after transport retries, unsupported locale pair, authentication), throw ProviderException,
- * and wrap transport and decoding errors in it: callers rely on every exception implementing TranslatorException.
+ * Failures: a unit the provider cannot translate goes into BatchResult::$failures with a reason and is re-sent without
+ * a Correction. If retrying cannot help (content filter, unsupported language for that unit), put it into
+ * BatchResult::$permanentFailures instead: it gets no corrective retries and the fallback strategy applies right away
+ * (with TextNodesOnly its text nodes are sent once more). Reasons end up in issues and logs, so they must never contain
+ * API keys, tokens or other credentials.
+ *
+ * When the whole batch cannot be handled (service down after transport retries, unsupported locale pair,
+ * authentication), throw ProviderException, and wrap transport and decoding errors in it: callers rely on every
+ * exception implementing TranslatorException. The core does not retry a batch that threw: transport retries
+ * (429/5xx, Retry-After, backoff) belong in the provider. A ProviderException on the first call of a batch reaches the
+ * caller as it is; on a corrective retry it becomes issues, and with FallbackStrategy::Throw it is the previous
+ * exception of the one thrown.
  */
 interface TranslationProviderInterface
 {
