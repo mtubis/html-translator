@@ -20,7 +20,9 @@ ADR-0002 (PSR-18/17 instead of SDKs), ADR-0005, skill `add-translation-provider`
 ## Open questions (decide before starting)
 - Runtime dependency `psr/http-message` (types of PSR-18/17 requests and responses; only a PSR interface package).
 - Dev dependency for a PSR-7/17 implementation in tests (e.g. `nyholm/psr7`) and whether to use `php-http/mock-client` or a hand-written fake client.
-- Transport retries with backoff for 429/5xx: ARCHITECTURE §6.8 puts them in adapters, ROADMAP schedules them for 0.4. Proposal: 0.2 maps errors only, retries in 0.4.
+
+## Decided
+- Transport retries with backoff for 429/5xx are not part of this issue: 0.2 maps errors only, retries come with the shared retry helper in 0.4 (ARCHITECTURE §6.8, ROADMAP).
 
 ## Out of scope
-`AnthropicChatModel` (0.3), streaming, transport retries (0.4 unless decided otherwise).
+`AnthropicChatModel` (0.3), streaming, transport retries (0.4).
