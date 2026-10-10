@@ -23,6 +23,15 @@ final readonly class SkipRules
 {
     private const string ELEMENT_NAME = '/^[a-z][a-z0-9-]*\z/';
 
+    /**
+     * Always skipped, whatever the configuration (withoutElement() cannot lift them):
+     * - raw-text elements serialize their text unescaped, so translated text inside them could become live markup
+     *   (noscript too: browsers with scripting treat it as raw text, although PHP parses its content as elements);
+     * - template content is not reachable as children, so it cannot be translated in place.
+     * The Reassembler relies on this list as well.
+     */
+    public const array ALWAYS_SKIPPED_ELEMENTS = ['script', 'style', 'xmp', 'iframe', 'noembed', 'noframes', 'noscript', 'plaintext', 'template'];
+
     private const string HTML_WHITESPACE = " \t\n\f\r";
 
     /**
@@ -38,7 +47,8 @@ final readonly class SkipRules
     {
         return new self(
             // textarea content is a form field's default value, i.e. data (interface text lives in placeholder).
-            ['script', 'style', 'code', 'pre', 'kbd', 'samp', 'var', 'svg', 'math', 'template', 'textarea'],
+            // script, style and template are in ALWAYS_SKIPPED_ELEMENTS, skipped regardless of configuration.
+            ['code', 'pre', 'kbd', 'samp', 'var', 'svg', 'math', 'textarea'],
             ['notranslate'],
         );
     }
@@ -81,7 +91,9 @@ final readonly class SkipRules
      */
     public function skipsSubtree(Element $element): bool
     {
-        return \in_array(strtolower($element->localName), $this->elements, true);
+        $name = strtolower($element->localName);
+
+        return \in_array($name, self::ALWAYS_SKIPPED_ELEMENTS, true) || \in_array($name, $this->elements, true);
     }
 
     /**
