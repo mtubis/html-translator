@@ -347,6 +347,136 @@ final class HtmlTranslatorTest extends TestCase
         self::assertSame([], $provider->batches[1]->corrections, 'Refused units are re-sent without a correction.');
     }
 
+    /**
+     * Answers by attempt: $script[attempt] maps unit id → 'timeout' | 'policy' | 'throw'; other units are translated.
+     *
+     * @param list<array<string, string>> $script
+     */
+    private function scriptedProvider(array $script): CallbackProvider
+    {
+        $attempt = 0;
+
+        return new CallbackProvider(static function (TranslationBatch $batch) use ($script, &$attempt): BatchResult {
+            $answers = $script[$attempt++] ?? [];
+            $translations = [];
+            $failures = [];
+            $permanent = [];
+
+            foreach ($batch->units as $unit) {
+                $id = $unit->id->toString();
+                match ($answers[$id] ?? 'ok') {
+                    'timeout' => $failures[$id] = 'timeout',
+                    'policy' => $permanent[$id] = 'content policy',
+                    'throw' => throw ProviderException::fromHttpResponse(503, 'Service unavailable.', 'overloaded'),
+                    default => $translations += new PseudoLocalizationProvider()->translate(new TranslationBatch($batch->locales, [$unit]))->translations,
+                };
+            }
+
+            return new BatchResult($translations, $failures, $permanent);
+        });
+    }
+
+    /**
+     * @return list<list<string>>
+     */
+    private function sentUnits(CallbackProvider $provider): array
+    {
+        return array_map(
+            static fn(TranslationBatch $batch): array => array_map(static fn(TranslationUnit $unit): string => $unit->id->toString(), $batch->units),
+            $provider->batches,
+        );
+    }
+
+    #[Test]
+    public function it_does_not_retry_permanent_failures(): void
+    {
+        $provider = $this->scriptedProvider([['u1' => 'timeout', 'u2' => 'policy'], ['u1' => 'timeout'], ['u1' => 'timeout']]);
+
+        $result = new HtmlTranslator($provider)->translate('<p>A</p><p>B</p>', Locale::fromString('pl'));
+
+        self::assertSame([['u1', 'u2'], ['u1'], ['u1']], $this->sentUnits($provider));
+        self::assertSame(2, $result->stats()->retries);
+        self::assertSame(
+            [
+                ['u1', 'ProviderFailure', 'The provider could not translate unit "u1": timeout'],
+                ['u2', 'ProviderFailure', 'The provider could not translate unit "u2" (permanent failure): content policy'],
+            ],
+            $this->issues($result),
+            'Issues follow document order.',
+        );
+    }
+
+    #[Test]
+    public function it_stops_retrying_a_unit_that_fails_permanently_on_a_retry(): void
+    {
+        $provider = $this->scriptedProvider([['u1' => 'timeout'], ['u1' => 'policy']]);
+
+        $result = new HtmlTranslator($provider)->translate('<p>A</p>', Locale::fromString('pl'));
+
+        self::assertSame([['u1'], ['u1']], $this->sentUnits($provider));
+        self::assertSame(1, $result->stats()->retries);
+        self::assertSame([['u1', 'ProviderFailure', 'The provider could not translate unit "u1" (permanent failure): content policy']], $this->issues($result));
+    }
+
+    #[Test]
+    public function it_keeps_permanent_failures_when_the_provider_throws_on_a_retry(): void
+    {
+        $provider = $this->scriptedProvider([['u1' => 'policy', 'u2' => 'timeout'], ['u2' => 'throw']]);
+
+        $result = new HtmlTranslator($provider)->translate('<p>A</p><p>B</p>', Locale::fromString('pl'));
+
+        self::assertSame(
+            [
+                ['u1', 'ProviderFailure', 'The provider could not translate unit "u1" (permanent failure): content policy'],
+                ['u2', 'ProviderFailure', 'The provider could not translate unit "u2": Service unavailable.'],
+            ],
+            $this->issues($result),
+        );
+    }
+
+    #[Test]
+    public function it_throws_a_permanent_failure_without_retrying_when_the_fallback_is_throw(): void
+    {
+        $provider = $this->scriptedProvider([['u1' => 'policy']]);
+
+        try {
+            new HtmlTranslator($provider)->translate('<p>A</p>', Locale::fromString('pl'), new TranslationOptions(fallback: FallbackStrategy::Throw));
+            self::fail('Expected exception was not thrown.');
+        } catch (ProviderException $exception) {
+            self::assertSame('The provider could not translate unit "u1" (permanent failure): content policy', $exception->getMessage());
+        }
+
+        self::assertCount(1, $provider->batches);
+    }
+
+    #[Test]
+    public function it_keeps_the_provider_details_when_a_retry_fails_and_the_fallback_is_throw(): void
+    {
+        $provider = $this->scriptedProvider([['u1' => 'timeout'], ['u1' => 'throw']]);
+
+        try {
+            new HtmlTranslator($provider)->translate('<p>A</p>', Locale::fromString('pl'), new TranslationOptions(fallback: FallbackStrategy::Throw));
+            self::fail('Expected exception was not thrown.');
+        } catch (ProviderException $exception) {
+            self::assertSame('The provider could not translate unit "u1": Service unavailable.', $exception->getMessage());
+            $cause = $exception->getPrevious();
+            self::assertInstanceOf(ProviderException::class, $cause);
+            self::assertSame(503, $cause->statusCode);
+            self::assertSame('overloaded', $cause->vendorCode);
+        }
+    }
+
+    #[Test]
+    public function it_reports_permanent_failures_of_text_nodes_in_the_fallback(): void
+    {
+        $provider = $this->scriptedProvider([['u1' => 'policy'], ['u1-1' => 'policy']]);
+
+        $result = new HtmlTranslator($provider)->translate('<p>Hello <b>world</b></p>', Locale::fromString('pl'), new TranslationOptions(fallback: FallbackStrategy::TextNodesOnly));
+
+        self::assertSame('<p>Hello <b>[!! ŵöŕļð !!]</b></p>', $result->html());
+        self::assertSame('Unit "u1": 1 of 2 text nodes kept their original text (content policy).', ($result->issues()[1] ?? null)?->message);
+    }
+
     #[Test]
     public function it_records_units_the_provider_left_out(): void
     {
