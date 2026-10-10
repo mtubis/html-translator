@@ -27,7 +27,7 @@ The library is framework-agnostic. It depends only on PHP and PSR interfaces. Sy
 | **Document** | The HTML input: a full document (`<!DOCTYPE html>…`) or a fragment. |
 | **Translation unit** (`TranslationUnit`) | The smallest piece of text sent to the model: one run of inline content inside a block element, the document `<title>`, or one translatable attribute value. Has a stable id within a document. |
 | **Inline tag** (`InlineTag`) | An inline element inside a unit, replaced by a numbered pseudo-tag before translation (see [ADR-0003](adr/0003-inline-markup-as-numbered-pseudo-tags.md)). |
-| **Skip rule** (`SkipRules`) | A rule deciding that text is not translated. *Element rules* (`script`, `style`, `code`, `pre`, `kbd`, `samp`, `var`, `svg`, `math`, `template`, `textarea`) skip the element's content and whole subtree; translatable attributes of the skipped element itself (e.g. `svg aria-label`, `textarea placeholder`) are still translated. The `translate` attribute and skip classes (`.notranslate`) are inherited per the HTML spec, so a descendant with `translate="yes"` is translated again. Configurable. |
+| **Skip rule** (`SkipRules`) | A rule deciding that text is not translated. *Element rules* (`code`, `pre`, `kbd`, `samp`, `var`, `svg`, `math`, `textarea`; always, whatever the configuration: raw-text elements `script`, `style`, `xmp`, `iframe`, `noembed`, `noframes`, `noscript`, `plaintext`, whose text is serialized unescaped, and `template`, whose content is not reachable as children) skip the element's content and whole subtree; translatable attributes of the skipped element itself (e.g. `svg aria-label`, `textarea placeholder`) are still translated. The `translate` attribute and skip classes (`.notranslate`) are inherited per the HTML spec, so a descendant with `translate="yes"` is translated again. Configurable. |
 | **Locale / LocalePair** | BCP 47 language tags for source and target. Source may be "auto". |
 | **Translation profile** (`TranslationProfile`) | Everything that steers *how* text is translated: domain, register/formality, term policy, glossary, do-not-translate terms, free-form instructions. |
 | **Term policy** (`TermPolicy`) | Enum controlling loan words: `TranslateAll`, `PreferOriginalTechnicalTerms`, `KeepOriginal`… |
@@ -141,8 +141,11 @@ Adapters are written on **PSR-18 / PSR-17**, not vendor SDKs ([ADR-0002](adr/000
 - Failed units are re-sent (only them) together with a precise error description, up to `maxCorrectiveRetries`. Then the `FallbackStrategy` applies and an `Issue` is recorded.
 
 ### 6.6 Reassembly
-- Pseudo-tags are decoded back to clones of the original elements (with original attributes), text nodes are created from the translation (never parsed as HTML — no injection path from model output into markup).
-- Document-level updates (`lang`, `dir`) are applied, the document is serialized.
+- `Reassembler::apply()` is called once per segmented document with the complete map (replaced nodes leave the document). It checks every translation against its unit first (tags exactly once, in their form, properly nested); a mismatch throws and leaves the DOM untouched. Validation with retries happens before, in the orchestration.
+- Attribute units are applied before runs, so clones carry translated attributes.
+- Pseudo-tags are decoded (`Domain\UnitText::tokenize()`, [ADR-0009](adr/0009-lenient-decoding-of-model-output.md)) back to clones of the original nodes: `<gN>` shallow with the translated content inside, `<xN/>` deep (void elements, opaque elements and comments with their original subtree). Text — including anything that looks like markup — becomes text nodes only, never parsed as HTML and never placed inside a raw-text element: no injection path from model output into markup. Template contents in opaque subtrees are copied from the original markup (PHP 8.4 `cloneNode()` drops them).
+- An `<option>` without `value` whose text changes gets its original text as `value`, so the form submits the same data.
+- Document-level updates: `<html lang>` is set to the target, `dir="rtl"` for right-to-left targets (`dir="ltr"` if a `dir` was present otherwise). Fragments have no element for these and are left as they are. Then the document is serialized.
 
 ### 6.7 Caching
 - Optional PSR-6 pool. Key = hash of (normalized unit text, locale pair, profile fingerprint, provider/model id, prompt version). Unit-level caching makes re-translating a slightly edited page cheap.
