@@ -1,6 +1,6 @@
 # 0007. Inline tag to DOM node mapping lives in the Html layer
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-10
 - Supersedes: the mapping clause of [0003](0003-inline-markup-as-numbered-pseudo-tags.md) ("The unit keeps the mapping N → original DOM node"). The rest of 0003 stands.
 
