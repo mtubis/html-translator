@@ -16,7 +16,7 @@ PHP 8.4+ (uses the native HTML5 parser `Dom\HTMLDocument`).
 ## Installation
 
 ```bash
-composer require your-vendor/html-translator
+composer require mtubis/html-translator
 ```
 
 ## Quick start
