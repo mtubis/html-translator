@@ -175,7 +175,7 @@ src/
   Provider/Llm/Testing/         FakeChatModel, ChatModelContractTestCase (+ ChatScenario, RecordedChatRequest; needs phpunit, suggested)
   Provider/Llm/Bridge/OpenAiCompatible/   OpenAiCompatibleChatModel
   Provider/Llm/Bridge/Anthropic/          AnthropicChatModel
-  Provider/Testing/             PseudoLocalizationProvider
+  Provider/Testing/             PseudoLocalizationProvider, TranslationProviderContractTestCase (needs phpunit, suggested)
   Cache/                        UnitCache, CacheKey
   Exception/                    TranslatorException (interface), InvalidHtmlException, ProviderException, StructureValidationException, InvalidArgumentException
 tests/
@@ -197,8 +197,8 @@ Dependency rule (checked by the `architecture-reviewer` agent and later by a PHP
 | Layer | What | Runs |
 |---|---|---|
 | Unit | Value objects, encoder, validator, prompt builder, parser | always |
-| Fixture (golden) | `tests/Fixtures/<name>/input.html` through the full pipeline with `PseudoLocalizationProvider`, compared with `expected.pseudo.html` (`tests/Integration/GoldenFixturesTest`, no group; regenerate with `composer fixtures:update -- <name>`) | always |
-| Contract | `TranslationProviderContractTestCase` / `ChatModelContractTestCase` every adapter must pass | always (with fake HTTP) |
+| Fixture (golden) | `tests/Fixtures/<name>/input.html` through the full pipeline with `PseudoLocalizationProvider`, and again with `LlmTranslationProvider` on `PseudoLocalizingChatModel` (same expected file), compared with `expected.pseudo.html` (`tests/Integration/GoldenFixturesTest`, no group; regenerate with `composer fixtures:update -- <name>`) | always |
+| Contract | `TranslationProviderContractTestCase` / `ChatModelContractTestCase` every provider and adapter must pass; both ship in `src/` (`Provider\Testing`, `Provider\Llm\Testing`) for implementations in other packages, run from `tests/Contract` | always (with fake HTTP or a fake chat model) |
 | Integration | Real APIs, `#[Group('integration')]`, needs env vars (tests in `tests/Integration` without that group, such as the golden fixtures, run always) | manual / nightly |
 | Mutation | Infection on `src/` | CI, MSI threshold |
 | Eval | `tools/eval` — real models × fixtures × profiles, structural pass-rate report | manual |
