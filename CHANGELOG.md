@@ -22,3 +22,5 @@ All notable changes to this project are documented here. The format follows [Kee
   permanently) and the reusable `TranslationProviderContractTestCase`.
 - `OpenAiCompatibleChatModel` and `OpenAiCompatibleConfig` with presets for OpenAI, Gemini, Ollama, vLLM and LM Studio;
   `docs/providers.md`. Runtime dependency `psr/http-message`.
+- Integration tests for OpenAI-compatible providers (`composer test:integration`, configured from `.env`) and
+  `tools/eval`, a structural report of a real model over the golden fixtures.
