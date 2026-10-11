@@ -15,3 +15,5 @@ All notable changes to this project are documented here. The format follows [Kee
 - Golden fixture harness and seed corpus.
 - `BatchResult::$permanentFailures` for units that must not be retried; `ProviderException::fromHttpResponse()` with
   `statusCode` and `vendorCode`.
+- Chat model port (`Provider\Llm`: `ChatModelInterface`, `ChatRequest`, `ChatMessage`, `ChatRole`, `ChatResponse`,
+  `FinishReason`), `FakeChatModel` and the reusable `ChatModelContractTestCase`.
