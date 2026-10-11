@@ -7,6 +7,7 @@ namespace HtmlTranslator\Tests\Support;
 use HtmlTranslator\Domain\Locale;
 use HtmlTranslator\HtmlTranslator;
 use HtmlTranslator\Provider\Testing\PseudoLocalizationProvider;
+use HtmlTranslator\Provider\TranslationProviderInterface;
 use HtmlTranslator\TranslatedDocument;
 use HtmlTranslator\TranslationOptions;
 use JsonException;
@@ -16,7 +17,8 @@ use UnexpectedValueException;
  * Golden fixtures: every directory in tests/Fixtures/ with an input.html is one fixture, translated with
  * PseudoLocalizationProvider and compared with its expected.pseudo.html. An optional options.json sets
  * {"target": "ar", "source": "en"} (default target: pl, source: auto). Shared by GoldenFixturesTest and
- * scripts/update-fixtures.php.
+ * scripts/update-fixtures.php. Any provider that pseudo-localises like PseudoLocalizationProvider must produce the
+ * same expected file (e.g. LlmTranslationProvider on PseudoLocalizingChatModel).
  */
 final class GoldenFixtures
 {
@@ -66,11 +68,11 @@ final class GoldenFixtures
         return is_file($file) ? self::read($file) : null;
     }
 
-    public static function translate(string $directory): TranslatedDocument
+    public static function translate(string $directory, ?TranslationProviderInterface $provider = null): TranslatedDocument
     {
         [$target, $source] = self::options($directory);
 
-        return new HtmlTranslator(new PseudoLocalizationProvider())
+        return new HtmlTranslator($provider ?? new PseudoLocalizationProvider())
             ->translate(self::input($directory), Locale::fromString($target), new TranslationOptions(source: null === $source ? null : Locale::fromString($source)));
     }
 

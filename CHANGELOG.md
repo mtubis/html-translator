@@ -18,3 +18,5 @@ All notable changes to this project are documented here. The format follows [Kee
 - Chat model port (`Provider\Llm`: `ChatModelInterface`, `ChatRequest`, `ChatMessage`, `ChatRole`, `ChatResponse`,
   `FinishReason`), `FakeChatModel` and the reusable `ChatModelContractTestCase`.
 - `PromptBuilder` and `ResponseParser`: the versioned prompt and the JSON unit format of the LLM provider (ADR-0011).
+- `LlmTranslationProvider` (prompt, chat model, parser; one retry for an unparsable answer, refused batches fail
+  permanently) and the reusable `TranslationProviderContractTestCase`.
