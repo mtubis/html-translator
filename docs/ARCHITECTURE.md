@@ -170,10 +170,12 @@ src/
   Validation/                   StructureValidator, ValidationResult, Violation, ViolationType
   Batching/                     Batcher, TokenEstimator
   Provider/                     TranslationProviderInterface, TranslationBatch, BatchResult
-  Provider/Llm/                 LlmTranslationProvider, PromptBuilder, ResponseParser, ChatModelInterface, ChatRequest, ChatResponse
+  Provider/Llm/                 LlmTranslationProvider, PromptBuilder, ResponseParser, ChatModelInterface, ChatRequest, ChatResponse,
+                                ChatMessage, ChatRole, FinishReason
+  Provider/Llm/Testing/         FakeChatModel, ChatModelContractTestCase (+ ChatScenario, RecordedChatRequest; needs phpunit, suggested)
   Provider/Llm/Bridge/OpenAiCompatible/   OpenAiCompatibleChatModel
   Provider/Llm/Bridge/Anthropic/          AnthropicChatModel
-  Provider/Testing/             PseudoLocalizationProvider, FakeChatModel
+  Provider/Testing/             PseudoLocalizationProvider
   Cache/                        UnitCache, CacheKey
   Exception/                    TranslatorException (interface), InvalidHtmlException, ProviderException, StructureValidationException, InvalidArgumentException
 tests/

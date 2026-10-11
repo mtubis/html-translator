@@ -18,6 +18,9 @@
         "psr/http-factory": "^1.1",
         "psr/log": "^3.0"
     },
+    "suggest": {
+        "phpunit/phpunit": "To run Provider\\Llm\\Testing\\ChatModelContractTestCase against your own chat model adapter"
+    },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.95",
         "infection/infection": "^0.35.6",
