@@ -7,7 +7,8 @@
             "Provider/Llm/Testing/ChatModelContractTestCase.php",
             "Provider/Llm/Testing/ChatScenario.php",
             "Provider/Llm/Testing/ChatScenarioKind.php",
-            "Provider/Llm/Testing/RecordedChatRequest.php"
+            "Provider/Llm/Testing/RecordedChatRequest.php",
+            "Provider/Testing/TranslationProviderContractTestCase.php"
         ]
     },
     "phpUnit": {
