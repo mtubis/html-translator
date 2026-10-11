@@ -135,9 +135,9 @@ Adapters are written on **PSR-18 / PSR-17**, not vendor SDKs ([ADR-0002](adr/000
 - Each batch carries document context hints: page title, neighbouring headings (helps the model with ambiguous short strings such as button labels).
 
 ### 6.4 Provider call (LLM)
-- `PromptBuilder` renders a system prompt from the `TranslationProfile` plus the pseudo-tag rules, and a user message containing units as JSON (`[{"id": "u12", "text": "…"}]`).
-- The model must answer with JSON of the same shape. `ResponseParser` tolerates code fences and minor JSON noise; anything else is an error for that batch.
-- The prompt template has a **version string**; it is part of the cache key.
+- `PromptBuilder::build(TranslationBatch): ChatRequest` renders a system prompt with the pseudo-tag rules (plus the `TranslationProfile` from 0.3) and a user message containing units as a JSON object (`{"units": [{"id": "u12", "kind": "block", "text": "…"}]}`), with the previous answer and the problems for units that are retried.
+- The model must answer with a JSON object `{"units": [{"id": "u12", "text": "…"}]}`. `ResponseParser::parse(ChatResponse, TranslationBatch): BatchResult` takes the first JSON value with that shape, skipping code fences and prose around it, drops trailing commas and surrounding whitespace of texts; anything else is a `ProviderException` for that batch. See [ADR-0011](adr/0011-prompt-and-response-format-of-the-llm-provider.md).
+- The prompt has a **version string** (`PromptBuilder::VERSION`); it is part of the cache key.
 
 ### 6.5 Validation and corrective retries
 - `StructureValidator` compares, per unit: the multiset of pseudo-tags, pairing/nesting, no unknown tags, no raw HTML, non-empty result. Plain-text units: no tags at all. Model output is decoded leniently by `Domain\UnitText::tokenize()` ([ADR-0009](adr/0009-lenient-decoding-of-model-output.md)); violation messages tell the model what to fix, because they are sent back in corrective retries.
