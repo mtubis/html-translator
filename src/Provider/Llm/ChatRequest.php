@@ -56,7 +56,7 @@ final readonly class ChatRequest
 
         // NAN compares false with everything, so it needs its own check.
         if (null !== $temperature && (is_nan($temperature) || $temperature < 0.0 || $temperature > 2.0)) {
-            throw new InvalidArgumentException(\sprintf('Temperature must be between 0 and 2, got %s.', $temperature));
+            throw new InvalidArgumentException(\sprintf('Temperature must be between 0 and 2, got %s.', var_export($temperature, true)));
         }
 
         if (null !== $maxOutputTokens && $maxOutputTokens < 1) {
