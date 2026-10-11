@@ -173,7 +173,7 @@ src/
   Provider/Llm/                 LlmTranslationProvider, PromptBuilder, ResponseParser, ChatModelInterface, ChatRequest, ChatResponse,
                                 ChatMessage, ChatRole, FinishReason
   Provider/Llm/Testing/         FakeChatModel, ChatModelContractTestCase (+ ChatScenario, RecordedChatRequest; needs phpunit, suggested)
-  Provider/Llm/Bridge/OpenAiCompatible/   OpenAiCompatibleChatModel
+  Provider/Llm/Bridge/OpenAiCompatible/   OpenAiCompatibleChatModel, OpenAiCompatibleConfig
   Provider/Llm/Bridge/Anthropic/          AnthropicChatModel
   Provider/Testing/             PseudoLocalizationProvider, TranslationProviderContractTestCase (needs phpunit, suggested)
   Cache/                        UnitCache, CacheKey

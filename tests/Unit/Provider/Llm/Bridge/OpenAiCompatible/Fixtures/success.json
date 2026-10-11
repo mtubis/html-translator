@@ -1,0 +1,25 @@
+{
+  "id": "chatcmpl-AbC123",
+  "object": "chat.completion",
+  "created": 1791700000,
+  "model": "gpt-4o-mini-2024-07-18",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"units\": [{\"id\": \"u1\", \"text\": \"Cześć <g1>świecie</g1>\"}]}",
+        "refusal": null,
+        "annotations": []
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 412,
+    "completion_tokens": 23,
+    "total_tokens": 435
+  },
+  "system_fingerprint": "fp_0123456789"
+}

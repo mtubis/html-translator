@@ -1,0 +1,21 @@
+{
+  "id": "chatcmpl-local-1",
+  "object": "chat.completion",
+  "created": 1791700000,
+  "model": "llama3.1:8b",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "```json\n{\"units\": [{\"id\": \"u1\", \"text\": \"Cześć\"}]}\n```"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 380,
+    "completion_tokens": 31,
+    "total_tokens": 411
+  }
+}

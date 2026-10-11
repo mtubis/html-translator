@@ -1,0 +1,12 @@
+{
+  "id": "chatcmpl-local-2",
+  "object": "chat.completion",
+  "created": 1791700000,
+  "model": "gemini-2.5-flash",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "content_filter"
+    }
+  ]
+}

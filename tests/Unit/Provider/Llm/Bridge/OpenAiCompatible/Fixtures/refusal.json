@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-AbC126",
+  "object": "chat.completion",
+  "created": 1791700000,
+  "model": "gpt-4o-2024-08-06",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "refusal": "I'm sorry, I can't assist with that request."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 412,
+    "completion_tokens": 12,
+    "total_tokens": 424
+  }
+}

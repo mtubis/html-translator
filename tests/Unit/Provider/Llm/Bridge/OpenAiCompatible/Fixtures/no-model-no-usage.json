@@ -1,0 +1,11 @@
+{
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"units\": [{\"id\": \"u1\", \"text\": \"Cześć\"}]}"
+      }
+    }
+  ]
+}
