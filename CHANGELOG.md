@@ -20,3 +20,5 @@ All notable changes to this project are documented here. The format follows [Kee
 - `PromptBuilder` and `ResponseParser`: the versioned prompt and the JSON unit format of the LLM provider (ADR-0011).
 - `LlmTranslationProvider` (prompt, chat model, parser; one retry for an unparsable answer, refused batches fail
   permanently) and the reusable `TranslationProviderContractTestCase`.
+- `OpenAiCompatibleChatModel` and `OpenAiCompatibleConfig` with presets for OpenAI, Gemini, Ollama, vLLM and LM Studio;
+  `docs/providers.md`. Runtime dependency `psr/http-message`.

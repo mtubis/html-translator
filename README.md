@@ -28,7 +28,7 @@ use HtmlTranslator\HtmlTranslator;
 use HtmlTranslator\Provider\Testing\PseudoLocalizationProvider;
 use HtmlTranslator\TranslationOptions;
 
-// Any TranslationProviderInterface; LLM providers arrive in Core 0.2.
+// Any TranslationProviderInterface (see Providers below).
 // PseudoLocalizationProvider needs no network: "Hello" becomes "[!! Ĥéļļö !!]".
 $translator = new HtmlTranslator(new PseudoLocalizationProvider());
 
@@ -67,6 +67,35 @@ $result->stats(); // units, batches, retries, durationSeconds
 target are the same), a provider that fails completely (`ProviderException`) or `FallbackStrategy::Throw`
 (`StructureValidationException` or `ProviderException`); all implement `HtmlTranslator\Exception\TranslatorException`.
 Pass options and collaborators as named arguments. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
+
+## Providers
+
+Language models are used through `LlmTranslationProvider` and a chat model adapter on any PSR-18 HTTP client:
+
+```php
+use HtmlTranslator\HtmlTranslator;
+use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleChatModel;
+use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig;
+use HtmlTranslator\Provider\Llm\LlmTranslationProvider;
+use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Component\HttpClient\Psr18Client;
+
+$http = new Psr18Client(HttpClient::create(['timeout' => 60]));
+$model = new OpenAiCompatibleChatModel($http, $http, $http, OpenAiCompatibleConfig::openAi($apiKey, 'gpt-4o-mini'));
+$translator = new HtmlTranslator(new LlmTranslationProvider($model));
+```
+
+| Provider | Configuration |
+|---|---|
+| OpenAI | `OpenAiCompatibleConfig::openAi($apiKey, $model)` |
+| Gemini | `OpenAiCompatibleConfig::gemini($apiKey, $model)` |
+| Ollama | `OpenAiCompatibleConfig::ollama($model)` |
+| vLLM | `OpenAiCompatibleConfig::vllm($model)` |
+| LM Studio | `OpenAiCompatibleConfig::lmStudio($model)` |
+| Other OpenAI-compatible APIs | `new OpenAiCompatibleConfig(...)` |
+| Anthropic | planned |
+
+See [docs/providers.md](docs/providers.md) for configuration, timeouts and error handling.
 
 ## Framework integrations
 
