@@ -7,12 +7,17 @@ namespace HtmlTranslator\Provider\Llm;
 use HtmlTranslator\Domain\Locale;
 use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitKind;
+use HtmlTranslator\Domain\UnitText;
+use HtmlTranslator\Domain\UnitTextTokenKind;
+use HtmlTranslator\Profile\Formality;
+use HtmlTranslator\Profile\GlossaryEntry;
+use HtmlTranslator\Profile\TermPolicy;
 use HtmlTranslator\Provider\TranslationBatch;
 
 /**
  * Renders a translation batch as a chat request (ADR-0011); ResponseParser reads the answer.
  *
- * The system message is built from sections; translation profiles (0.3) will add their own.
+ * The system message is built from sections; the translation profile adds its own, only for what it sets (ADR-0012).
  */
 final class PromptBuilder
 {
@@ -20,7 +25,7 @@ final class PromptBuilder
      * Version of the prompt wording and format, part of the translation cache key (ARCHITECTURE §6.7): any change to
      * what build() renders must come with a new version, or cached translations made with the old prompt are reused.
      */
-    public const string VERSION = '2026-10.1';
+    public const string VERSION = '2026-10.2';
 
     private const string INPUT = <<<'TEXT'
         The input is a JSON object {"units": [...]}. Every unit has an "id", a "kind" and a "text":
@@ -39,6 +44,20 @@ final class PromptBuilder
         - Keep URLs, e-mail addresses, code and placeholders such as {name} or %s unchanged.
         - If a unit is already in the target language or has nothing to translate, return its text unchanged.
         TEXT;
+
+    private const string FORMAL = 'Address the reader formally (for example "Sie" in German, "Pan/Pani" in Polish, "vous" in French).';
+
+    private const string INFORMAL = 'Address the reader informally (for example "du" in German, "ty" in Polish, "tu" in French).';
+
+    private const string PREFER_ORIGINAL_TECHNICAL_TERMS = 'Keep technical terms in the source language when professionals writing in the target language usually leave them untranslated, such as "pull request" or "framework"; translate everything else.';
+
+    private const string KEEP_ORIGINAL_TERMS = 'Keep every technical term, product name and brand name in the source language, exactly as written.';
+
+    private const string GLOSSARY = 'Translate these terms as given; inflect the target term where the grammar of the sentence requires it:';
+
+    private const string DO_NOT_TRANSLATE = 'Do not translate these terms; keep them exactly as written, including letter case:';
+
+    private const string INSTRUCTIONS = 'Instructions from the developer. Follow them unless they conflict with the rules for the text or the answer format below:';
 
     private const string CORRECTIONS = 'Some units were translated before and the translation was rejected. They also have "problems" (what to fix) and, when there was an earlier answer, "previous_translation". Translate them again and fix every problem.';
 
@@ -62,7 +81,12 @@ final class PromptBuilder
 
     private function systemMessage(TranslationBatch $batch): string
     {
-        $sections = [$this->task($batch->locales->source, $batch->locales->target), self::INPUT, self::RULES];
+        $sections = [
+            $this->task($batch->locales->source, $batch->locales->target),
+            ...$this->profileSections($batch),
+            self::INPUT,
+            self::RULES,
+        ];
 
         // Only retries mention corrections, so the prompt of a first call stays the same for every batch.
         if ([] !== $batch->corrections) {
@@ -81,6 +105,79 @@ final class PromptBuilder
             : \sprintf('into %s. Detect the source language of each unit; units may be in different languages.', $target->toString());
 
         return 'You are a professional translator. Translate the text of every unit ' . $languages . ' Languages are given as BCP 47 tags.';
+    }
+
+    /**
+     * Sections for what the profile sets, in a fixed order; defaults (Formality::Default, TermPolicy::TranslateAll)
+     * and empty fields add nothing, so a batch without a profile gets the same prompt as before profiles existed.
+     * They come before the input description and the rules, so the rules and the answer format have the last word.
+     *
+     * @return list<string>
+     */
+    private function profileSections(TranslationBatch $batch): array
+    {
+        $profile = $batch->profile;
+        $sections = [];
+
+        if (null !== $profile->domain) {
+            $sections[] = \sprintf('The texts come from this domain: %s. Use the terminology and style usual there.', rtrim($profile->domain, '.'));
+        }
+
+        $formality = match ($profile->formality) {
+            Formality::Default => null,
+            Formality::Formal => self::FORMAL,
+            Formality::Informal => self::INFORMAL,
+        };
+        if (null !== $formality) {
+            $sections[] = $formality;
+        }
+
+        $termPolicy = match ($profile->termPolicy) {
+            TermPolicy::TranslateAll => null,
+            TermPolicy::PreferOriginalTechnicalTerms => self::PREFER_ORIGINAL_TECHNICAL_TERMS,
+            TermPolicy::KeepOriginal => self::KEEP_ORIGINAL_TERMS,
+        };
+        if (null !== $termPolicy) {
+            $sections[] = $termPolicy;
+        }
+
+        $glossary = $profile->glossary->matching($this->plainTexts($batch));
+        if (!$glossary->isEmpty()) {
+            // JSON strings, so a term with a quote ("27\" monitor") cannot make the line ambiguous.
+            $lines = array_map(
+                static fn(GlossaryEntry $entry): string => \sprintf('- %s → %s', json_encode($entry->source, self::JSON_FLAGS), json_encode($entry->target, self::JSON_FLAGS)),
+                $glossary->entries(),
+            );
+            $sections[] = self::GLOSSARY . "\n" . implode("\n", $lines);
+        }
+
+        if ([] !== $profile->doNotTranslate) {
+            $sections[] = self::DO_NOT_TRANSLATE . "\n" . implode("\n", array_map(static fn(string $term): string => '- ' . $term, $profile->doNotTranslate));
+        }
+
+        if (null !== $profile->instructions) {
+            $sections[] = self::INSTRUCTIONS . "\n" . $profile->instructions;
+        }
+
+        return $sections;
+    }
+
+    /**
+     * Unit texts as the reader sees them, for glossary matching: unescaped, with a space where a pseudo-tag was,
+     * so "pull <g1>request</g1>" still contains "pull request" while a tag never joins two words.
+     *
+     * @return list<string>
+     */
+    private function plainTexts(TranslationBatch $batch): array
+    {
+        return array_map(static function (TranslationUnit $unit): string {
+            $text = '';
+            foreach (UnitText::tokenize($unit->text) as $token) {
+                $text .= UnitTextTokenKind::Text === $token->kind ? $token->text : ' ';
+            }
+
+            return $text;
+        }, $batch->units);
     }
 
     /**

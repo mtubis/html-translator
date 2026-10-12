@@ -50,7 +50,7 @@ $translator = new HtmlTranslator(
     // loader, segmenter, validator, reassembler, skipRules, translatableAttributes, clock
 );
 // Named arguments beyond `provider`; positional order is not part of the API (ADR-0010).
-// cache, clock and profile arrive in 0.3/0.4.
+// cache and clock arrive in 0.4; the profile is a TranslationOptions argument.
 
 $result = $translator->translate(
     html: $html,
@@ -135,7 +135,7 @@ Adapters are written on **PSR-18 / PSR-17**, not vendor SDKs ([ADR-0002](adr/000
 - Each batch carries document context hints: page title, neighbouring headings (helps the model with ambiguous short strings such as button labels).
 
 ### 6.4 Provider call (LLM)
-- `PromptBuilder::build(TranslationBatch): ChatRequest` renders a system prompt with the pseudo-tag rules (plus the `TranslationProfile` from 0.3) and a user message containing units as a JSON object (`{"units": [{"id": "u12", "kind": "block", "text": "…"}]}`), with the previous answer and the problems for units that are retried.
+- `PromptBuilder::build(TranslationBatch): ChatRequest` renders a system prompt with the pseudo-tag rules (plus sections for what the `TranslationProfile` sets, with the glossary filtered to the batch; [ADR-0012](adr/0012-translation-profile-in-the-prompt.md)) and a user message containing units as a JSON object (`{"units": [{"id": "u12", "kind": "block", "text": "…"}]}`), with the previous answer and the problems for units that are retried.
 - The model must answer with a JSON object `{"units": [{"id": "u12", "text": "…"}]}`. `ResponseParser::parse(ChatResponse, TranslationBatch): BatchResult` takes the first JSON value with that shape, skipping code fences and prose around it, drops trailing commas and surrounding whitespace of texts; anything else is a `ProviderException` for that batch. See [ADR-0011](adr/0011-prompt-and-response-format-of-the-llm-provider.md).
 - The prompt has a **version string** (`PromptBuilder::VERSION`); it is part of the cache key.
 

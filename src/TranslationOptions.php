@@ -7,6 +7,7 @@ namespace HtmlTranslator;
 use Closure;
 use HtmlTranslator\Domain\Locale;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Profile\TranslationProfile;
 
 final readonly class TranslationOptions
 {
@@ -16,9 +17,13 @@ final readonly class TranslationOptions
     /** @var positive-int units per provider call (a token-based batcher replaces this in 0.4) */
     public int $batchSize;
 
+    /** How text is translated: domain, formality, term policy, glossary, … */
+    public TranslationProfile $profile;
+
     /**
      * @param Locale|null $source null lets the model detect the source language
      * @param (Closure(Progress): void)|null $onProgress called after each batch
+     * @param TranslationProfile|null $profile null means TranslationProfile::default()
      *
      * @throws InvalidArgumentException when retries are negative or the batch size is below 1
      */
@@ -28,6 +33,7 @@ final readonly class TranslationOptions
         int $maxCorrectiveRetries = 2,
         int $batchSize = 20,
         public ?Closure $onProgress = null,
+        ?TranslationProfile $profile = null,
     ) {
         if ($maxCorrectiveRetries < 0) {
             throw new InvalidArgumentException(\sprintf('Corrective retries cannot be negative, got %d.', $maxCorrectiveRetries));
@@ -39,5 +45,6 @@ final readonly class TranslationOptions
 
         $this->maxCorrectiveRetries = $maxCorrectiveRetries;
         $this->batchSize = $batchSize;
+        $this->profile = $profile ?? TranslationProfile::default();
     }
 }

@@ -22,6 +22,7 @@ use HtmlTranslator\Html\Reassembler;
 use HtmlTranslator\Html\Segmenter;
 use HtmlTranslator\Html\SkipRules;
 use HtmlTranslator\Html\TranslatableAttributes;
+use HtmlTranslator\Profile\TranslationProfile;
 use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\TranslationBatch;
 use HtmlTranslator\Provider\TranslationProviderInterface;
@@ -79,7 +80,7 @@ final readonly class HtmlTranslator
         $unitsDone = 0;
 
         foreach ($batches as $index => $batchUnits) {
-            [$translated, $failures, $batchRetries] = $this->translateWithRetries($locales, $batchUnits, $options->maxCorrectiveRetries);
+            [$translated, $failures, $batchRetries] = $this->translateWithRetries($locales, $options->profile, $batchUnits, $options->maxCorrectiveRetries);
             $translations += $translated;
             $retries += $batchRetries;
 
@@ -121,7 +122,7 @@ final readonly class HtmlTranslator
      * @return array{array<string, string>, array<string, Failure>, int} valid translations, the last failure of
      *                                                                   each failed unit in document order, units retried
      */
-    private function translateWithRetries(LocalePair $locales, array $units, int $maxRetries): array
+    private function translateWithRetries(LocalePair $locales, TranslationProfile $profile, array $units, int $maxRetries): array
     {
         $pending = [];
         foreach ($units as $unit) {
@@ -140,7 +141,7 @@ final readonly class HtmlTranslator
             }
 
             try {
-                $result = $this->provider->translate(new TranslationBatch($locales, array_values($pending), $corrections));
+                $result = $this->provider->translate(new TranslationBatch($locales, array_values($pending), $corrections, $profile));
             } catch (ProviderException $exception) {
                 if (0 === $attempt) {
                     throw $exception;
@@ -239,7 +240,7 @@ final readonly class HtmlTranslator
             return [[], $issues, false];
         }
 
-        [$translations, $partialIssues] = $this->translateTextNodes($locales, $failedUnits);
+        [$translations, $partialIssues] = $this->translateTextNodes($locales, $options->profile, $failedUnits);
 
         return [$translations, [...$issues, ...$partialIssues], [] === $partialIssues];
     }
@@ -268,7 +269,7 @@ final readonly class HtmlTranslator
      *
      * @return array{array<string, string>, list<Issue>}
      */
-    private function translateTextNodes(LocalePair $locales, array $units): array
+    private function translateTextNodes(LocalePair $locales, TranslationProfile $profile, array $units): array
     {
         $plans = [];
         $pieces = [];
@@ -292,7 +293,7 @@ final readonly class HtmlTranslator
         $result = null;
         $providerError = 'no translation';
         try {
-            $result = [] === $pieces ? null : $this->provider->translate(new TranslationBatch($locales, $pieces));
+            $result = [] === $pieces ? null : $this->provider->translate(new TranslationBatch($locales, $pieces, profile: $profile));
         } catch (ProviderException $exception) {
             $providerError = $exception->getMessage();
         }

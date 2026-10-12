@@ -10,6 +10,9 @@ use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitKind;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Profile\Glossary;
+use HtmlTranslator\Profile\ProfileText;
+use HtmlTranslator\Profile\TranslationProfile;
 use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\TranslationBatch;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -24,6 +27,9 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(TranslationUnit::class)]
 #[UsesClass(UnitId::class)]
 #[UsesClass(InvalidArgumentException::class)]
+#[UsesClass(TranslationProfile::class)]
+#[UsesClass(Glossary::class)]
+#[UsesClass(ProfileText::class)]
 final class TranslationBatchTest extends TestCase
 {
     #[Test]
@@ -37,6 +43,15 @@ final class TranslationBatchTest extends TestCase
         self::assertSame('<g1>x', $correction->previousTranslation);
         self::assertSame('- Close <g1> with </g1>.', $correction->problems);
         self::assertSame('pl', $batch->locales->target->toString());
+    }
+
+    #[Test]
+    public function it_carries_the_default_profile_unless_given_one(): void
+    {
+        $profile = TranslationProfile::legal();
+
+        self::assertEquals(TranslationProfile::default(), new TranslationBatch($this->locales(), [$this->unit('u1')])->profile);
+        self::assertSame($profile, new TranslationBatch($this->locales(), [$this->unit('u1')], profile: $profile)->profile);
     }
 
     #[Test]
