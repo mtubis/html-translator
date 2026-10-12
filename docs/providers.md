@@ -77,8 +77,9 @@ new OpenAiCompatibleConfig(
 - **The API key and extra header values** are treated as secrets: they are only sent as headers, never quoted in
   validation errors, removed from error messages built by the adapter (also from a transport error's causes), hidden
   from `var_dump()`, `print_r()` and `var_export()`, and the configuration cannot be serialized. The key must be
-  visible ASCII without spaces or line breaks, so trim a key read from a file. A kept transport exception
-  (`getPrevious()`) may still hold the HTTP request, including its `Authorization` header: do not log its request.
+  visible ASCII without spaces or line breaks, so trim a key read from a file. The client's transport exception
+  is kept as `getPrevious()` only when nothing in it holds the HTTP request (PSR-18 request and network exceptions
+  do, with the key header); otherwise a `ProviderException` with its class name and redacted message takes its place.
 - **The base URL** must not contain credentials, a query or a fragment.
 - **Errors** are `ProviderException`s. HTTP errors carry `statusCode` and `vendorCode` (the vendor's `error.code`,
   `error.type` or Gemini's `status`). A refused or content-filtered batch is not an exception: its units are reported
@@ -137,5 +138,7 @@ $translator = new HtmlTranslator(new LlmTranslationProvider($model));
 
 - **A chat model for another API**: implement `Provider\Llm\ChatModelInterface` and pass
   `Provider\Llm\Testing\ChatModelContractTestCase` (it needs `phpunit/phpunit`).
+  Since 0.4 its scenarios include `ChatScenarioKind::NetworkError`: the fake transport throws a PSR-18
+  `NetworkExceptionInterface` holding the request, which the adapter must not keep as the cause.
 - **A non-LLM engine**: implement `Provider\TranslationProviderInterface` and pass
   `Provider\Testing\TranslationProviderContractTestCase`.

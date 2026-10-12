@@ -14,6 +14,8 @@ use HtmlTranslator\Provider\Llm\JsonSchema;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Client\NetworkExceptionInterface;
+use Psr\Http\Client\RequestExceptionInterface;
 use Throwable;
 
 /**
@@ -199,6 +201,20 @@ abstract class ChatModelContractTestCase extends TestCase
         $exception = $this->failureOf(ChatScenario::transportError('cURL error 7: Failed to connect to https://api.example.test/v1/chat?key=' . static::API_KEY));
 
         self::assertNotNull($exception->getPrevious(), 'The transport error must be kept as the previous exception.');
+        $this->assertNoCredentials($exception);
+    }
+
+    #[Test]
+    public function it_does_not_keep_a_transport_exception_that_holds_the_request(): void
+    {
+        $exception = $this->failureOf(ChatScenario::networkError('Operation timed out after 30001 milliseconds'));
+
+        for ($current = $exception; $current instanceof Throwable; $current = $current->getPrevious()) {
+            self::assertNotInstanceOf(RequestExceptionInterface::class, $current, 'A cause that holds the request (and its credential headers) must not be kept.');
+            self::assertNotInstanceOf(NetworkExceptionInterface::class, $current, 'A cause that holds the request (and its credential headers) must not be kept.');
+        }
+
+        self::assertStringContainsString('Operation timed out', $exception->getMessage());
         $this->assertNoCredentials($exception);
     }
 

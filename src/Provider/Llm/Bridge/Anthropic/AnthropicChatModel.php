@@ -17,6 +17,8 @@ use HtmlTranslator\Provider\Llm\JsonSchema;
 use JsonException;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
+use Psr\Http\Client\NetworkExceptionInterface;
+use Psr\Http\Client\RequestExceptionInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Throwable;
@@ -214,17 +216,19 @@ final readonly class AnthropicChatModel implements ChatModelInterface
     }
 
     /**
-     * Keeps the client's exception as the cause unless a message in its chain contains a credential; then a redacted
-     * copy of its message replaces the whole chain. A kept PSR-18 exception may still hold the request (getRequest()),
-     * including its x-api-key header.
+     * Keeps the client's exception as the cause only when that is safe: no exception in its chain may hold the request
+     * (PSR-18 request and network exceptions expose getRequest(), with the x-api-key header) or contain a credential in
+     * its message. Otherwise a ProviderException naming the client's exception class and its redacted message
+     * replaces the whole chain.
      */
     private function transportError(ClientExceptionInterface $exception): ProviderException
     {
         $message = UntrustedText::quote($this->config->redact($exception->getMessage()));
         $cause = $exception;
         for ($current = $exception; $current instanceof Throwable; $current = $current->getPrevious()) {
-            if ($this->config->redact($current->getMessage()) !== $current->getMessage()) {
-                $cause = new ProviderException($message);
+            $holdsRequest = $current instanceof RequestExceptionInterface || $current instanceof NetworkExceptionInterface;
+            if ($holdsRequest || $this->config->redact($current->getMessage()) !== $current->getMessage()) {
+                $cause = new ProviderException(\sprintf('%s: %s', $exception::class, $message));
 
                 break;
             }

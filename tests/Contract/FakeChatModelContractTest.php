@@ -45,6 +45,7 @@ final class FakeChatModelContractTest extends ChatModelContractTestCase
             ChatScenarioKind::HttpError => throw ProviderException::fromHttpResponse($scenario->statusCode ?? 500, 'The chat model returned an error.', $scenario->vendorCode),
             ChatScenarioKind::MalformedBody => throw new ProviderException('The chat model returned a body that is not valid JSON.'),
             ChatScenarioKind::UnexpectedShape => throw new ProviderException('The chat model returned JSON without an answer.'),
+            ChatScenarioKind::NetworkError => throw new ProviderException('The chat model could not be reached: ' . ($scenario->errorMessage ?? '')),
             ChatScenarioKind::TransportError => throw new ProviderException('The chat model could not be reached.', 0, new RuntimeException(str_replace(self::API_KEY, '[redacted]', $scenario->errorMessage ?? ''))),
         })->withModelId('fake:' . self::MODEL);
 

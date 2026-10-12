@@ -20,4 +20,10 @@ enum ChatScenarioKind
 
     /** The transport fails before any response (connection refused, timeout). */
     case TransportError;
+
+    /**
+     * The transport fails with a Psr\Http\Client\NetworkExceptionInterface whose getRequest() returns the request the
+     * adapter sent, credentials included. Added in 0.4: contract tests that match the kinds exhaustively must handle it.
+     */
+    case NetworkError;
 }

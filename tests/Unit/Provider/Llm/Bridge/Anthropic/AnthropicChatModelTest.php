@@ -18,6 +18,7 @@ use HtmlTranslator\Provider\Llm\FinishReason;
 use HtmlTranslator\Provider\Llm\JsonSchema;
 use HtmlTranslator\Tests\Support\FakeClientException;
 use HtmlTranslator\Tests\Support\FakeHttpClient;
+use HtmlTranslator\Tests\Support\FakeNetworkException;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Nyholm\Psr7\Response;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -25,6 +26,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Client\NetworkExceptionInterface;
+use Psr\Http\Client\RequestExceptionInterface;
 use Psr\Http\Message\RequestInterface;
 use Throwable;
 
@@ -419,6 +422,38 @@ final class AnthropicChatModelTest extends TestCase
     public function it_names_the_configured_model(): void
     {
         self::assertSame('anthropic:claude-opus-5-5', $this->model($this->client(200, 'success.json'))->modelId());
+    }
+
+    #[Test]
+    public function it_replaces_a_network_exception_that_holds_the_request(): void
+    {
+        $model = $this->model(new FakeHttpClient(static fn(RequestInterface $request): Response => throw new FakeNetworkException('Operation timed out', $request)));
+
+        $exception = $this->failure($model);
+
+        self::assertStringContainsString('Operation timed out', $exception->getMessage());
+        self::assertSame(FakeNetworkException::class . ': Operation timed out', $exception->getPrevious()?->getMessage());
+        $this->assertNoRequestInChain($exception);
+    }
+
+    #[Test]
+    public function it_replaces_a_request_exception_deeper_in_the_chain(): void
+    {
+        $model = $this->model(new FakeHttpClient(static fn(RequestInterface $request): Response => throw new FakeClientException('Transport failed', 0, new FakeNetworkException('Connection reset', $request))));
+
+        $exception = $this->failure($model);
+
+        self::assertSame(FakeClientException::class . ': Transport failed', $exception->getPrevious()?->getMessage());
+        $this->assertNoRequestInChain($exception);
+    }
+
+    private function assertNoRequestInChain(ProviderException $exception): void
+    {
+        self::assertNotNull($exception->getPrevious(), 'The transport error must be kept in a safe form.');
+        for ($current = $exception; $current instanceof Throwable; $current = $current->getPrevious()) {
+            self::assertNotInstanceOf(NetworkExceptionInterface::class, $current);
+            self::assertNotInstanceOf(RequestExceptionInterface::class, $current);
+        }
     }
 
     private function model(FakeHttpClient $client): AnthropicChatModel

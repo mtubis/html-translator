@@ -20,10 +20,12 @@ use HtmlTranslator\Provider\Llm\Testing\ChatScenarioKind;
 use HtmlTranslator\Provider\Llm\Testing\RecordedChatRequest;
 use HtmlTranslator\Tests\Support\FakeClientException;
 use HtmlTranslator\Tests\Support\FakeHttpClient;
+use HtmlTranslator\Tests\Support\FakeNetworkException;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Nyholm\Psr7\Response;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
+use Psr\Http\Message\RequestInterface;
 
 /**
  * The fake PSR-18 client answers like the OpenAI Chat Completions API would in each scenario.
@@ -47,7 +49,7 @@ final class OpenAiCompatibleChatModelContractTest extends ChatModelContractTestC
 
     protected function modelFor(ChatScenario $scenario): ChatModelInterface
     {
-        $this->client = new FakeHttpClient(static fn(): Response => match ($scenario->kind) {
+        $this->client = new FakeHttpClient(static fn(RequestInterface $request): Response => match ($scenario->kind) {
             ChatScenarioKind::Success => self::json(200, self::completion($scenario)),
             ChatScenarioKind::HttpError => $scenario->jsonErrorBody
                 ? self::json($scenario->statusCode ?? 500, ['error' => ['message' => $scenario->errorMessage, 'type' => null, 'param' => null, 'code' => $scenario->vendorCode]])
@@ -55,6 +57,7 @@ final class OpenAiCompatibleChatModelContractTest extends ChatModelContractTestC
             ChatScenarioKind::MalformedBody => new Response(200, ['Content-Type' => 'application/json'], '{"choices": [{"message": '),
             ChatScenarioKind::UnexpectedShape => self::json(200, ['object' => 'chat.completion', 'choices' => []]),
             ChatScenarioKind::TransportError => throw new FakeClientException($scenario->errorMessage ?? 'Connection refused'),
+            ChatScenarioKind::NetworkError => throw new FakeNetworkException($scenario->errorMessage ?? 'Timed out', $request),
         });
         $factory = new Psr17Factory();
 
