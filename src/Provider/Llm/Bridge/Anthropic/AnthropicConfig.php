@@ -27,13 +27,8 @@ final readonly class AnthropicConfig
     /** Server-side refusal fallbacks, routed by refusal category ("fallbacks": "default"). */
     public const string REFUSAL_FALLBACKS_BETA = 'server-side-fallback-2026-07-01';
 
-    private const string REDACTED = '[redacted]';
-
     /** Headers the adapter sets itself; Authorization stays free for a gateway in front of the API. */
     private const array RESERVED_HEADERS = ['x-api-key', 'anthropic-version', 'anthropic-beta', 'content-type', 'accept'];
-
-    /** The API version is sent as a header value: visible characters, spaces and tabs, no line breaks. */
-    private const string HEADER_VALUE = '/^[\x20\x09\x21-\x7E\x80-\xFF]*$/D';
 
     private HttpSecrets $secrets;
 
@@ -64,9 +59,12 @@ final readonly class AnthropicConfig
             throw new InvalidArgumentException('An Anthropic configuration needs a model.');
         }
 
+        // Same order of checks as before the secrets moved to HttpSecrets: the key right after the model.
+        $secrets = new HttpSecrets($apiKey, $extraHeaders, self::RESERVED_HEADERS);
+
         HttpSecrets::checkBaseUrl($baseUrl, 'The Anthropic base URL');
 
-        if ('' === trim($apiVersion) || 1 !== preg_match(self::HEADER_VALUE, $apiVersion)) {
+        if ('' === trim($apiVersion) || !HttpSecrets::isHeaderValue($apiVersion)) {
             throw new InvalidArgumentException('The Anthropic API version must be a non-empty header value.');
         }
 
@@ -74,7 +72,7 @@ final readonly class AnthropicConfig
             throw new InvalidArgumentException(\sprintf('The default output limit must be at least 1, got %d.', $defaultMaxOutputTokens));
         }
 
-        $this->secrets = new HttpSecrets($apiKey, $extraHeaders, self::RESERVED_HEADERS);
+        $this->secrets = $secrets;
     }
 
     public function modelId(): string
@@ -130,7 +128,7 @@ final readonly class AnthropicConfig
         return [
             'baseUrl' => $this->baseUrl,
             'model' => $this->model,
-            'apiKey' => self::REDACTED,
+            'apiKey' => $this->secrets->maskedApiKey() ?? '',
             'apiVersion' => $this->apiVersion,
             'defaultMaxOutputTokens' => $this->defaultMaxOutputTokens,
             'effort' => $this->effort?->value,

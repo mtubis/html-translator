@@ -45,6 +45,22 @@ final class HttpSecretsTest extends TestCase
     }
 
     #[Test]
+    public function it_masks_the_key_for_debug_output(): void
+    {
+        self::assertSame('[redacted]', new HttpSecrets(self::API_KEY, [], self::RESERVED)->maskedApiKey());
+        self::assertNull(new HttpSecrets(null, [], self::RESERVED)->maskedApiKey());
+    }
+
+    #[Test]
+    public function it_tells_a_valid_header_value(): void
+    {
+        self::assertTrue(HttpSecrets::isHeaderValue("2023-06-01 \tv2 żółw"));
+        self::assertTrue(HttpSecrets::isHeaderValue(''));
+        self::assertFalse(HttpSecrets::isHeaderValue("a\r\nX-Injected: b"));
+        self::assertFalse(HttpSecrets::isHeaderValue("a\x00b"));
+    }
+
+    #[Test]
     public function it_removes_the_key_always_and_header_values_from_eight_characters(): void
     {
         $secrets = new HttpSecrets('sk-1', ['X-Token' => 'tok12345', 'X-Team' => 'team1234', 'X-V' => 'v2'], self::RESERVED);

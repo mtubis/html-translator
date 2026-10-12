@@ -69,7 +69,7 @@ final readonly class HttpSecrets
                 throw new InvalidArgumentException(\sprintf('The header "%s" is set by the adapter.', UntrustedText::quote($header)));
             }
 
-            if (1 !== preg_match(self::HEADER_VALUE, $value)) {
+            if (!self::isHeaderValue($value)) {
                 throw new InvalidArgumentException(\sprintf('The value of header "%s" contains line breaks or control characters.', UntrustedText::quote($header)));
             }
 
@@ -105,6 +105,14 @@ final readonly class HttpSecrets
         }
     }
 
+    /**
+     * Visible characters, spaces and tabs: no line breaks or other control characters that could inject headers.
+     */
+    public static function isHeaderValue(string $value): bool
+    {
+        return 1 === preg_match(self::HEADER_VALUE, $value);
+    }
+
     public function hasApiKey(): bool
     {
         return $this->apiKey instanceof SensitiveParameterValue;
@@ -124,6 +132,14 @@ final readonly class HttpSecrets
     }
 
     /**
+     * "[redacted]" when there is a key, for debug output.
+     */
+    public function maskedApiKey(): ?string
+    {
+        return $this->apiKey instanceof SensitiveParameterValue ? self::REDACTED : null;
+    }
+
+    /**
      * @return array<string, string> header name → "[redacted]"
      */
     public function maskedExtraHeaders(): array
@@ -133,7 +149,8 @@ final readonly class HttpSecrets
 
     /**
      * The text without the API key and extra header values of at least MIN_REDACTED_LENGTH characters, for messages
-     * built from vendor or transport errors. Only exact copies are found, not URL-encoded or masked ones.
+     * built from vendor or transport errors. The key is removed whatever its length, on purpose: a garbled message is
+     * better than a leaked key. Only exact copies are found, not URL-encoded or masked ones.
      */
     public function redact(string $text): string
     {

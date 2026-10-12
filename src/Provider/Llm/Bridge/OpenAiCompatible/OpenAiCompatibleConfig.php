@@ -23,8 +23,6 @@ final readonly class OpenAiCompatibleConfig
     /** OpenAI's newer models (o-series, gpt-5) reject max_tokens. */
     public const string MAX_COMPLETION_TOKENS = 'max_completion_tokens';
 
-    private const string REDACTED = '[redacted]';
-
     private const int MAX_NAME_LENGTH = 100;
 
     /** Headers the adapter sets itself. */
@@ -69,11 +67,14 @@ final readonly class OpenAiCompatibleConfig
             throw new InvalidArgumentException('An OpenAI-compatible configuration needs a model.');
         }
 
+        // Same order of checks as before the secrets moved to HttpSecrets: the key before the output limit field.
+        $secrets = new HttpSecrets($apiKey, $extraHeaders, self::RESERVED_HEADERS, '; pass null for a server without authentication');
+
         if (!\in_array($maxTokensField, [self::MAX_TOKENS, self::MAX_COMPLETION_TOKENS], true)) {
             throw new InvalidArgumentException(\sprintf('"%s" is not a supported output limit field.', UntrustedText::quote($maxTokensField)));
         }
 
-        $this->secrets = new HttpSecrets($apiKey, $extraHeaders, self::RESERVED_HEADERS, '; pass null for a server without authentication');
+        $this->secrets = $secrets;
     }
 
     /**
@@ -170,7 +171,7 @@ final readonly class OpenAiCompatibleConfig
             'name' => $this->name,
             'baseUrl' => $this->baseUrl,
             'model' => $this->model,
-            'apiKey' => $this->secrets->hasApiKey() ? self::REDACTED : null,
+            'apiKey' => $this->secrets->maskedApiKey(),
             'jsonMode' => $this->jsonMode,
             'maxTokensField' => $this->maxTokensField,
             'extraHeaders' => $this->secrets->maskedExtraHeaders(),
