@@ -93,4 +93,62 @@ final class DomAssertionsTest extends TestCase
 
         self::assertSameDocumentStructure($expected, $actual);
     }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function sameSkeletons(): iterable
+    {
+        yield 'other wording' => ['<p>Hello <a href="/x">world</a></p>', '<p>Cześć <a href="/x">świecie</a>, miło</p>'];
+        yield 'moved inline tags' => ['<p><b>a</b> and <i>b</i></p>', '<p><i>b</i> i <b>a</b></p>'];
+        yield 'translated attributes' => ['<img src="a.png" alt="A cat">', '<img src="a.png" alt="Kot">'];
+        yield 'text split differently' => ['<p><b>a</b> b</p>', '<p>x <b>a</b></p>'];
+        yield 'untouched code' => ['<p>Run <code>make test</code></p>', '<p>Uruchom <code>make test</code> teraz</p>'];
+        yield 'translation switched back on' => ['<div translate="no">Acme <span translate="yes">Hello</span></div>', '<div translate="no">Acme <span translate="yes">Cześć</span></div>'];
+    }
+
+    #[Test]
+    #[DataProvider('sameSkeletons')]
+    public function it_accepts_the_same_skeleton(string $expected, string $actual): void
+    {
+        self::assertSameSkeleton($expected, $actual, true);
+    }
+
+    #[Test]
+    public function it_accepts_the_same_document_skeleton(): void
+    {
+        self::assertSameSkeleton(
+            '<!DOCTYPE html><html lang="pl"><head><title>About</title></head><body><p>Hello</p></body></html>',
+            '<!DOCTYPE html><html lang="pl"><head><title>O nas</title></head><body><p>Cześć</p></body></html>',
+            false,
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string, string, bool}>
+     */
+    public static function differentSkeletons(): iterable
+    {
+        yield 'lost element' => ['<p>a <b>b</b></p>', '<p>a b</p>', true];
+        yield 'gained element' => ['<p>a b</p>', '<p>a <b>b</b></p>', true];
+        yield 'duplicated element' => ['<p><b>a</b></p>', '<p><b>a</b><b>a</b></p>', true];
+        yield 'changed code' => ['<p>Run <code>make test</code></p>', '<p>Uruchom <code>zrób test</code></p>', true];
+        yield 'translated text under translate="no"' => ['<p translate="no">Acme Corp</p>', '<p translate="no">Firma Acme</p>', true];
+        yield 'changed script' => ['<script>var a = 1;</script>', '<script>var a = 2;</script>', true];
+        yield 'changed nesting' => ['<p><b><i>a</i></b></p>', '<p><b>a</b><i>a</i></p>', true];
+        yield 'changed link' => ['<a href="/x">a</a>', '<a href="/y">a</a>', true];
+        yield 'changed class' => ['<p class="a">x</p>', '<p class="b">x</p>', true];
+        yield 'changed comment' => ['<p>x<!-- a --></p>', '<p>x<!-- b --></p>', true];
+        yield 'fragment gained a body' => ['<p>x</p>', '<body><p>x</p></body>', true];
+        yield 'changed document language' => ['<html lang="pl"><body><p>x</p></body></html>', '<html lang="en"><body><p>x</p></body></html>', false];
+    }
+
+    #[Test]
+    #[DataProvider('differentSkeletons')]
+    public function it_rejects_a_different_skeleton(string $expected, string $actual, bool $fragment): void
+    {
+        $this->expectException(AssertionFailedError::class);
+
+        self::assertSameSkeleton($expected, $actual, $fragment);
+    }
 }

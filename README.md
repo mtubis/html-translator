@@ -105,6 +105,8 @@ See [docs/providers.md](docs/providers.md) for configuration, timeouts and error
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Design decisions are recorded in [docs/adr](docs/adr/).
+Tests against real models run with `composer test:integration` (configure `.env` from `.env.dist`), and
+[tools/eval](tools/eval/README.md) compares models over the golden fixtures.
 
 ## License
 

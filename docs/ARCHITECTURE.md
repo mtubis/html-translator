@@ -199,9 +199,9 @@ Dependency rule (checked by the `architecture-reviewer` agent and later by a PHP
 | Unit | Value objects, encoder, validator, prompt builder, parser | always |
 | Fixture (golden) | `tests/Fixtures/<name>/input.html` through the full pipeline with `PseudoLocalizationProvider`, and again with `LlmTranslationProvider` on `PseudoLocalizingChatModel` (same expected file), compared with `expected.pseudo.html` (`tests/Integration/GoldenFixturesTest`, no group; regenerate with `composer fixtures:update -- <name>`) | always |
 | Contract | `TranslationProviderContractTestCase` / `ChatModelContractTestCase` every provider and adapter must pass; both ship in `src/` (`Provider\Testing`, `Provider\Llm\Testing`) for implementations in other packages, run from `tests/Contract` | always (with fake HTTP or a fake chat model) |
-| Integration | Real APIs, `#[Group('integration')]`, needs env vars (tests in `tests/Integration` without that group, such as the golden fixtures, run always) | manual / nightly |
+| Integration | Real APIs, `#[Group('integration')]`, needs env vars from `.env.dist` (`composer test:integration`); a few fixtures end to end, structure checked with `assertSameSkeleton()`, not wording. Tests in `tests/Integration` without that group, such as the golden fixtures, run always | manual / nightly |
 | Mutation | Infection on `src/` | CI, MSI threshold |
-| Eval | `tools/eval` — real models × fixtures × profiles, structural pass-rate report | manual |
+| Eval | `tools/eval/run.php` — a real model over all golden fixtures: completeness, issues, retries, calls, tokens, time; Markdown and JSON report with the prompt version (`tools/eval/README.md`) | manual |
 
 `PseudoLocalizationProvider` turns `Hello <g1>world</g1>` into `[!! Ĥéļļö <g1>ŵöŕļð</g1> !!]` — deterministic, visibly "translated", exercises the whole pipeline without network.
 

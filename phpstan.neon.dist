@@ -4,6 +4,7 @@ parameters:
         - src
         - tests
         - scripts
+        - tools
     tmpDir: var/phpstan
     checkUninitializedProperties: true
     checkImplicitMixed: true
