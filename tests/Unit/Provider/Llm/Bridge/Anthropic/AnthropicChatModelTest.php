@@ -8,6 +8,7 @@ use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
+use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicEffort;
 use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatRequest;
 use HtmlTranslator\Provider\Llm\ChatResponse;
@@ -103,11 +104,11 @@ final class AnthropicChatModelTest extends TestCase
      */
     public static function errors(): iterable
     {
-        yield 'bad request' => [400, 'error-400.json', 'invalid_request_error', 'anthropic returned HTTP 400: max_tokens: Field required'];
-        yield 'wrong key, echoed' => [401, 'error-401.json', 'authentication_error', 'anthropic returned HTTP 401: invalid x-api-key [redacted]'];
-        yield 'rate limit' => [429, 'error-429.json', 'rate_limit_error', 'anthropic returned HTTP 429: Number of request tokens has exceeded your per-minute rate limit.'];
-        yield 'server error' => [500, 'error-500.json', 'api_error', 'anthropic returned HTTP 500: Internal server error'];
-        yield 'overloaded' => [529, 'error-529.json', 'overloaded_error', 'anthropic returned HTTP 529: Overloaded'];
+        yield 'bad request' => [400, 'error-400.json', 'invalid_request_error', 'anthropic returned HTTP 400 (request req_011CSHoEeqs5C35K2UUqR7Fy): max_tokens: Field required'];
+        yield 'wrong key, echoed' => [401, 'error-401.json', 'authentication_error', 'anthropic returned HTTP 401 (request req_011CSHoEeqs5C35K2UUqR7Fy): invalid x-api-key [redacted]'];
+        yield 'rate limit' => [429, 'error-429.json', 'rate_limit_error', 'anthropic returned HTTP 429 (request req_011CSHoEeqs5C35K2UUqR7Fy): Number of request tokens has exceeded your per-minute rate limit.'];
+        yield 'server error' => [500, 'error-500.json', 'api_error', 'anthropic returned HTTP 500 (request req_011CSHoEeqs5C35K2UUqR7Fy): Internal server error'];
+        yield 'overloaded' => [529, 'error-529.json', 'overloaded_error', 'anthropic returned HTTP 529 (request req_011CSHoEeqs5C35K2UUqR7Fy): Overloaded'];
     }
 
     #[Test]
@@ -130,6 +131,79 @@ final class AnthropicChatModelTest extends TestCase
     }
 
     #[Test]
+    public function it_takes_the_request_id_from_the_header_when_the_body_has_none(): void
+    {
+        $exception = $this->failure($this->model(new FakeHttpClient(static fn(): Response => new Response(529, ['request-id' => 'req_from_header'], '{"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}}'))));
+
+        self::assertSame('anthropic returned HTTP 529 (request req_from_header): Overloaded', $exception->getMessage());
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>, string}>
+     */
+    public static function unquotedRequestIds(): iterable
+    {
+        yield 'markup in the header' => [['request-id' => 'req 1; <script>'], '"Service unavailable"'];
+        yield 'junk before an id' => [['request-id' => 'x;req_1'], '"Service unavailable"'];
+        yield 'line break after an id in the body' => [[], '{"type": "error", "request_id": "req_1\\n"}'];
+    }
+
+    /**
+     * @param array<string, string> $headers
+     */
+    #[Test]
+    #[DataProvider('unquotedRequestIds')]
+    public function it_quotes_only_a_plain_request_id(array $headers, string $body): void
+    {
+        $exception = $this->failure($this->model(new FakeHttpClient(static fn(): Response => new Response(503, $headers, $body))));
+
+        self::assertSame('anthropic returned HTTP 503.', $exception->getMessage());
+        self::assertNull($exception->vendorCode);
+    }
+
+    #[Test]
+    public function it_keeps_vendor_messages_of_exactly_200_characters(): void
+    {
+        $exception = $this->failure($this->model($this->jsonClient(400, ['type' => 'error', 'error' => ['type' => 'invalid_request_error', 'message' => str_repeat('ż', 200)]])));
+
+        self::assertSame('anthropic returned HTTP 400: ' . str_repeat('ż', 200), $exception->getMessage());
+    }
+
+    /**
+     * @return iterable<string, array{int, bool}>
+     */
+    public static function statuses(): iterable
+    {
+        yield '200' => [200, true];
+        yield '299' => [299, true];
+        yield '300' => [300, false];
+        yield '199' => [199, false];
+    }
+
+    #[Test]
+    #[DataProvider('statuses')]
+    public function it_accepts_only_2xx_statuses(int $status, bool $accepted): void
+    {
+        $model = $this->model($this->client($status, 'success.json'));
+
+        if (!$accepted) {
+            $this->expectException(ProviderException::class);
+        }
+
+        self::assertSame('claude-opus-5-5', $model->complete($this->request())->model);
+    }
+
+    #[Test]
+    public function it_ignores_a_blank_model_and_invalid_token_counts(): void
+    {
+        $response = $this->model($this->jsonClient(200, ['type' => 'message', 'model' => '  ', 'content' => [], 'usage' => ['input_tokens' => -1, 'output_tokens' => '12']]))->complete($this->request());
+
+        self::assertSame('claude-opus-5-5', $response->model);
+        self::assertNull($response->inputTokens);
+        self::assertNull($response->outputTokens);
+    }
+
+    #[Test]
     public function it_reports_an_error_without_a_readable_body(): void
     {
         $exception = $this->failure($this->model(new FakeHttpClient(static fn(): Response => new Response(502, [], '<html>Bad gateway</html>'))));
@@ -140,24 +214,27 @@ final class AnthropicChatModelTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{string}>
+     * @return iterable<string, array{string, string}>
      */
     public static function unreadableAnswers(): iterable
     {
-        yield 'not JSON' => ['{"type": "message", "content": ['];
-        yield 'a JSON list' => ['[1, 2]'];
-        yield 'no content' => ['{"type": "message", "model": "claude-opus-5-5"}'];
-        yield 'content that is not a list' => ['{"type": "message", "content": "text"}'];
-        yield 'text block without text' => ['{"type": "message", "content": [{"type": "text"}]}'];
+        yield 'not JSON' => ['{"type": "message", "content": [', 'not valid JSON'];
+        yield 'a JSON list' => ['[1, 2]', 'not an object'];
+        yield 'a JSON string' => ['"message"', 'not an object'];
+        yield 'no content' => ['{"type": "message", "model": "claude-opus-5-5"}', 'without a content list'];
+        yield 'content that is not a list' => ['{"type": "message", "content": {"type": "text"}}', 'without a content list'];
+        yield 'text block without text' => ['{"type": "message", "content": [{"type": "text"}]}', 'without text'];
     }
 
     #[Test]
     #[DataProvider('unreadableAnswers')]
-    public function it_rejects_a_successful_response_it_cannot_read(string $body): void
+    public function it_rejects_a_successful_response_it_cannot_read(string $body, string $messagePart): void
     {
-        $this->expectException(ProviderException::class);
+        $exception = $this->failure($this->model(new FakeHttpClient(static fn(): Response => new Response(200, [], $body))));
 
-        $this->model(new FakeHttpClient(static fn(): Response => new Response(200, [], $body)))->complete($this->request());
+        self::assertStringContainsString($messagePart, $exception->getMessage());
+        self::assertSame(0, $exception->getCode());
+        self::assertNull($exception->statusCode);
     }
 
     #[Test]
@@ -213,7 +290,7 @@ final class AnthropicChatModelTest extends TestCase
     public function it_sends_effort_and_refusal_fallbacks_when_configured(): void
     {
         $client = $this->client(200, 'success.json');
-        $config = new AnthropicConfig('claude-opus-5-5', self::API_KEY, effort: 'low', refusalFallbacks: true);
+        $config = new AnthropicConfig('claude-opus-5-5', self::API_KEY, effort: AnthropicEffort::Low, refusalFallbacks: true);
 
         new AnthropicChatModel($client, new Psr17Factory(), new Psr17Factory(), $config)->complete(new ChatRequest(
             [new ChatMessage(ChatRole::User, 'Answer in JSON.')],
@@ -225,6 +302,53 @@ final class AnthropicChatModelTest extends TestCase
         self::assertSame(['effort' => 'low', 'format' => ['type' => 'json_schema', 'schema' => json_decode(self::SCHEMA, true, 16, \JSON_THROW_ON_ERROR)]], $body['output_config'] ?? null);
         self::assertSame('default', $body['fallbacks'] ?? null);
         self::assertSame('server-side-fallback-2026-07-01', ($client->requests[0] ?? self::fail('No request.'))->getHeaderLine('anthropic-beta'));
+    }
+
+    #[Test]
+    public function it_keeps_empty_objects_of_the_schema_as_objects(): void
+    {
+        $client = $this->client(200, 'success.json');
+
+        $this->model($client)->complete(new ChatRequest(
+            [new ChatMessage(ChatRole::User, 'Answer in JSON.')],
+            jsonResponse: true,
+            jsonSchema: JsonSchema::fromJson('{"type": "object", "properties": {}, "additionalProperties": false}'),
+        ));
+
+        $request = $client->requests[0] ?? self::fail('No request was sent.');
+        self::assertStringContainsString('"output_config":{"format":{"type":"json_schema","schema":{"type":"object","properties":{},"additionalProperties":false}}}', (string) $request->getBody());
+    }
+
+    #[Test]
+    public function it_rejects_a_prefilled_answer_without_calling_the_api(): void
+    {
+        $client = $this->client(200, 'success.json');
+
+        try {
+            $this->model($client)->complete(new ChatRequest([new ChatMessage(ChatRole::User, 'Answer in JSON.'), new ChatMessage(ChatRole::Assistant, '{')]));
+            self::fail('Expected an InvalidArgumentException.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertStringContainsString('prefill', $exception->getMessage());
+        }
+
+        self::assertSame([], $client->requests);
+    }
+
+    #[Test]
+    public function it_sends_an_earlier_assistant_message_of_the_conversation(): void
+    {
+        $client = $this->client(200, 'success.json');
+
+        $this->model($client)->complete(new ChatRequest([
+            new ChatMessage(ChatRole::User, 'Hi'),
+            new ChatMessage(ChatRole::Assistant, 'Hello'),
+            new ChatMessage(ChatRole::User, 'Translate.'),
+        ]));
+
+        self::assertSame(
+            [['role' => 'user', 'content' => 'Hi'], ['role' => 'assistant', 'content' => 'Hello'], ['role' => 'user', 'content' => 'Translate.']],
+            $this->body($client)['messages'] ?? null,
+        );
     }
 
     #[Test]
@@ -273,6 +397,7 @@ final class AnthropicChatModelTest extends TestCase
         $exception = $this->failure($model);
 
         self::assertStringStartsWith('Could not reach anthropic at https://api.anthropic.com/v1/messages: ', $exception->getMessage());
+        self::assertSame(0, $exception->getCode());
         for ($current = $exception; $current instanceof Throwable; $current = $current->getPrevious()) {
             self::assertStringNotContainsString(self::API_KEY, $current->getMessage());
         }

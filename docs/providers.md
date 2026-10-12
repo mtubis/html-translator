@@ -111,9 +111,9 @@ $translator = new HtmlTranslator(new LlmTranslationProvider($model));
 | `baseUrl` | `https://api.anthropic.com/v1` | API root, e.g. a gateway in front of the Claude API |
 | `apiVersion` | `2023-06-01` | The `anthropic-version` header |
 | `defaultMaxOutputTokens` | `16000` | `max_tokens` when a request sets none (the API requires a limit) |
-| `effort` | `null` (model default) | `low`, `medium`, `high`, `xhigh` or `max`: thinking depth and token spend |
+| `effort` | `null` (model default) | `AnthropicEffort::Low` … `Max` (`low`, `medium`, `high`, `xhigh`, `max`): thinking depth and token spend |
 | `refusalFallbacks` | `false` | Let the API answer a refused request with a fallback model (`fallbacks: "default"`) |
-| `extraHeaders` | `[]` | Further headers; treated as secret |
+| `extraHeaders` | `[]` | Further headers, e.g. `Authorization` for a gateway; treated as secret |
 
 - **JSON**: `LlmTranslationProvider` asks for its answer format as a JSON schema, which the adapter sends as structured
   output (`output_config.format`), so the answer is always valid JSON (ADR-0014). Current Claude models reject assistant
@@ -121,14 +121,17 @@ $translator = new HtmlTranslator(new LlmTranslationProvider($model));
 - **Thinking**: current models think before answering (Claude Opus 5.5 always does); the adapter returns only the text
   blocks. Lower `effort` (e.g. `low`) for cheaper and faster translations, raise it for hard texts. Requests can take a
   while at higher effort: allow a generous client timeout (120 seconds or more).
-- **Temperature**: current Claude models reject sampling parameters with HTTP 400, and the adapter rejects
-  temperatures above 1. `LlmTranslationProvider` sends none.
+- **Temperature**: current Claude models reject sampling parameters with HTTP 400; the adapter's 0–1 range only
+  matters for older models. `LlmTranslationProvider` sends none.
+- **Prefill**: a conversation that ends with an assistant message is rejected before the call
+  (`InvalidArgumentException`), since current models answer it with HTTP 400.
 - **Refusals**: a declined request (`stop_reason: "refusal"`) becomes `FinishReason::Refusal`; its units are reported
   as permanent failures. With `refusalFallbacks: true` the adapter sends the `server-side-fallback-2026-07-01` beta,
   and the API may answer with a fallback model instead (`ChatResponse::$model` names it). Available on the Claude API
   only; check that your model supports it.
 - **Errors** are `ProviderException`s with `statusCode` and `vendorCode` (`error.type`, e.g. `rate_limit_error`,
-  `overloaded_error` for HTTP 529). No transport retries yet (0.4).
+  `overloaded_error` for HTTP 529); the message names the request id, which Anthropic support asks for. No transport
+  retries yet (0.4).
 
 ## Writing your own
 

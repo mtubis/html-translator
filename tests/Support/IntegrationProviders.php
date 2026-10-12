@@ -60,7 +60,7 @@ final class IntegrationProviders
     /**
      * The provider's configuration from the environment, with optional overrides; null when it is not configured:
      * hosted APIs need their key, local servers a model (from the environment or $model). $baseUrl applies to local
-     * servers only.
+     * servers and Anthropic (e.g. a gateway).
      *
      * @throws UnexpectedValueException for an unknown provider
      */
@@ -72,7 +72,7 @@ final class IntegrationProviders
 
         return match ($provider) {
             'openai' => self::withKey($required, static fn(string $key): OpenAiCompatibleConfig => OpenAiCompatibleConfig::openAi($key, $model ?? '')),
-            'anthropic' => self::withKey($required, static fn(string $key): AnthropicConfig => new AnthropicConfig($model ?? '', $key)),
+            'anthropic' => self::withKey($required, static fn(string $key): AnthropicConfig => new AnthropicConfig($model ?? '', $key, baseUrl: $baseUrl ?? AnthropicConfig::DEFAULT_BASE_URL)),
             'gemini' => self::withKey($required, static fn(string $key): OpenAiCompatibleConfig => OpenAiCompatibleConfig::gemini($key, $model ?? '')),
             'ollama' => null === $model ? null : (null === $baseUrl ? OpenAiCompatibleConfig::ollama($model) : OpenAiCompatibleConfig::ollama($model, $baseUrl)),
             'vllm' => null === $model ? null : OpenAiCompatibleConfig::vllm($model, $baseUrl ?? 'http://localhost:8000/v1', self::variable('HTML_TRANSLATOR_VLLM_API_KEY')),

@@ -23,6 +23,8 @@ use Throwable;
 /**
  * ChatModelInterface for the Claude Messages API (POST {baseUrl}/messages, anthropic-version 2023-06-01, API shape as
  * of 2026-10) on any PSR-18 client (ADR-0002).
+ * API reference: https://platform.claude.com/docs/en/api/messages; structured outputs:
+ * https://platform.claude.com/docs/en/build-with-claude/structured-outputs
  *
  * A JSON answer with a schema is asked for as structured output (output_config.format), which guarantees valid JSON;
  * current models reject assistant prefill (ADR-0014). Only text blocks make up the answer: thinking blocks, which
@@ -56,7 +58,8 @@ final readonly class AnthropicChatModel implements ChatModelInterface
     }
 
     /**
-     * @throws InvalidArgumentException when the temperature is above 1, which the Messages API does not accept
+     * @throws InvalidArgumentException when the temperature is above 1 or the conversation ends with an assistant
+     *                                  message (prefill), which the Messages API does not accept
      */
     public function complete(ChatRequest $request): ChatResponse
     {
@@ -75,14 +78,14 @@ final readonly class AnthropicChatModel implements ChatModelInterface
         $status = $response->getStatusCode();
         $body = (string) $response->getBody();
         if ($status < 200 || $status > 299) {
-            throw $this->httpError($status, $body);
+            throw $this->httpError($status, $body, $response->getHeaderLine('request-id'));
         }
 
         return $this->answer($body);
     }
 
     /**
-     * @throws InvalidArgumentException when the temperature is above 1
+     * @throws InvalidArgumentException when the temperature is above 1 or the last message is the assistant's
      *
      * @return array<string, mixed>
      */
@@ -91,6 +94,11 @@ final readonly class AnthropicChatModel implements ChatModelInterface
         // Rejected rather than clamped, so a setting is never silently changed.
         if (null !== $request->temperature && $request->temperature > self::MAX_TEMPERATURE) {
             throw new InvalidArgumentException(\sprintf('The Messages API accepts temperatures from 0 to 1, got %s.', var_export($request->temperature, true)));
+        }
+
+        // Current models reject a prefilled answer with HTTP 400 (ADR-0014); failing here says why.
+        if (ChatRole::Assistant === ($request->messages[array_key_last($request->messages)] ?? null)?->role) {
+            throw new InvalidArgumentException('The Messages API does not accept a conversation that ends with an assistant message (prefill).');
         }
 
         $body = ['model' => $this->config->model, 'max_tokens' => $request->maxOutputTokens ?? $this->config->defaultMaxOutputTokens];
@@ -108,8 +116,8 @@ final readonly class AnthropicChatModel implements ChatModelInterface
         }
 
         $outputConfig = [];
-        if (null !== $this->config->effort) {
-            $outputConfig['effort'] = $this->config->effort;
+        if ($this->config->effort instanceof AnthropicEffort) {
+            $outputConfig['effort'] = $this->config->effort->value;
         }
 
         // Without a schema there is nothing to enforce: the prompt asks for JSON and the caller's parser copes.
@@ -182,9 +190,10 @@ final readonly class AnthropicChatModel implements ChatModelInterface
     }
 
     /**
-     * Error bodies are {"type": "error", "error": {"type", "message"}, "request_id"}.
+     * Error bodies are {"type": "error", "error": {"type", "message"}, "request_id"}. The request id (also sent as the
+     * request-id header) is what Anthropic support asks for, so it goes into the message; it is not a secret.
      */
-    private function httpError(int $status, string $body): ProviderException
+    private function httpError(int $status, string $body, string $requestIdHeader): ProviderException
     {
         // Proxy pages and other non-JSON bodies are not quoted: they may be large and say nothing useful.
         $data = json_decode($body, true);
@@ -196,7 +205,12 @@ final readonly class AnthropicChatModel implements ChatModelInterface
             $vendorMessage = mb_substr($vendorMessage, 0, self::VENDOR_MESSAGE_LENGTH - 1) . '…';
         }
 
+        $requestId = \is_array($data) && \is_string($data['request_id'] ?? null) && '' !== $data['request_id'] ? $data['request_id'] : $requestIdHeader;
         $message = \sprintf('anthropic returned HTTP %d', $status);
+        // Only a plain id is quoted: the header could be anything a proxy sends.
+        if (1 === preg_match('/^[A-Za-z0-9_-]{1,100}$/D', $requestId)) {
+            $message .= \sprintf(' (request %s)', $requestId);
+        }
 
         return ProviderException::fromHttpResponse($status, '' === $vendorMessage ? $message . '.' : $message . ': ' . $vendorMessage, $vendorCode);
     }

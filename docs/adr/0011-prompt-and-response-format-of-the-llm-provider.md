@@ -1,6 +1,6 @@
 # 0011. Prompt and response format of the LLM provider
 
-- Status: proposed
+- Status: proposed; amended by [0012](0012-translation-profile-in-the-prompt.md), [0013](0013-context-hints-in-the-prompt.md), [0014](0014-json-schema-in-chat-requests.md)
 - Date: 2026-10-11
 
 ## Context

@@ -8,6 +8,7 @@ use Closure;
 use Exception;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
+use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicEffort;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -63,29 +64,45 @@ final class AnthropicConfigTest extends TestCase
         ], $config->headers());
     }
 
-    /**
-     * @return iterable<string, array{string}>
-     */
-    public static function effortLevels(): iterable
+    #[Test]
+    public function it_keeps_the_effort_and_shows_it_in_dumps(): void
     {
-        foreach (['low', 'medium', 'high', 'xhigh', 'max'] as $effort) {
-            yield $effort => [$effort];
-        }
+        $config = new AnthropicConfig('claude-opus-5-5', self::API_KEY, effort: AnthropicEffort::XHigh);
+
+        self::assertSame(AnthropicEffort::XHigh, $config->effort);
+        self::assertSame('xhigh', $config->__debugInfo()['effort']);
     }
 
     #[Test]
-    #[DataProvider('effortLevels')]
-    public function it_accepts_every_effort_level(string $effort): void
+    public function it_lets_a_gateway_header_through(): void
     {
-        self::assertSame($effort, new AnthropicConfig('claude-opus-5-5', self::API_KEY, effort: $effort)->effort);
+        $config = new AnthropicConfig('claude-opus-5-5', self::API_KEY, extraHeaders: ['Authorization' => 'Bearer gateway-token', '123' => 'numeric-name']);
+
+        self::assertSame('Bearer gateway-token', $config->headers()['Authorization'] ?? null);
+        self::assertSame('numeric-name', $config->headers()['123'] ?? null);
+    }
+
+    #[Test]
+    public function it_accepts_an_output_limit_of_one(): void
+    {
+        self::assertSame(1, new AnthropicConfig('claude-opus-5-5', self::API_KEY, defaultMaxOutputTokens: 1)->defaultMaxOutputTokens);
     }
 
     #[Test]
     public function it_removes_its_key_and_header_values_from_text(): void
     {
-        $config = new AnthropicConfig('claude-opus-5-5', self::API_KEY, extraHeaders: ['X-Gateway-Token' => 'gateway-SECRET', 'X-V' => 'v2']);
+        $config = new AnthropicConfig('claude-opus-5-5', self::API_KEY, extraHeaders: ['X-Gateway-Token' => 'gateway-SECRET', 'X-Team' => 'team1234', 'X-V' => 'v2']);
 
-        self::assertSame('invalid x-api-key [redacted] via [redacted] for v2.', $config->redact('invalid x-api-key ' . self::API_KEY . ' via gateway-SECRET for v2.'));
+        self::assertSame(
+            'invalid x-api-key [redacted] via [redacted] of [redacted] for v2.',
+            $config->redact('invalid x-api-key ' . self::API_KEY . ' via gateway-SECRET of team1234 for v2.'),
+        );
+    }
+
+    #[Test]
+    public function it_removes_even_a_short_key(): void
+    {
+        self::assertSame('bad key [redacted]', new AnthropicConfig('claude-opus-5-5', 'sk-1')->redact('bad key sk-1'));
     }
 
     #[Test]
@@ -127,10 +144,14 @@ final class AnthropicConfigTest extends TestCase
         yield 'relative URL' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, baseUrl: '/v1')];
         yield 'URL with a query' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, baseUrl: 'https://api.example.test/v1?key=1')];
         yield 'URL with credentials' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, baseUrl: 'https://user:pw@api.example.test/v1')];
+        yield 'URL with a token as user' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, baseUrl: 'https://token@api.example.test/v1')];
+        yield 'URL with a fragment' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, baseUrl: 'https://api.example.test/v1#top')];
+        yield 'URL that is not HTTP' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, baseUrl: 'ftp://api.example.test/v1')];
+        yield 'URL without host' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, baseUrl: 'http:/v1')];
+        yield 'unparsable URL' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, baseUrl: 'https:///v1')];
         yield 'blank API version' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, apiVersion: ' ')];
         yield 'API version with a line break' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, apiVersion: "2023-06-01\r\nX: y")];
         yield 'output limit of zero' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, defaultMaxOutputTokens: 0)];
-        yield 'unknown effort' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, effort: 'extreme')];
         yield 'header overriding the key' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, extraHeaders: ['X-Api-Key' => 'other'])];
         yield 'header overriding the version' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, extraHeaders: ['anthropic-version' => '2024-01-01'])];
         yield 'header overriding the beta header' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, extraHeaders: ['Anthropic-Beta' => 'x'])];

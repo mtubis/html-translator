@@ -44,6 +44,15 @@ final class JsonSchemaTest extends TestCase
     }
 
     #[Test]
+    public function it_says_why_the_text_is_not_json(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('A JSON schema must be valid JSON: Syntax error.');
+
+        JsonSchema::fromJson('{"type": object}');
+    }
+
+    #[Test]
     #[DataProvider('invalidSchemas')]
     public function it_rejects_what_is_not_a_json_object_schema(string $json): void
     {

@@ -19,6 +19,7 @@ use HtmlTranslator\Provider\Llm\Testing\ChatScenarioKind;
 use HtmlTranslator\Provider\Llm\Testing\RecordedChatRequest;
 use HtmlTranslator\Tests\Support\FakeClientException;
 use HtmlTranslator\Tests\Support\FakeHttpClient;
+use LogicException;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Nyholm\Psr7\Response;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -115,6 +116,7 @@ final class AnthropicChatModelContractTest extends ChatModelContractTestCase
         return new RecordedChatRequest(
             $messages,
             null === $temperature ? null : (float) $temperature,
+            // Only a schema enforces JSON here (ADR-0014): the contract sends one, so a missing format fails it.
             null !== $format,
             // The API requires a limit: the adapter's default stands for "the request set none".
             self::DEFAULT_MAX_OUTPUT_TOKENS === $maxTokens ? null : $maxTokens,
@@ -139,7 +141,8 @@ final class AnthropicChatModelContractTest extends ChatModelContractTestCase
             FinishReason::Stop => 'end_turn',
             FinishReason::Length => 'max_tokens',
             FinishReason::Refusal => 'refusal',
-            FinishReason::ContentFilter, FinishReason::Other => 'tool_use',
+            FinishReason::Other => 'tool_use',
+            FinishReason::ContentFilter => throw new LogicException('No Anthropic equivalent; excluded in finishReasons().'),
             null => null,
         };
         if (null !== $stopReason) {

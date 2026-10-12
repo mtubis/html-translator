@@ -24,15 +24,13 @@ final readonly class AnthropicConfig
     /** Fits a non-streaming request; the Messages API requires an output limit on every call. */
     public const int DEFAULT_MAX_OUTPUT_TOKENS = 16000;
 
-    public const array EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'];
-
     /** Server-side refusal fallbacks, routed by refusal category ("fallbacks": "default"). */
     public const string REFUSAL_FALLBACKS_BETA = 'server-side-fallback-2026-07-01';
 
     private const string REDACTED = '[redacted]';
 
-    /** Headers the adapter sets itself. */
-    private const array RESERVED_HEADERS = ['x-api-key', 'anthropic-version', 'anthropic-beta', 'content-type', 'accept', 'authorization'];
+    /** Headers the adapter sets itself; Authorization stays free for a gateway in front of the API. */
+    private const array RESERVED_HEADERS = ['x-api-key', 'anthropic-version', 'anthropic-beta', 'content-type', 'accept'];
 
     /** A header name (RFC 9110 token). */
     private const string HEADER_NAME = '/^[!#$%&\'*+.^_`|~0-9A-Za-z-]+$/D';
@@ -56,7 +54,7 @@ final readonly class AnthropicConfig
      * @param string $baseUrl API root without the endpoint, e.g. a gateway in front of the Claude API
      * @param string $apiVersion the anthropic-version header
      * @param int $defaultMaxOutputTokens max_tokens when a request sets no limit; at least 1
-     * @param ?string $effort output_config.effort (one of EFFORT_LEVELS); null leaves the model's default
+     * @param ?AnthropicEffort $effort output_config.effort; null leaves the model's default
      * @param bool $refusalFallbacks let the API answer a refused request with a fallback model (Claude API only)
      * @param array<array-key, string> $extraHeaders treated as secret like the key (PHP turns numeric names into int keys)
      *
@@ -69,7 +67,7 @@ final readonly class AnthropicConfig
         public string $baseUrl = self::DEFAULT_BASE_URL,
         public string $apiVersion = self::DEFAULT_API_VERSION,
         public int $defaultMaxOutputTokens = self::DEFAULT_MAX_OUTPUT_TOKENS,
-        public ?string $effort = null,
+        public ?AnthropicEffort $effort = null,
         public bool $refusalFallbacks = false,
         #[SensitiveParameter]
         array $extraHeaders = [],
@@ -98,10 +96,6 @@ final readonly class AnthropicConfig
 
         if ($defaultMaxOutputTokens < 1) {
             throw new InvalidArgumentException(\sprintf('The default output limit must be at least 1, got %d.', $defaultMaxOutputTokens));
-        }
-
-        if (null !== $effort && !\in_array($effort, self::EFFORT_LEVELS, true)) {
-            throw new InvalidArgumentException(\sprintf('"%s" is not an effort level; expected one of %s.', $effort, implode(', ', self::EFFORT_LEVELS)));
         }
 
         $headers = [];
@@ -162,15 +156,16 @@ final readonly class AnthropicConfig
     }
 
     /**
-     * The text without the API key and extra header values (of at least MIN_REDACTED_LENGTH characters), for messages
+     * The text without the API key and extra header values of at least MIN_REDACTED_LENGTH characters, for messages
      * built from vendor or transport errors. Only exact copies are found.
      *
      * @internal for AnthropicChatModel
      */
     public function redact(string $text): string
     {
-        $secrets = [...array_values(array_map($this->reveal(...), $this->extraHeaders)), $this->reveal($this->apiKey)];
-        $secrets = array_filter($secrets, static fn(string $secret): bool => \strlen($secret) >= self::MIN_REDACTED_LENGTH);
+        // The key is always removed; short header values are not secrets and would garble the text.
+        $secrets = array_filter(array_map($this->reveal(...), $this->extraHeaders), static fn(string $secret): bool => \strlen($secret) >= self::MIN_REDACTED_LENGTH);
+        $secrets[] = $this->reveal($this->apiKey);
 
         return str_replace($secrets, self::REDACTED, $text);
     }
@@ -186,7 +181,7 @@ final readonly class AnthropicConfig
             'apiKey' => self::REDACTED,
             'apiVersion' => $this->apiVersion,
             'defaultMaxOutputTokens' => $this->defaultMaxOutputTokens,
-            'effort' => $this->effort,
+            'effort' => $this->effort?->value,
             'refusalFallbacks' => $this->refusalFallbacks,
             'extraHeaders' => array_map(static fn(): string => self::REDACTED, $this->extraHeaders),
         ];

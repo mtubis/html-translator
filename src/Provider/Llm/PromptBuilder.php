@@ -19,7 +19,7 @@ use HtmlTranslator\Provider\TranslationBatch;
  *
  * The system message is built from sections; the translation profile adds its own, only for what it sets (ADR-0012).
  */
-final class PromptBuilder
+final readonly class PromptBuilder
 {
     /**
      * Version of the prompt wording and format, part of the translation cache key (ARCHITECTURE §6.7): any change to
@@ -75,6 +75,13 @@ final class PromptBuilder
      */
     private const int JSON_FLAGS = \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_THROW_ON_ERROR;
 
+    private JsonSchema $answerSchema;
+
+    public function __construct()
+    {
+        $this->answerSchema = JsonSchema::fromJson(self::ANSWER_SCHEMA);
+    }
+
     public function build(TranslationBatch $batch): ChatRequest
     {
         return new ChatRequest(
@@ -83,7 +90,7 @@ final class PromptBuilder
                 new ChatMessage(ChatRole::User, $this->userMessage($batch)),
             ],
             jsonResponse: true,
-            jsonSchema: JsonSchema::fromJson(self::ANSWER_SCHEMA),
+            jsonSchema: $this->answerSchema,
         );
     }
 
