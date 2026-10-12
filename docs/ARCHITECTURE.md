@@ -116,7 +116,7 @@ Adapters are written on **PSR-18 / PSR-17**, not vendor SDKs ([ADR-0002](adr/000
 ## 6. Pipeline in detail
 
 ### 6.1 Loading
-- `Dom\HTMLDocument` (PHP 8.4 native HTML5 parser). Full documents via `createFromString`, fragments are wrapped in a template/body and unwrapped on serialization.
+- `Dom\HTMLDocument` (PHP 8.4 native HTML5 parser). Full documents via `createFromString`; fragments are parsed with the fragment parsing algorithm in a `<body>` context — or, when they open with a table part (`<tr>`, `<td>`, `<thead>`, `<col>`, …), in the element it belongs in (`<tbody>`, `<tr>`, `<table>`; `<colgroup>` only when nothing but columns follows, since it would drop other content) — and only the fragment's nodes are serialized. Later content that does not fit that context is restructured as in a browser, keeping its text (see `HtmlLoader`).
 - Round-trip guarantee: `serialize(load($html))` must be structurally identical to `$html` for every fixture when nothing is translated (tested).
 
 ### 6.2 Segmentation

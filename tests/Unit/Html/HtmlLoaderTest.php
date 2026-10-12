@@ -114,6 +114,114 @@ final class HtmlLoaderTest extends TestCase
         self::assertNotNull($root->ownerDocument?->querySelector('p'));
     }
 
+    /**
+     * @return iterable<string, array{string, string}> fragment, element the fragment is parsed in
+     */
+    public static function tablePartFragments(): iterable
+    {
+        yield 'rows' => ['<tr><th>Plan</th><td>Price <b>9 €</b></td></tr><tr><td>Pro</td><td>19 €</td></tr>', 'tbody'];
+        yield 'cells' => ['<td>A</td><th scope="row">B</th>', 'tr'];
+        yield 'header cell first' => ['<th>Name</th><td>Value</td>', 'tr'];
+        yield 'sections' => ['<thead><tr><th>H</th></tr></thead><tbody><tr><td>D</td></tr></tbody><tfoot><tr><td>F</td></tr></tfoot>', 'table'];
+        yield 'body section only' => ['<tbody><tr><td>D</td></tr></tbody>', 'table'];
+        yield 'foot section only' => ['<tfoot><tr><td>F</td></tr></tfoot>', 'table'];
+        yield 'caption and column group' => ['<caption>Prices</caption><colgroup><col span="2"></colgroup>', 'table'];
+        yield 'column group first' => ['<colgroup><col></colgroup><thead><tr><th>H</th></tr></thead>', 'table'];
+        yield 'columns' => ['<col span="2"><col class="price">', 'colgroup'];
+        yield 'columns with whitespace and a comment' => ['<col span="2"> <!-- c --> <col>', 'colgroup'];
+        yield 'upper-case tag' => ['<TR><TD>A</TD></TR>', 'tbody'];
+        yield 'whitespace and comments first' => ["\n  <!-- rows --><?pi x?>\n<tr><td>A</td></tr>\n", 'tbody'];
+        yield 'rows followed by other content' => ['<tr><td>A</td></tr><p>After</p>', 'tbody'];
+    }
+
+    #[Test]
+    #[DataProvider('tablePartFragments')]
+    public function it_keeps_table_parts_at_the_start_of_a_fragment(string $html, string $context): void
+    {
+        $loaded = new HtmlLoader()->load($html);
+
+        self::assertTrue($loaded->isFragment());
+        self::assertSame($context, $loaded->root()->localName);
+        self::assertTrue($loaded->root()->isConnected);
+        self::assertSame(
+            str_replace(['<TR>', '</TR>', '<TD>', '</TD>', '<?pi x?>'], ['<tr>', '</tr>', '<td>', '</td>', '<!--?pi x?-->'], $html),
+            $loaded->serialize(),
+        );
+    }
+
+    /**
+     * Content after leading columns that a <colgroup> context would drop, text included, is parsed in a <table>
+     * instead: nothing is lost, at the cost of an implied <colgroup> around the columns.
+     *
+     * @return iterable<string, array{string, string}>
+     */
+    public static function columnsFollowedByOtherContent(): iterable
+    {
+        yield 'rows' => ['<col><tr><td>A</td></tr>', '<colgroup><col></colgroup><tbody><tr><td>A</td></tr></tbody>'];
+        yield 'text' => ['<col>Text', '<colgroup><col></colgroup>Text'];
+    }
+
+    #[Test]
+    #[DataProvider('columnsFollowedByOtherContent')]
+    public function it_parses_columns_followed_by_other_content_in_a_table(string $html, string $expected): void
+    {
+        $loaded = new HtmlLoader()->load($html);
+
+        self::assertSame('table', $loaded->root()->localName);
+        self::assertSame($expected, $loaded->serialize());
+    }
+
+    /**
+     * Known limitation, as in a browser: later content that does not fit the context chosen by the first element is
+     * restructured. Text is kept; pinned here so a parser change shows up.
+     *
+     * @return iterable<string, array{string, string}>
+     */
+    public static function contentNotFittingTheContext(): iterable
+    {
+        yield 'rows after a head section get an implied body' => ['<thead><tr><th>H</th></tr></thead><tr><td>D</td></tr>', '<thead><tr><th>H</th></tr></thead><tbody><tr><td>D</td></tr></tbody>'];
+        yield 'a row after cells is dropped, its cells stay' => ['<td>A</td><tr><td>B</td></tr>', '<td>A</td><td>B</td>'];
+        yield 'a foot section after rows is dropped, its rows stay' => ['<tr><td>A</td></tr><tfoot><tr><td>F</td></tr></tfoot>', '<tr><td>A</td></tr><tr><td>F</td></tr>'];
+        yield 'a nested table after rows is dropped, its rows stay' => ['<tr><td>A</td></tr><table><tr><td>B</td></tr></table>', '<tr><td>A</td></tr><tr><td>B</td></tr>'];
+    }
+
+    #[Test]
+    #[DataProvider('contentNotFittingTheContext')]
+    public function it_restructures_later_content_that_does_not_fit_the_context(string $html, string $expected): void
+    {
+        self::assertSame($expected, new HtmlLoader()->load($html)->serialize());
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function bodyContextFragments(): iterable
+    {
+        yield 'table part after other content' => ['<p>x</p><tr><td>y</td></tr>', '<p>x</p>y'];
+        yield 'custom element starting with tr' => ['<tr-row>x</tr-row>', '<tr-row>x</tr-row>'];
+        yield 'custom element starting with col' => ['<col-span>x</col-span>', '<col-span>x</col-span>'];
+        yield 'table part after text' => ['Total <td>9</td>', 'Total 9'];
+        yield 'a whole table' => ['<table><tr><td>A</td></tr></table>', '<table><tbody><tr><td>A</td></tr></tbody></table>'];
+    }
+
+    #[Test]
+    #[DataProvider('bodyContextFragments')]
+    public function it_parses_other_fragments_in_a_body_as_before(string $html, string $expected): void
+    {
+        $loaded = new HtmlLoader()->load($html);
+
+        self::assertSame('body', $loaded->root()->localName);
+        self::assertSame($expected, $loaded->serialize());
+    }
+
+    #[Test]
+    public function it_detects_table_parts_after_a_very_long_leading_comment(): void
+    {
+        $loaded = new HtmlLoader()->load('<!--' . str_repeat('x', 2_000_000) . '--><tr><td>A</td></tr>');
+
+        self::assertSame('tbody', $loaded->root()->localName);
+    }
+
     #[Test]
     public function it_does_not_wrap_fragments_on_serialization(): void
     {

@@ -71,13 +71,38 @@ trait DomAssertions
         return HTMLDocument::createFromString($html, \LIBXML_NOERROR, 'UTF-8');
     }
 
+    /**
+     * Parsed in a <body>, or for a fragment that opens with a table part in the element it belongs in, so lost
+     * rows and cells show up as a difference. Deliberately independent of HtmlLoader's own detection.
+     */
     private static function parseFragment(string $html): Element
     {
         $document = HTMLDocument::createFromString('<!DOCTYPE html><html><head></head><body></body></html>', \LIBXML_NOERROR, 'UTF-8');
-        $body = $document->body ?? self::fail('Empty skeleton document has no <body>.');
-        $body->innerHTML = $html;
+        $container = $document->body ?? self::fail('Empty skeleton document has no <body>.');
 
-        return $body;
+        // Possessive and without lazy quantifiers, so a long leading comment cannot exhaust the backtrack limit.
+        $tablePart = preg_match('/^(?:\s++|<!--[^-]*+(?:-(?!->)[^-]*+)*+-->|<\?[^>]*+>)*+<(tr|td|th|thead|tbody|tfoot|caption|colgroup|col)[\s>\/]/i', $html, $match);
+        if (false === $tablePart) {
+            self::fail('Could not check the fragment for a table part: ' . preg_last_error_msg());
+        }
+
+        if (1 === $tablePart) {
+            $chain = match (strtolower($match[1])) {
+                'tr' => ['table', 'tbody'],
+                'td', 'th' => ['table', 'tbody', 'tr'],
+                'col' => ['table', 'colgroup'],
+                default => ['table'],
+            };
+            foreach ($chain as $name) {
+                $element = $document->createElement($name);
+                $container->appendChild($element);
+                $container = $element;
+            }
+        }
+
+        $container->innerHTML = $html;
+
+        return $container;
     }
 
     private static function dumpSkeleton(Node $parent, int $depth, bool $translates, SkipRules $skipRules, TranslatableAttributes $attributes): string
