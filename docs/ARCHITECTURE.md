@@ -155,7 +155,7 @@ Adapters are written on **PSR-18 / PSR-17**, not vendor SDKs ([ADR-0002](adr/000
 - Optional PSR-6 pool. Key = hash of (normalized unit text, locale pair, profile fingerprint, provider/model id, prompt version). Unit-level caching makes re-translating a slightly edited page cheap.
 
 ### 6.8 Reliability
-- Transport-level retries with exponential backoff and jitter for 429/5xx live in the chat-model adapters (configurable), not in the core.
+- Transport-level retries with exponential backoff and jitter for 408/429/5xx/529 and network errors live in the chat-model adapters, not in the core: `Provider\Llm\Bridge\Retrier` with a `RetryPolicy` and a `Sleeper` port, honouring `Retry-After` (docs/providers.md).
 - `onProgress` is called after each batch.
 
 ## 7. Package layout

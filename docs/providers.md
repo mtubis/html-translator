@@ -72,8 +72,8 @@ new OpenAiCompatibleConfig(
 
 - **Timeouts** are set on the HTTP client: PSR-18 has no per-request timeout. Translation batches can take a while,
   so allow at least 60 seconds.
-- **Retries** for rate limits and server errors are not built in yet (0.4). Until then, a client with its own retry
-  middleware works. `LlmTranslationProvider` asks the model once more only when an answer cannot be parsed.
+- **Retries**: see [Retries](#retries) below. `LlmTranslationProvider` also asks the model once more when an answer
+  cannot be parsed.
 - **The API key and extra header values** are treated as secrets: they are only sent as headers, never quoted in
   validation errors, removed from error messages built by the adapter (also from a transport error's causes), hidden
   from `var_dump()`, `print_r()` and `var_export()`, and the configuration cannot be serialized. The key must be
@@ -134,8 +134,35 @@ $translator = new HtmlTranslator(new LlmTranslationProvider($model));
   and the API may answer with a fallback model instead (`ChatResponse::$model` names it). Available on the Claude API
   only; check that your model supports it.
 - **Errors** are `ProviderException`s with `statusCode` and `vendorCode` (`error.type`, e.g. `rate_limit_error`,
-  `overloaded_error` for HTTP 529); the message names the request id, which Anthropic support asks for. No transport
-  retries yet (0.4).
+  `overloaded_error` for HTTP 529); the message names the request id, which Anthropic support asks for. Transient
+  failures are retried, see [Retries](#retries).
+
+## Retries
+
+Both adapters retry transient failures through a `Retrier` (ARCHITECTURE §6.8):
+
+- **What:** HTTP 408, 429, 500, 502, 503, 504 and 529 (Anthropic's overload), and PSR-18 network errors. Permanent
+  errors such as 400, 401 or 404 are never retried.
+- **How often:** 3 attempts in total by default.
+- **How long:** the server's `Retry-After` (seconds, or an HTTP date measured against its `Date` header) when it sends
+  one, otherwise exponential backoff with jitter: 0.5–1 s before the second attempt, 1–2 s before the third, … Each
+  wait is capped at 30 s, so a call takes at most about `attempts × 30 s` plus the requests themselves.
+- **Messages:** a failure after several attempts says so (`… returned HTTP 529 after 3 attempts …`); status and vendor
+  code are those of the last response.
+
+```php
+use HtmlTranslator\Provider\Llm\Bridge\Retrier;
+use HtmlTranslator\Provider\Llm\Bridge\RetryPolicy;
+
+// More patience for a busy model:
+$model = new AnthropicChatModel($http, $http, $http, $config, new Retrier(new RetryPolicy(maxAttempts: 5, maxDelayMilliseconds: 60_000)));
+
+// No retries, e.g. when the HTTP client already retries:
+$model = new OpenAiCompatibleChatModel($http, $http, $http, $config, new Retrier(RetryPolicy::none()));
+```
+
+Waiting goes through the `Sleeper` port (default `UsleepSleeper`, which blocks); event-loop applications and tests
+can pass their own: `new Retrier(sleeper: $sleeper)`.
 
 ## Writing your own
 
