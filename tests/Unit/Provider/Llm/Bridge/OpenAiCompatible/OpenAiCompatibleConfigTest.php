@@ -8,6 +8,7 @@ use Closure;
 use Exception;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\UntrustedText;
+use HtmlTranslator\Provider\Llm\Bridge\HttpSecrets;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -18,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(OpenAiCompatibleConfig::class)]
 #[UsesClass(InvalidArgumentException::class)]
 #[UsesClass(UntrustedText::class)]
+#[UsesClass(HttpSecrets::class)]
 final class OpenAiCompatibleConfigTest extends TestCase
 {
     private const string API_KEY = 'sk-test-SECRET-0123456789';
@@ -76,6 +78,12 @@ final class OpenAiCompatibleConfigTest extends TestCase
 
         self::assertSame('Incorrect API key provided: [redacted], twice: [redacted].', $config->redact('Incorrect API key provided: ' . self::API_KEY . ', twice: ' . self::API_KEY . '.'));
         self::assertSame('No key here.', OpenAiCompatibleConfig::ollama('llama3.1')->redact('No key here.'));
+    }
+
+    #[Test]
+    public function it_removes_even_a_short_key_from_text(): void
+    {
+        self::assertSame('Rejected token [redacted].', OpenAiCompatibleConfig::vllm('qwen', 'http://localhost:8000/v1', 'abc123')->redact('Rejected token abc123.'));
     }
 
     #[Test]
@@ -193,6 +201,7 @@ final class OpenAiCompatibleConfigTest extends TestCase
     public function it_accepts_a_name_of_100_characters(): void
     {
         self::assertSame(str_repeat('n', 100), new OpenAiCompatibleConfig(str_repeat('n', 100), 'https://api.example.test/v1', 'model')->name);
+        self::assertSame(str_repeat('ż', 100), new OpenAiCompatibleConfig(str_repeat('ż', 100), 'https://api.example.test/v1', 'model')->name);
     }
 
     #[Test]

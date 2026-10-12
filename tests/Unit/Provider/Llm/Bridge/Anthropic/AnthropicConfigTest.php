@@ -10,6 +10,7 @@ use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicEffort;
+use HtmlTranslator\Provider\Llm\Bridge\HttpSecrets;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -19,6 +20,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(AnthropicConfig::class)]
 #[UsesClass(InvalidArgumentException::class)]
 #[UsesClass(UntrustedText::class)]
+#[UsesClass(HttpSecrets::class)]
 final class AnthropicConfigTest extends TestCase
 {
     private const string API_KEY = 'sk-ant-test-SECRET-0123456789';
@@ -146,6 +148,7 @@ final class AnthropicConfigTest extends TestCase
         yield 'relative URL' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, baseUrl: '/v1')];
         yield 'URL with a query' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, baseUrl: 'https://api.example.test/v1?key=1')];
         yield 'URL with credentials' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, baseUrl: 'https://user:pw@api.example.test/v1')];
+        yield 'URL with a line break' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, baseUrl: "https://api.example.test/v1\nX")];
         yield 'URL with a token as user' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, baseUrl: 'https://token@api.example.test/v1')];
         yield 'URL with a fragment' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, baseUrl: 'https://api.example.test/v1#top')];
         yield 'URL that is not HTTP' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, baseUrl: 'ftp://api.example.test/v1')];

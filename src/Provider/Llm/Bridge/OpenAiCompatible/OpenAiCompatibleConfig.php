@@ -6,8 +6,8 @@ namespace HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible;
 
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\UntrustedText;
+use HtmlTranslator\Provider\Llm\Bridge\HttpSecrets;
 use SensitiveParameter;
-use SensitiveParameterValue;
 
 /**
  * Where and how OpenAiCompatibleChatModel calls an OpenAI-style Chat Completions API (docs/providers.md).
@@ -23,29 +23,12 @@ final readonly class OpenAiCompatibleConfig
     /** OpenAI's newer models (o-series, gpt-5) reject max_tokens. */
     public const string MAX_COMPLETION_TOKENS = 'max_completion_tokens';
 
-    private const string REDACTED = '[redacted]';
-
     private const int MAX_NAME_LENGTH = 100;
 
     /** Headers the adapter sets itself. */
     private const array RESERVED_HEADERS = ['authorization', 'content-type', 'accept'];
 
-    /** A header name (RFC 9110 token). */
-    private const string HEADER_NAME = '/^[!#$%&\'*+.^_`|~0-9A-Za-z-]+$/D';
-
-    /** A header value: visible characters, spaces and tabs, no line breaks or other control characters. */
-    private const string HEADER_VALUE = '/^[\x20\x09\x21-\x7E\x80-\xFF]*$/D';
-
-    /** An API key: visible ASCII only, which also rejects the line break of a key read from a file. */
-    private const string API_KEY = '/^[\x21-\x7E]+$/D';
-
-    /** Shorter header values are not removed from messages: they are not secrets and would garble the text. */
-    private const int MIN_REDACTED_LENGTH = 8;
-
-    private ?SensitiveParameterValue $apiKey;
-
-    /** @var array<string, SensitiveParameterValue> */
-    private array $extraHeaders;
+    private HttpSecrets $secrets;
 
     /**
      * @param string $name prefix of modelId(), e.g. "openai"
@@ -78,52 +61,20 @@ final readonly class OpenAiCompatibleConfig
             throw new InvalidArgumentException(\sprintf('The configuration name "%s" must be at most %d characters on one line.', UntrustedText::quote($name), self::MAX_NAME_LENGTH));
         }
 
-        if (1 === preg_match('/[\x00-\x20\x7F]/', $baseUrl)) {
-            throw new InvalidArgumentException(\sprintf('The base URL of "%s" contains whitespace or control characters.', $name));
-        }
-
-        // The URL is not quoted: it may contain a credential (user info, ?key=).
-        $parts = parse_url($baseUrl);
-        if (false === $parts || !\in_array($parts['scheme'] ?? null, ['http', 'https'], true) || !isset($parts['host'])) {
-            throw new InvalidArgumentException(\sprintf('The base URL of "%s" is not an absolute HTTP(S) URL.', $name));
-        }
-
-        if (isset($parts['user']) || isset($parts['pass']) || isset($parts['query']) || isset($parts['fragment'])) {
-            throw new InvalidArgumentException(\sprintf('The base URL of "%s" must not contain credentials, a query or a fragment.', $name));
-        }
+        HttpSecrets::checkBaseUrl($baseUrl, \sprintf('The base URL of "%s"', $name));
 
         if ('' === trim($model)) {
             throw new InvalidArgumentException('An OpenAI-compatible configuration needs a model.');
         }
 
-        if (null !== $apiKey && 1 !== preg_match(self::API_KEY, $apiKey)) {
-            throw new InvalidArgumentException('The API key must be visible ASCII characters without spaces or line breaks; pass null for a server without authentication.');
-        }
+        // Same order of checks as before the secrets moved to HttpSecrets: the key before the output limit field.
+        $secrets = new HttpSecrets($apiKey, $extraHeaders, self::RESERVED_HEADERS, '; pass null for a server without authentication');
 
         if (!\in_array($maxTokensField, [self::MAX_TOKENS, self::MAX_COMPLETION_TOKENS], true)) {
             throw new InvalidArgumentException(\sprintf('"%s" is not a supported output limit field.', UntrustedText::quote($maxTokensField)));
         }
 
-        $headers = [];
-        foreach ($extraHeaders as $header => $value) {
-            $header = (string) $header;
-            if (1 !== preg_match(self::HEADER_NAME, $header)) {
-                throw new InvalidArgumentException('An extra header has an invalid name.');
-            }
-
-            if (\in_array(strtolower($header), self::RESERVED_HEADERS, true)) {
-                throw new InvalidArgumentException(\sprintf('The header "%s" is set by the adapter.', UntrustedText::quote($header)));
-            }
-
-            if (1 !== preg_match(self::HEADER_VALUE, $value)) {
-                throw new InvalidArgumentException(\sprintf('The value of header "%s" contains line breaks or control characters.', UntrustedText::quote($header)));
-            }
-
-            $headers[$header] = new SensitiveParameterValue($value);
-        }
-
-        $this->apiKey = null === $apiKey ? null : new SensitiveParameterValue($apiKey);
-        $this->extraHeaders = $headers;
+        $this->secrets = $secrets;
     }
 
     /**
@@ -192,30 +143,23 @@ final readonly class OpenAiCompatibleConfig
      */
     public function headers(): array
     {
-        $headers = array_map($this->reveal(...), $this->extraHeaders) + ['Content-Type' => 'application/json', 'Accept' => 'application/json'];
-        if ($this->apiKey instanceof SensitiveParameterValue) {
-            $headers['Authorization'] = 'Bearer ' . $this->reveal($this->apiKey);
+        $headers = $this->secrets->extraHeaders() + ['Content-Type' => 'application/json', 'Accept' => 'application/json'];
+        $apiKey = $this->secrets->apiKey();
+        if (null !== $apiKey) {
+            $headers['Authorization'] = 'Bearer ' . $apiKey;
         }
 
         return $headers;
     }
 
     /**
-     * The text without the API key and extra header values (of at least MIN_REDACTED_LENGTH characters), for messages
-     * built from vendor or transport errors. Only exact copies are found, not URL-encoded or masked ones.
+     * The text without the API key and extra header values, for messages built from vendor or transport errors.
      *
      * @internal for OpenAiCompatibleChatModel
      */
     public function redact(string $text): string
     {
-        $secrets = array_map($this->reveal(...), $this->extraHeaders);
-        if ($this->apiKey instanceof SensitiveParameterValue) {
-            $secrets[] = $this->reveal($this->apiKey);
-        }
-
-        $secrets = array_filter($secrets, static fn(string $secret): bool => \strlen($secret) >= self::MIN_REDACTED_LENGTH);
-
-        return str_replace($secrets, self::REDACTED, $text);
+        return $this->secrets->redact($text);
     }
 
     /**
@@ -227,17 +171,10 @@ final readonly class OpenAiCompatibleConfig
             'name' => $this->name,
             'baseUrl' => $this->baseUrl,
             'model' => $this->model,
-            'apiKey' => $this->apiKey instanceof SensitiveParameterValue ? self::REDACTED : null,
+            'apiKey' => $this->secrets->maskedApiKey(),
             'jsonMode' => $this->jsonMode,
             'maxTokensField' => $this->maxTokensField,
-            'extraHeaders' => array_map(static fn(): string => self::REDACTED, $this->extraHeaders),
+            'extraHeaders' => $this->secrets->maskedExtraHeaders(),
         ];
-    }
-
-    private function reveal(SensitiveParameterValue $secret): string
-    {
-        $value = $secret->getValue();
-
-        return \is_string($value) ? $value : '';
     }
 }

@@ -10,6 +10,7 @@ use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicEffort;
+use HtmlTranslator\Provider\Llm\Bridge\HttpSecrets;
 use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatRequest;
 use HtmlTranslator\Provider\Llm\ChatResponse;
@@ -45,6 +46,7 @@ use Throwable;
 #[UsesClass(ProviderException::class)]
 #[UsesClass(InvalidArgumentException::class)]
 #[UsesClass(UntrustedText::class)]
+#[UsesClass(HttpSecrets::class)]
 final class AnthropicChatModelTest extends TestCase
 {
     private const string API_KEY = 'sk-ant-test-SECRET-0123456789';

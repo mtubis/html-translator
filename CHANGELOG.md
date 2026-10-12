@@ -13,6 +13,9 @@ All notable changes to this project are documented here. The format follows [Kee
   bounded and kept on one line (`Exception\UntrustedText`, #43).
 
 ### Changed
+- The chat model configs share their key, header and base URL rules (`Provider\Llm\Bridge\HttpSecrets`, #53).
+  `AnthropicConfig` now also rejects a base URL with whitespace or control characters, and
+  `OpenAiCompatibleConfig::redact()` removes the key whatever its length.
 - `ChatModelContractTestCase` has a new scenario, `ChatScenarioKind::NetworkError` / `ChatScenario::networkError()`.
   Contract tests of third-party adapters that match the kinds exhaustively must handle it (#52).
 
