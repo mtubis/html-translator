@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HtmlTranslator\Tests\Contract;
 
 use HtmlTranslator\Exception\ProviderException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig;
 use HtmlTranslator\Provider\Llm\ChatMessage;
@@ -37,6 +38,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(ChatResponse::class)]
 #[UsesClass(ProviderException::class)]
 #[UsesClass(JsonSchema::class)]
+#[UsesClass(UntrustedText::class)]
 final class OpenAiCompatibleChatModelContractTest extends ChatModelContractTestCase
 {
     private const string MODEL = 'contract-configured-model';

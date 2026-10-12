@@ -6,6 +6,7 @@ namespace HtmlTranslator\Html;
 
 use Dom\Element;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 
 /**
  * Decides whether an element's text is excluded from translation.
@@ -157,7 +158,7 @@ final readonly class SkipRules
         $normalized = strtolower($name);
 
         if (1 !== preg_match(self::ELEMENT_NAME, $normalized)) {
-            throw new InvalidArgumentException(\sprintf('"%s" is not a valid element name; expected e.g. "code" or "x-foo".', $name));
+            throw new InvalidArgumentException(\sprintf('"%s" is not a valid element name; expected e.g. "code" or "x-foo".', UntrustedText::quote($name)));
         }
 
         return $normalized;
@@ -166,7 +167,7 @@ final readonly class SkipRules
     private function className(string $class): string
     {
         if ('' === $class || false !== strpbrk($class, self::HTML_WHITESPACE) || str_starts_with($class, '.')) {
-            throw new InvalidArgumentException(\sprintf('"%s" is not a valid class name; expected e.g. "notranslate" (no dot, no whitespace).', $class));
+            throw new InvalidArgumentException(\sprintf('"%s" is not a valid class name; expected e.g. "notranslate" (no dot, no whitespace).', UntrustedText::quote($class)));
         }
 
         return $class;

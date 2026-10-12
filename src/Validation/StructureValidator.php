@@ -10,6 +10,7 @@ use HtmlTranslator\Domain\UnitKind;
 use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
 use HtmlTranslator\Domain\UnitTextTokenKind;
+use HtmlTranslator\Exception\UntrustedText;
 
 /**
  * Checks that a translation keeps the structure of its source unit (ADR-0003, ARCHITECTURE §6.5).
@@ -175,9 +176,8 @@ final readonly class StructureValidator
 
     private function rawMarkup(UnitTextToken $token): Violation
     {
-        $snippet = mb_strlen($token->text, 'UTF-8') > self::SNIPPET_LENGTH
-            ? mb_substr($token->text, 0, self::SNIPPET_LENGTH - 1, 'UTF-8') . '…'
-            : $token->text;
+        // Model output, quoted back to the model and into issues: bounded and on one line.
+        $snippet = UntrustedText::quote($token->text, self::SNIPPET_LENGTH);
 
         return new Violation(ViolationType::RawMarkup, \sprintf('Remove the markup "%s": use only the tags from the source text, and write a literal "<" as &lt;.', $snippet));
     }

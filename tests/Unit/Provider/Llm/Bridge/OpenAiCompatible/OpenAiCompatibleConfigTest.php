@@ -7,6 +7,7 @@ namespace HtmlTranslator\Tests\Unit\Provider\Llm\Bridge\OpenAiCompatible;
 use Closure;
 use Exception;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -16,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 
 #[CoversClass(OpenAiCompatibleConfig::class)]
 #[UsesClass(InvalidArgumentException::class)]
+#[UsesClass(UntrustedText::class)]
 final class OpenAiCompatibleConfigTest extends TestCase
 {
     private const string API_KEY = 'sk-test-SECRET-0123456789';

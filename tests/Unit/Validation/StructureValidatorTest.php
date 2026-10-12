@@ -11,6 +11,7 @@ use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitKind;
 use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Validation\StructureValidator;
 use HtmlTranslator\Validation\TagNesting;
 use HtmlTranslator\Validation\ValidationResult;
@@ -30,6 +31,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(InlineTag::class)]
 #[UsesClass(UnitText::class)]
 #[UsesClass(UnitTextToken::class)]
+#[UsesClass(UntrustedText::class)]
 final class StructureValidatorTest extends TestCase
 {
     /** Tags 1–3 paired, 4 void, 5 opaque (see block()). */

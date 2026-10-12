@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HtmlTranslator\Domain;
 
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use Stringable;
 
 /**
@@ -27,7 +28,7 @@ final readonly class UnitId implements Stringable
     public static function fromString(string $id): self
     {
         if (1 !== preg_match(self::PATTERN, $id)) {
-            throw new InvalidArgumentException(\sprintf('"%s" is not a valid unit id; expected e.g. "u1" or "a12".', $id));
+            throw new InvalidArgumentException(\sprintf('"%s" is not a valid unit id; expected e.g. "u1" or "a12".', UntrustedText::quote($id)));
         }
 
         return new self($id);

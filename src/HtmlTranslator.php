@@ -17,6 +17,7 @@ use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\InvalidHtmlException;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Exception\StructureValidationException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Html\HtmlLoader;
 use HtmlTranslator\Html\Reassembler;
 use HtmlTranslator\Html\Segmenter;
@@ -265,7 +266,7 @@ final readonly class HtmlTranslator
     private function failureMessage(string $id, IssueType $type, string $detail, bool $permanent, int $maxRetries): string
     {
         return match ($type) {
-            IssueType::ProviderFailure => \sprintf('The provider could not translate unit "%s"%s: %s', $id, $permanent ? ' (permanent failure)' : '', $detail),
+            IssueType::ProviderFailure => \sprintf('The provider could not translate unit "%s"%s: %s', $id, $permanent ? ' (permanent failure)' : '', UntrustedText::quote($detail)),
             IssueType::MissingTranslation => \sprintf('The provider returned no translation for unit "%s".', $id),
             IssueType::InvalidStructure, IssueType::PartiallyTranslated => \sprintf(
                 "The translation of unit \"%s\" is still invalid after %d corrective %s:\n%s",
@@ -354,7 +355,7 @@ final readonly class HtmlTranslator
                     $unit->id,
                     \count($reasons),
                     $total,
-                    implode('; ', array_unique($reasons)),
+                    implode('; ', array_map(static fn(string $reason): string => UntrustedText::quote($reason), array_unique($reasons))),
                 ));
             }
         }

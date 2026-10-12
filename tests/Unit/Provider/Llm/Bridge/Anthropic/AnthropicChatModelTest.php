@@ -6,6 +6,7 @@ namespace HtmlTranslator\Tests\Unit\Provider\Llm\Bridge\Anthropic;
 
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\ProviderException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicEffort;
@@ -39,6 +40,7 @@ use Throwable;
 #[UsesClass(JsonSchema::class)]
 #[UsesClass(ProviderException::class)]
 #[UsesClass(InvalidArgumentException::class)]
+#[UsesClass(UntrustedText::class)]
 final class AnthropicChatModelTest extends TestCase
 {
     private const string API_KEY = 'sk-ant-test-SECRET-0123456789';

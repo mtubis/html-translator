@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible;
 
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use SensitiveParameter;
 use SensitiveParameterValue;
 
@@ -73,11 +74,11 @@ final readonly class OpenAiCompatibleConfig
         // The URL is not quoted: it may contain a credential (user info, ?key=).
         $parts = parse_url($baseUrl);
         if (false === $parts || !\in_array($parts['scheme'] ?? null, ['http', 'https'], true) || !isset($parts['host'])) {
-            throw new InvalidArgumentException(\sprintf('The base URL of "%s" is not an absolute HTTP(S) URL.', $name));
+            throw new InvalidArgumentException(\sprintf('The base URL of "%s" is not an absolute HTTP(S) URL.', UntrustedText::quote($name)));
         }
 
         if (isset($parts['user']) || isset($parts['pass']) || isset($parts['query']) || isset($parts['fragment'])) {
-            throw new InvalidArgumentException(\sprintf('The base URL of "%s" must not contain credentials, a query or a fragment.', $name));
+            throw new InvalidArgumentException(\sprintf('The base URL of "%s" must not contain credentials, a query or a fragment.', UntrustedText::quote($name)));
         }
 
         if ('' === trim($model)) {
@@ -89,7 +90,7 @@ final readonly class OpenAiCompatibleConfig
         }
 
         if (!\in_array($maxTokensField, [self::MAX_TOKENS, self::MAX_COMPLETION_TOKENS], true)) {
-            throw new InvalidArgumentException(\sprintf('"%s" is not a supported output limit field.', $maxTokensField));
+            throw new InvalidArgumentException(\sprintf('"%s" is not a supported output limit field.', UntrustedText::quote($maxTokensField)));
         }
 
         $headers = [];
@@ -100,11 +101,11 @@ final readonly class OpenAiCompatibleConfig
             }
 
             if (\in_array(strtolower($header), self::RESERVED_HEADERS, true)) {
-                throw new InvalidArgumentException(\sprintf('The header "%s" is set by the adapter.', $header));
+                throw new InvalidArgumentException(\sprintf('The header "%s" is set by the adapter.', UntrustedText::quote($header)));
             }
 
             if (1 !== preg_match(self::HEADER_VALUE, $value)) {
-                throw new InvalidArgumentException(\sprintf('The value of header "%s" contains line breaks or control characters.', $header));
+                throw new InvalidArgumentException(\sprintf('The value of header "%s" contains line breaks or control characters.', UntrustedText::quote($header)));
             }
 
             $headers[$header] = new SensitiveParameterValue($value);
