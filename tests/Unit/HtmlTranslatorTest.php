@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Tests\Unit;
 
+use HtmlTranslator\Batching\Batcher;
+use HtmlTranslator\Batching\CharacterTokenEstimator;
+use HtmlTranslator\Batching\TokenEstimatorInterface;
 use HtmlTranslator\Domain\InlineTag;
 use HtmlTranslator\Domain\Locale;
 use HtmlTranslator\Domain\LocalePair;
@@ -62,6 +65,8 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(Issue::class)]
 #[CoversClass(StructureValidationException::class)]
 #[UsesClass(TranslationOptions::class)]
+#[UsesClass(Batcher::class)]
+#[UsesClass(CharacterTokenEstimator::class)]
 #[UsesClass(PseudoLocalizationProvider::class)]
 #[UsesClass(TranslationBatch::class)]
 #[UsesClass(BatchResult::class)]
@@ -553,6 +558,40 @@ final class HtmlTranslatorTest extends TestCase
         self::assertSame(5, $result->stats()->units);
         self::assertSame(0, $result->stats()->retries);
         self::assertGreaterThanOrEqual(0.0, $result->stats()->durationSeconds);
+    }
+
+    #[Test]
+    public function it_sizes_batches_by_the_token_budget(): void
+    {
+        $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => new PseudoLocalizationProvider()->translate($batch));
+        $paragraph = str_repeat('word ', 6);
+        $unitTokens = new CharacterTokenEstimator()->estimate(trim($paragraph)) + Batcher::UNIT_OVERHEAD;
+
+        $result = new HtmlTranslator($provider)->translate(
+            str_repeat("<p>{$paragraph}</p>", 5),
+            Locale::fromString('pl'),
+            new TranslationOptions(tokenBudget: 2 * $unitTokens),
+        );
+
+        self::assertSame([2, 2, 1], array_map(static fn(TranslationBatch $batch): int => \count($batch->units), $provider->batches));
+        self::assertSame(3, $result->stats()->batches);
+        self::assertTrue($result->isComplete());
+    }
+
+    #[Test]
+    public function it_batches_with_the_injected_batcher(): void
+    {
+        $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => new PseudoLocalizationProvider()->translate($batch));
+        $expensive = new class implements TokenEstimatorInterface {
+            public function estimate(string $text): int
+            {
+                return 1500;
+            }
+        };
+
+        new HtmlTranslator($provider, batcher: new Batcher($expensive))->translate('<p>A</p><p>B</p><p>C</p>', Locale::fromString('pl'));
+
+        self::assertSame([1, 1, 1], array_map(static fn(TranslationBatch $batch): int => \count($batch->units), $provider->batches));
     }
 
     #[Test]

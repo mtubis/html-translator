@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HtmlTranslator;
 
 use Closure;
+use HtmlTranslator\Batching\Batcher;
 use HtmlTranslator\Domain\Locale;
 use HtmlTranslator\Domain\LocalePair;
 use HtmlTranslator\Domain\TranslationUnit;
@@ -60,6 +61,7 @@ final readonly class HtmlTranslator
         private Reassembler $reassembler = new Reassembler(),
         ?SkipRules $skipRules = null,
         ?TranslatableAttributes $translatableAttributes = null,
+        private Batcher $batcher = new Batcher(),
     ) {
         $this->skipRules = $skipRules ?? SkipRules::defaults();
         $this->translatableAttributes = $translatableAttributes ?? TranslatableAttributes::defaults();
@@ -85,7 +87,7 @@ final readonly class HtmlTranslator
         }
 
         $documentContext = BatchContext::forUnits($segmented->title(), $headingByUnit);
-        $batches = array_chunk($units, $options->batchSize);
+        $batches = $this->batcher->batches($units, $options->tokenBudget, $options->batchSize);
 
         $translations = [];
         $issues = [];
