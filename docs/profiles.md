@@ -4,8 +4,14 @@ A `TranslationProfile` steers *how* text is translated: domain, formality, term 
 terms and free-form instructions (ARCHITECTURE §3). It is an immutable value object in `HtmlTranslator\Profile`;
 every `with…()` method returns a new profile.
 
-> Status (0.3, in progress): the value objects are in place; passing a profile to `HtmlTranslator` through
-> `TranslationOptions` and rendering it into the prompt are next.
+Pass it with the translation options; it applies to every call of the document, corrective retries and the
+text-node fallback included:
+
+```php
+$result = $translator->translate($html, Locale::fromString('pl'), new TranslationOptions(profile: $profile));
+```
+
+Providers that cannot be steered (`PseudoLocalizationProvider`, non-LLM engines) ignore it.
 
 ```php
 use HtmlTranslator\Profile\Glossary;
@@ -72,6 +78,24 @@ $glossary->isEmpty();   // Glossary::empty() is the empty glossary
 A glossary belongs to one target language: build one profile per target locale. Several source terms may share a
 target term. `fromArray()` expects string values; validate untyped configuration first, because a non-string value
 raises a `TypeError`.
+
+## How the profile reaches the model
+
+`LlmTranslationProvider` adds one system-message section per field that is set, between the task and the input
+description
+([ADR-0012](adr/0012-translation-profile-in-the-prompt.md)), in this order: domain, formality, term policy,
+glossary, do-not-translate terms, instructions. `Formality::Default`, `TermPolicy::TranslateAll` and empty fields
+add nothing, so the default profile leaves the prompt as it is. Instructions are introduced as "Instructions from the
+developer" and cannot override the rules for pseudo-tags or the answer format, which come after them.
+
+The glossary section lists only the entries that occur in the units of the batch. A term matches regardless of
+case, whitespace and inline markup (`pull <b>request</b>` matches "pull request"), as a whole word ("art" does not
+match "party", ".NET" matches in "ASP.NET"); in Chinese, Japanese, Thai and other scripts without spaces it matches
+anywhere. Do-not-translate terms are always sent in full.
+
+Token cost per call, roughly: 20–40 tokens for each of domain, formality and term policy, 10 tokens per matched
+glossary entry or do-not-translate term, plus the instructions. The rendered prompts are in
+`tests/Unit/Provider/Llm/Fixtures/prompts/profile-*.txt`.
 
 ## Presets
 

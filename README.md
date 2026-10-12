@@ -68,6 +68,24 @@ target are the same), a provider that fails completely (`ProviderException`) or 
 (`StructureValidationException` or `ProviderException`); all implement `HtmlTranslator\Exception\TranslatorException`.
 Pass options and collaborators as named arguments. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 
+## Translation profiles
+
+A `TranslationProfile` steers how language models translate: domain, formality, technical terms, a glossary,
+terms to keep as they are and your own instructions.
+
+```php
+use HtmlTranslator\Profile\Glossary;
+use HtmlTranslator\Profile\TranslationProfile;
+
+$result = $translator->translate($html, Locale::fromString('pl'), new TranslationOptions(
+    profile: TranslationProfile::technical()
+        ->withGlossary(Glossary::fromArray(['branch' => 'gałąź']))
+        ->withDoNotTranslate('GitHub'),
+));
+```
+
+Presets: `technical()`, `marketing()`, `legal()`. See [docs/profiles.md](docs/profiles.md).
+
 ## Providers
 
 Language models are used through `LlmTranslationProvider` and a chat model adapter on any PSR-18 HTTP client:
