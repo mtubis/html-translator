@@ -6,6 +6,7 @@ namespace HtmlTranslator\Tests\Unit\Provider\Llm;
 
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Provider\Llm\JsonSchema;
+use JsonException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -43,13 +44,21 @@ final class JsonSchemaTest extends TestCase
         yield 'no type' => ['{"properties": {}}'];
     }
 
+    /**
+     * The parser's wording differs between PHP versions, so the message is compared with the cause, not a literal.
+     */
     #[Test]
     public function it_says_why_the_text_is_not_json(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('A JSON schema must be valid JSON: Syntax error.');
-
-        JsonSchema::fromJson('{"type": object}');
+        try {
+            JsonSchema::fromJson('{"type": object}');
+            self::fail('Expected an InvalidArgumentException.');
+        } catch (InvalidArgumentException $exception) {
+            $cause = $exception->getPrevious();
+            self::assertInstanceOf(JsonException::class, $cause);
+            self::assertSame('A JSON schema must be valid JSON: ' . $cause->getMessage() . '.', $exception->getMessage());
+            self::assertSame(0, $exception->getCode());
+        }
     }
 
     #[Test]
