@@ -1,0 +1,11 @@
+{
+  "id": "msg_01ContextWindow",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-5-5",
+  "content": [],
+  "stop_reason": "model_context_window_exceeded",
+  "stop_sequence": null,
+  "stop_details": null,
+  "usage": {"input_tokens": 999000, "output_tokens": 0}
+}

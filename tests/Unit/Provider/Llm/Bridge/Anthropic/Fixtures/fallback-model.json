@@ -1,0 +1,13 @@
+{
+  "id": "msg_01FallbackServed",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-opus-4-8",
+  "content": [
+    {"type": "text", "text": "{\"units\": [{\"id\": \"u1\", \"text\": \"Cześć\"}]}"}
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "stop_details": null,
+  "usage": {"input_tokens": 512, "output_tokens": 24}
+}

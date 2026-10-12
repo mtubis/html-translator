@@ -1,0 +1,15 @@
+{
+  "id": "msg_01ThinkingAndTwoTextBlocks",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-opus-5-5",
+  "content": [
+    {"type": "thinking", "thinking": "", "signature": "EqQBCgIYAhIM1gbcDa9GJwZA2b3hGgxBdjrkzLoky3dl1pkiMOYds"},
+    {"type": "text", "text": "{\"units\": [{\"id\": \"u1\", "},
+    {"type": "text", "text": "\"text\": \"Cześć\"}]}"}
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "stop_details": null,
+  "usage": {"input_tokens": 530, "output_tokens": 210}
+}
