@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace HtmlTranslator\Tests\Support;
 
 use Closure;
+use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicChatModel;
+use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig;
+use HtmlTranslator\Provider\Llm\ChatModelInterface;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\HttpClient\Psr18Client;
 use UnexpectedValueException;
@@ -27,6 +30,7 @@ final class IntegrationProviders
      */
     private const array PROVIDERS = [
         'openai' => ['HTML_TRANSLATOR_OPENAI_API_KEY', 'HTML_TRANSLATOR_OPENAI_MODEL', 'gpt-4o-mini', null],
+        'anthropic' => ['HTML_TRANSLATOR_ANTHROPIC_API_KEY', 'HTML_TRANSLATOR_ANTHROPIC_MODEL', 'claude-opus-5-5', null],
         'gemini' => ['HTML_TRANSLATOR_GEMINI_API_KEY', 'HTML_TRANSLATOR_GEMINI_MODEL', 'gemini-2.5-flash', null],
         'ollama' => ['HTML_TRANSLATOR_OLLAMA_MODEL', 'HTML_TRANSLATOR_OLLAMA_MODEL', null, 'HTML_TRANSLATOR_OLLAMA_BASE_URL'],
         'vllm' => ['HTML_TRANSLATOR_VLLM_MODEL', 'HTML_TRANSLATOR_VLLM_MODEL', null, 'HTML_TRANSLATOR_VLLM_BASE_URL'],
@@ -56,11 +60,11 @@ final class IntegrationProviders
     /**
      * The provider's configuration from the environment, with optional overrides; null when it is not configured:
      * hosted APIs need their key, local servers a model (from the environment or $model). $baseUrl applies to local
-     * servers only.
+     * servers and Anthropic (e.g. a gateway).
      *
      * @throws UnexpectedValueException for an unknown provider
      */
-    public static function config(string $provider, ?string $model = null, ?string $baseUrl = null): ?OpenAiCompatibleConfig
+    public static function config(string $provider, ?string $model = null, ?string $baseUrl = null): OpenAiCompatibleConfig|AnthropicConfig|null
     {
         [$required, $modelVariable, $defaultModel, $baseUrlVariable] = self::definition($provider);
         $model ??= self::variable($modelVariable) ?? $defaultModel;
@@ -68,6 +72,7 @@ final class IntegrationProviders
 
         return match ($provider) {
             'openai' => self::withKey($required, static fn(string $key): OpenAiCompatibleConfig => OpenAiCompatibleConfig::openAi($key, $model ?? '')),
+            'anthropic' => self::withKey($required, static fn(string $key): AnthropicConfig => new AnthropicConfig($model ?? '', $key, baseUrl: $baseUrl ?? AnthropicConfig::DEFAULT_BASE_URL)),
             'gemini' => self::withKey($required, static fn(string $key): OpenAiCompatibleConfig => OpenAiCompatibleConfig::gemini($key, $model ?? '')),
             'ollama' => null === $model ? null : (null === $baseUrl ? OpenAiCompatibleConfig::ollama($model) : OpenAiCompatibleConfig::ollama($model, $baseUrl)),
             'vllm' => null === $model ? null : OpenAiCompatibleConfig::vllm($model, $baseUrl ?? 'http://localhost:8000/v1', self::variable('HTML_TRANSLATOR_VLLM_API_KEY')),
@@ -76,11 +81,13 @@ final class IntegrationProviders
         };
     }
 
-    public static function chatModel(OpenAiCompatibleConfig $config): OpenAiCompatibleChatModel
+    public static function chatModel(OpenAiCompatibleConfig|AnthropicConfig $config): ChatModelInterface
     {
         $client = new Psr18Client(HttpClient::create(['timeout' => self::TIMEOUT_SECONDS]));
 
-        return new OpenAiCompatibleChatModel($client, $client, $client, $config);
+        return $config instanceof AnthropicConfig
+            ? new AnthropicChatModel($client, $client, $client, $config)
+            : new OpenAiCompatibleChatModel($client, $client, $client, $config);
     }
 
     /**
@@ -92,9 +99,13 @@ final class IntegrationProviders
     }
 
     /**
-     * @param Closure(string): OpenAiCompatibleConfig $create
+     * @template T of OpenAiCompatibleConfig|AnthropicConfig
+     *
+     * @param Closure(string): T $create
+     *
+     * @return T|null
      */
-    private static function withKey(string $variable, Closure $create): ?OpenAiCompatibleConfig
+    private static function withKey(string $variable, Closure $create): OpenAiCompatibleConfig|AnthropicConfig|null
     {
         $key = self::variable($variable);
 

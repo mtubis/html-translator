@@ -111,7 +111,7 @@ $translator = new HtmlTranslator(new LlmTranslationProvider($model));
 | vLLM | `OpenAiCompatibleConfig::vllm($model)` |
 | LM Studio | `OpenAiCompatibleConfig::lmStudio($model)` |
 | Other OpenAI-compatible APIs | `new OpenAiCompatibleConfig(...)` |
-| Anthropic | planned |
+| Anthropic | `new AnthropicChatModel($http, $http, $http, new AnthropicConfig($model, $apiKey))` |
 
 See [docs/providers.md](docs/providers.md) for configuration, timeouts and error handling.
 

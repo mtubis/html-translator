@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Provider\Llm;
 
+use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\ProviderException;
 
 /**
@@ -29,6 +30,8 @@ interface ChatModelInterface
 
     /**
      * @throws ProviderException when the model cannot answer
+     * @throws InvalidArgumentException when the request uses a setting the vendor API does not support (e.g. a
+     *                                  temperature above 1 or a prefilled answer); nothing is sent
      */
     public function complete(ChatRequest $request): ChatResponse;
 }

@@ -10,6 +10,7 @@ use HtmlTranslator\Provider\Llm\ChatModelInterface;
 use HtmlTranslator\Provider\Llm\ChatRequest;
 use HtmlTranslator\Provider\Llm\ChatRole;
 use HtmlTranslator\Provider\Llm\FinishReason;
+use HtmlTranslator\Provider\Llm\JsonSchema;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -26,6 +27,9 @@ abstract class ChatModelContractTestCase extends TestCase
 {
     /** A credential the adapter is configured with; it must never appear in exception messages or traces. */
     protected const string API_KEY = 'sk-contract-SECRET-0123456789';
+
+    /** An answer schema the contract sends; adapters with structured outputs must pass it on unchanged. */
+    private const string ANSWER_SCHEMA = '{"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":false}';
 
     /**
      * A model configured with API_KEY whose far side behaves as described by the scenario. It must answer every call
@@ -62,6 +66,7 @@ abstract class ChatModelContractTestCase extends TestCase
             temperature: 0.3,
             jsonResponse: true,
             maxOutputTokens: 256,
+            jsonSchema: JsonSchema::fromJson(self::ANSWER_SCHEMA),
         ));
 
         $recorded = $this->recordedRequest();
@@ -75,6 +80,9 @@ abstract class ChatModelContractTestCase extends TestCase
         self::assertNotNull($recorded->model, 'The adapter must send its configured model.');
         self::assertNotSame('', $recorded->model);
         self::assertStringContainsString($recorded->model, $model->modelId(), 'modelId() must name the model that is sent.');
+        if (null !== $recorded->jsonSchema) {
+            self::assertJsonStringEqualsJsonString(self::ANSWER_SCHEMA, $recorded->jsonSchema, 'An adapter that sends a schema must send the requested one.');
+        }
     }
 
     #[Test]
@@ -86,6 +94,7 @@ abstract class ChatModelContractTestCase extends TestCase
         self::assertNull($recorded->temperature);
         self::assertFalse($recorded->jsonResponse);
         self::assertNull($recorded->maxOutputTokens);
+        self::assertNull($recorded->jsonSchema);
     }
 
     #[Test]
