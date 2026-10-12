@@ -19,6 +19,7 @@ final class IntegrationProvidersTest extends TestCase
 {
     private const array VARIABLES = [
         'HTML_TRANSLATOR_OPENAI_API_KEY', 'HTML_TRANSLATOR_OPENAI_MODEL',
+        'HTML_TRANSLATOR_ANTHROPIC_API_KEY', 'HTML_TRANSLATOR_ANTHROPIC_MODEL',
         'HTML_TRANSLATOR_GEMINI_API_KEY', 'HTML_TRANSLATOR_GEMINI_MODEL',
         'HTML_TRANSLATOR_OLLAMA_MODEL', 'HTML_TRANSLATOR_OLLAMA_BASE_URL',
         'HTML_TRANSLATOR_VLLM_MODEL', 'HTML_TRANSLATOR_VLLM_BASE_URL', 'HTML_TRANSLATOR_VLLM_API_KEY',
@@ -65,17 +66,19 @@ final class IntegrationProvidersTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{string, list<string>, string, string, ?string}>
+     * @return iterable<string, array{string, list<string>, string, string, ?string, string}>
      */
     public static function configurations(): iterable
     {
-        yield 'OpenAI with the default model' => ['openai', ['HTML_TRANSLATOR_OPENAI_API_KEY=sk-test-1'], 'openai:gpt-4o-mini', 'https://api.openai.com/v1/chat/completions', 'Bearer sk-test-1'];
-        yield 'OpenAI with a model' => ['openai', ['HTML_TRANSLATOR_OPENAI_API_KEY= sk-test-1 ', 'HTML_TRANSLATOR_OPENAI_MODEL=gpt-4.1'], 'openai:gpt-4.1', 'https://api.openai.com/v1/chat/completions', 'Bearer sk-test-1'];
-        yield 'Gemini' => ['gemini', ['HTML_TRANSLATOR_GEMINI_API_KEY=g-key-123'], 'gemini:gemini-2.5-flash', 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', 'Bearer g-key-123'];
-        yield 'Ollama on the default URL' => ['ollama', ['HTML_TRANSLATOR_OLLAMA_MODEL=llama3.1'], 'ollama:llama3.1', 'http://localhost:11434/v1/chat/completions', null];
-        yield 'Ollama elsewhere' => ['ollama', ['HTML_TRANSLATOR_OLLAMA_MODEL=llama3.1', 'HTML_TRANSLATOR_OLLAMA_BASE_URL=http://gpu:11434/v1'], 'ollama:llama3.1', 'http://gpu:11434/v1/chat/completions', null];
-        yield 'vLLM with a key' => ['vllm', ['HTML_TRANSLATOR_VLLM_MODEL=qwen', 'HTML_TRANSLATOR_VLLM_API_KEY=v-key-123'], 'vllm:qwen', 'http://localhost:8000/v1/chat/completions', 'Bearer v-key-123'];
-        yield 'LM Studio' => ['lmstudio', ['HTML_TRANSLATOR_LMSTUDIO_MODEL=qwen2.5', 'HTML_TRANSLATOR_LMSTUDIO_BASE_URL=http://studio:1234/v1'], 'lmstudio:qwen2.5', 'http://studio:1234/v1/chat/completions', null];
+        yield 'Anthropic with the default model' => ['anthropic', ['HTML_TRANSLATOR_ANTHROPIC_API_KEY=sk-ant-test-1'], 'anthropic:claude-opus-5-5', 'https://api.anthropic.com/v1/messages', 'sk-ant-test-1', 'x-api-key'];
+        yield 'Anthropic with a model' => ['anthropic', ['HTML_TRANSLATOR_ANTHROPIC_API_KEY=sk-ant-test-1', 'HTML_TRANSLATOR_ANTHROPIC_MODEL=claude-sonnet-5-5'], 'anthropic:claude-sonnet-5-5', 'https://api.anthropic.com/v1/messages', 'sk-ant-test-1', 'x-api-key'];
+        yield 'OpenAI with the default model' => ['openai', ['HTML_TRANSLATOR_OPENAI_API_KEY=sk-test-1'], 'openai:gpt-4o-mini', 'https://api.openai.com/v1/chat/completions', 'Bearer sk-test-1', 'Authorization'];
+        yield 'OpenAI with a model' => ['openai', ['HTML_TRANSLATOR_OPENAI_API_KEY= sk-test-1 ', 'HTML_TRANSLATOR_OPENAI_MODEL=gpt-4.1'], 'openai:gpt-4.1', 'https://api.openai.com/v1/chat/completions', 'Bearer sk-test-1', 'Authorization'];
+        yield 'Gemini' => ['gemini', ['HTML_TRANSLATOR_GEMINI_API_KEY=g-key-123'], 'gemini:gemini-2.5-flash', 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', 'Bearer g-key-123', 'Authorization'];
+        yield 'Ollama on the default URL' => ['ollama', ['HTML_TRANSLATOR_OLLAMA_MODEL=llama3.1'], 'ollama:llama3.1', 'http://localhost:11434/v1/chat/completions', null, 'Authorization'];
+        yield 'Ollama elsewhere' => ['ollama', ['HTML_TRANSLATOR_OLLAMA_MODEL=llama3.1', 'HTML_TRANSLATOR_OLLAMA_BASE_URL=http://gpu:11434/v1'], 'ollama:llama3.1', 'http://gpu:11434/v1/chat/completions', null, 'Authorization'];
+        yield 'vLLM with a key' => ['vllm', ['HTML_TRANSLATOR_VLLM_MODEL=qwen', 'HTML_TRANSLATOR_VLLM_API_KEY=v-key-123'], 'vllm:qwen', 'http://localhost:8000/v1/chat/completions', 'Bearer v-key-123', 'Authorization'];
+        yield 'LM Studio' => ['lmstudio', ['HTML_TRANSLATOR_LMSTUDIO_MODEL=qwen2.5', 'HTML_TRANSLATOR_LMSTUDIO_BASE_URL=http://studio:1234/v1'], 'lmstudio:qwen2.5', 'http://studio:1234/v1/chat/completions', null, 'Authorization'];
     }
 
     /**
@@ -83,7 +86,7 @@ final class IntegrationProvidersTest extends TestCase
      */
     #[Test]
     #[DataProvider('configurations')]
-    public function it_reads_the_configuration_from_the_environment(string $provider, array $variables, string $modelId, string $endpoint, ?string $authorization): void
+    public function it_reads_the_configuration_from_the_environment(string $provider, array $variables, string $modelId, string $endpoint, ?string $credential, string $credentialHeader): void
     {
         foreach ($variables as $variable) {
             putenv($variable);
@@ -93,7 +96,8 @@ final class IntegrationProvidersTest extends TestCase
 
         self::assertSame($modelId, $config->modelId());
         self::assertSame($endpoint, $config->endpoint());
-        self::assertSame($authorization, $config->headers()['Authorization'] ?? null);
+        self::assertSame($credential, $config->headers()[$credentialHeader] ?? null);
+        self::assertSame($modelId, IntegrationProviders::chatModel($config)->modelId());
     }
 
     #[Test]
@@ -121,6 +125,6 @@ final class IntegrationProvidersTest extends TestCase
     {
         $this->expectException(UnexpectedValueException::class);
 
-        IntegrationProviders::config('anthropic');
+        IntegrationProviders::config('mistral');
     }
 }

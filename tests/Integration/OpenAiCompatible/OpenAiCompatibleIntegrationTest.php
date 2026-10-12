@@ -33,7 +33,8 @@ final class OpenAiCompatibleIntegrationTest extends TestCase
      */
     public static function providersAndFixtures(): iterable
     {
-        foreach (IntegrationProviders::names() as $provider) {
+        // AnthropicIntegrationTest covers the provider with its own adapter.
+        foreach (array_diff(IntegrationProviders::names(), ['anthropic']) as $provider) {
             foreach (self::FIXTURES as $fixture) {
                 yield $provider . ' ' . $fixture => [$provider, $fixture];
             }

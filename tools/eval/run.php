@@ -8,7 +8,6 @@ declare(strict_types=1);
  */
 
 use HtmlTranslator\Exception\TranslatorException;
-use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig;
 use HtmlTranslator\Provider\Llm\PromptBuilder;
 use HtmlTranslator\Tests\Support\GoldenFixtures;
 use HtmlTranslator\Tests\Support\IntegrationProviders;
@@ -23,7 +22,7 @@ require __DIR__ . '/../../vendor/autoload.php';
 const USAGE = <<<'TEXT'
     Usage: php tools/eval/run.php --provider=<name> [--model=<model>] [--base-url=<url>] [--fixtures=<a,b>] [--out=<dir>]
 
-      --provider   openai, gemini, ollama, vllm, lmstudio, or pseudo (no network, checks the tool itself)
+      --provider   openai, anthropic, gemini, ollama, vllm, lmstudio, or pseudo (no network, checks the tool itself)
       --model      overrides HTML_TRANSLATOR_<PROVIDER>_MODEL
       --base-url   overrides HTML_TRANSLATOR_<PROVIDER>_BASE_URL (local servers only)
       --fixtures   comma-separated fixture names (default: all)
@@ -69,7 +68,7 @@ try {
         $chatModel = PseudoLocalizingChatModel::create();
     } else {
         $config = IntegrationProviders::config($provider, option($options, 'model'), option($options, 'base-url'));
-        if (!$config instanceof OpenAiCompatibleConfig) {
+        if (null === $config) {
             fwrite(STDERR, sprintf("Set %s in .env (see .env.dist) and load it: set -a; . ./.env; set +a\n", IntegrationProviders::requiredVariable($provider)));
             exit(1);
         }
