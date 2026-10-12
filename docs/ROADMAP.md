@@ -1,7 +1,7 @@
 # Roadmap
 
 Each milestone is a GitHub milestone; each bullet is one issue = one Claude Code session = one PR.
-Issue bodies are drafted in [`docs/issues/core-0.1/`](issues/core-0.1/) and [`docs/issues/core-0.2/`](issues/core-0.2/) and can be created with `scripts/create-issues.sh`.
+Issue bodies are drafted in [`docs/issues/core-0.1/`](issues/core-0.1/), [`docs/issues/core-0.2/`](issues/core-0.2/) and [`docs/issues/core-0.3/`](issues/core-0.3/) and can be created with `scripts/create-issues.sh`.
 
 ## Core 0.1 — pipeline without any LLM
 Goal: any HTML fixture round-trips through segmentation → pseudo-localization → validation → reassembly with valid structure.
@@ -27,6 +27,7 @@ Goal: any HTML fixture round-trips through segmentation → pseudo-localization 
 - `TranslationProfile`, `TermPolicy`, `Formality`, `Glossary`, presets (`technical()`, `marketing()`, `legal()`)
 - `AnthropicChatModel`
 - Context hints in batches (title, neighbouring headings)
+- Follow-ups from 0.1: table-part fragments, truncated untrusted text in exception messages
 
 ## Core 0.4 — production readiness
 - `Batcher` with token budget, `TokenEstimator`
