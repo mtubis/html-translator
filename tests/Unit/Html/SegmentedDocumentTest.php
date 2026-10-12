@@ -79,6 +79,33 @@ final class SegmentedDocumentTest extends TestCase
     }
 
     #[Test]
+    public function it_has_no_title_or_headings_unless_given(): void
+    {
+        $segmented = new SegmentedDocument($this->document(), [$this->unit('u1')], ['u1' => $this->runAnchor()]);
+
+        self::assertNull($segmented->title());
+        self::assertNull($segmented->sectionHeadingOf(UnitId::fromString('u1')));
+    }
+
+    #[Test]
+    public function it_returns_the_given_title_and_headings(): void
+    {
+        $segmented = new SegmentedDocument($this->document(), [$this->unit('u1')], ['u1' => $this->runAnchor()], 'About', ['u1' => 'Team']);
+
+        self::assertSame('About', $segmented->title());
+        self::assertSame('Team', $segmented->sectionHeadingOf(UnitId::fromString('u1')));
+    }
+
+    #[Test]
+    public function it_rejects_a_heading_for_a_unit_it_does_not_have(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('"u9"');
+
+        new SegmentedDocument($this->document(), [$this->unit('u1')], ['u1' => $this->runAnchor()], null, ['u9' => 'Team']);
+    }
+
+    #[Test]
     public function its_run_anchor_needs_at_least_one_node(): void
     {
         $this->expectException(InvalidArgumentException::class);

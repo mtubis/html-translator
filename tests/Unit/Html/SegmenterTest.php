@@ -538,6 +538,143 @@ final class SegmenterTest extends TestCase
         $this->segment('<p>x</p>')->anchorFor(UnitId::fromString('u9'));
     }
 
+    /**
+     * @return iterable<string, array{string, ?string}>
+     */
+    public static function documentTitles(): iterable
+    {
+        yield 'title' => ['<!DOCTYPE html><html><head><title>About us</title></head><body><p>x</p></body></html>', 'About us'];
+        yield 'whitespace collapsed' => ["<!DOCTYPE html><title>\n  About\t\tus  </title><p>x</p>", 'About us'];
+        yield 'not translated, still context' => ['<!DOCTYPE html><title translate="no">ACME</title><p>x</p>', 'ACME'];
+        yield 'no title' => ['<!DOCTYPE html><html><head></head><body><p>x</p></body></html>', null];
+        yield 'empty title' => ['<!DOCTYPE html><title>   </title><p>x</p>', null];
+        yield 'fragment' => ['<p>x</p>', null];
+        yield 'title element in a fragment is not the document title' => ['<title>Not a title</title><p>x</p>', null];
+    }
+
+    #[Test]
+    #[DataProvider('documentTitles')]
+    public function it_records_the_document_title(string $html, ?string $expected): void
+    {
+        self::assertSame($expected, $this->segment($html)->title());
+    }
+
+    /**
+     * @return iterable<string, array{string, array<string, ?string>}>
+     */
+    public static function sectionHeadings(): iterable
+    {
+        yield 'nested sections' => [
+            '<h1>Guide</h1><p>Intro</p><h2>Install</h2><p>Run it</p><h3>On Linux</h3><ul><li>apt</li></ul><h2>Use</h2><p>Go</p>',
+            ['u1' => null, 'u2' => 'Guide', 'u3' => 'Guide', 'u4' => 'Install', 'u5' => 'Install', 'u6' => 'On Linux', 'u7' => 'On Linux', 'u8' => 'Use'],
+        ];
+        yield 'units before the first heading' => [
+            '<!DOCTYPE html><title>Shop</title><meta name="description" content="Things"><p>Welcome</p><h2>Offers</h2><p>Cheap</p>',
+            ['u1' => null, 'a1' => null, 'u2' => null, 'u3' => null, 'u4' => 'Offers'],
+        ];
+        yield 'attribute units and table cells' => [
+            '<h2>Pricing</h2><img alt="Plans"><table><tr><th>Plan</th><td><button>Buy</button></td></tr></table>',
+            ['u1' => null, 'a1' => 'Pricing', 'u2' => 'Pricing', 'u3' => 'Pricing'],
+        ];
+        yield 'heading with inline markup and skipped inline content' => [
+            '<h2>Install <code>npm</code> <em>now</em></h2><p>x</p>',
+            ['u1' => null, 'u2' => 'Install npm now'],
+        ];
+        yield 'whitespace collapsed' => ["<h2>\n  Getting\t\tstarted  </h2><p>x</p>", ['u1' => null, 'u2' => 'Getting started']];
+        yield 'fragment' => ['<h3>FAQ</h3><p>Question</p>', ['u1' => null, 'u2' => 'FAQ']];
+        yield 'heading that is not translated' => ['<h2 translate="no">ACME Cloud</h2><p>Fast</p>', ['u1' => 'ACME Cloud']];
+        yield 'heading in a notranslate container' => ['<div class="notranslate"><h2>ACME</h2></div><p>Fast</p>', ['u1' => 'ACME']];
+        yield 'heading in a skipped subtree' => [
+            '<h2>Charts</h2><svg><foreignObject><h3>Revenue</h3></foreignObject></svg><p>Caption</p>',
+            ['u1' => null, 'u2' => 'Revenue'],
+        ];
+        yield 'skipped subtree without headings keeps the section' => [
+            '<h2>Charts</h2><svg><text>Axis</text></svg><p>Caption</p>',
+            ['u1' => null, 'u2' => 'Charts'],
+        ];
+        yield 'last heading in a skipped subtree' => [
+            '<svg><foreignObject><h3>Revenue</h3><h3>Costs</h3></foreignObject></svg><p>Caption</p>',
+            ['u1' => 'Costs'],
+        ];
+        yield 'heading nested in a heading counts as part of the outer one' => [
+            '<h2>Plans <span><h3>Pro</h3></span></h2><p>Price</p>',
+            ['u1' => null, 'u2' => null, 'u3' => 'Plans Pro'],
+        ];
+        yield 'empty heading starts a section without a name' => ['<h2>Intro</h2><p>A</p><h2><img src="x.png"></h2><p>B</p>', ['u1' => null, 'u2' => 'Intro', 'u3' => null]];
+        yield 'heading inside a section element' => ['<section><h2>News</h2><article><p>Item</p></article></section>', ['u1' => null, 'u2' => 'News']];
+    }
+
+    /**
+     * @param array<string, ?string> $expected unit id → heading
+     */
+    #[Test]
+    #[DataProvider('sectionHeadings')]
+    public function it_records_the_nearest_previous_heading_of_every_unit(string $html, array $expected): void
+    {
+        $segmented = $this->segment($html);
+
+        $actual = [];
+        foreach ($segmented->units() as $unit) {
+            $actual[$unit->id->toString()] = $segmented->sectionHeadingOf($unit->id);
+        }
+
+        self::assertSame($expected, $actual);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function longContextTexts(): iterable
+    {
+        yield 'over the limit' => ['A' . str_repeat('ż', 299), 'A' . str_repeat('ż', 198) . '…'];
+        yield 'no space before the ellipsis' => [str_repeat('a', 198) . ' ' . str_repeat('b', 10), str_repeat('a', 198) . '…'];
+        yield 'exactly the limit' => [str_repeat('ż', 200), str_repeat('ż', 200)];
+        yield 'multibyte below the limit but over 200 bytes' => [str_repeat('ż', 150), str_repeat('ż', 150)];
+    }
+
+    #[Test]
+    #[DataProvider('longContextTexts')]
+    public function it_caps_long_headings_and_titles_on_a_character_boundary(string $text, string $expected): void
+    {
+        $segmented = $this->segment(\sprintf('<!DOCTYPE html><title>%s</title><h2>%s</h2><p>x</p>', $text, $text));
+
+        self::assertSame($expected, $segmented->title());
+        self::assertSame($expected, $segmented->sectionHeadingOf(UnitId::fromString('u3')));
+    }
+
+    #[Test]
+    public function it_records_headings_of_deeply_nested_headings_in_linear_time(): void
+    {
+        $depth = 500;
+        $words = str_repeat('word ', 400);
+        $html = str_repeat('<h2>' . $words . '<span>', $depth) . '<p>end</p>';
+
+        $start = hrtime(true);
+        $segmented = $this->segment($html);
+        $elapsedMs = (hrtime(true) - $start) / 1_000_000;
+
+        self::assertNotEmpty($segmented->units());
+        self::assertLessThan(1000, $elapsedMs, 'Headings nested in headings must not make segmentation quadratic.');
+    }
+
+    #[Test]
+    public function it_keeps_units_and_ids_unchanged_by_headings(): void
+    {
+        self::assertSame(
+            [['u1', 'Block', 'Guide'], ['u2', 'Block', 'Intro']],
+            $this->triples($this->segment('<h1>Guide</h1><p>Intro</p>')),
+        );
+    }
+
+    #[Test]
+    public function it_rejects_heading_lookups_for_unknown_unit_ids(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('"u9"');
+
+        $this->segment('<h1>A</h1><p>x</p>')->sectionHeadingOf(UnitId::fromString('u9'));
+    }
+
     private function segment(string $html, ?SkipRules $rules = null, ?TranslatableAttributes $attributes = null): SegmentedDocument
     {
         return new Segmenter()->segment(
