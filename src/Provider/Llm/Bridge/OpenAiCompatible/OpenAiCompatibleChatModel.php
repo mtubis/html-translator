@@ -16,7 +16,7 @@ use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
-use Throwable;
+use SensitiveParameter;
 
 /**
  * ChatModelInterface for OpenAI-style Chat Completions APIs (POST {baseUrl}/chat/completions, API shape as of 2026-10):
@@ -155,7 +155,7 @@ final readonly class OpenAiCompatibleChatModel implements ChatModelInterface
      * Error bodies are {"error": {"message", "type", "code"}}, or a list of such objects (Gemini), with
      * Gemini's "status" instead of a string code.
      */
-    private function httpError(int $status, string $body): ProviderException
+    private function httpError(int $status, #[SensitiveParameter] string $body): ProviderException
     {
         // Proxy pages and other non-JSON bodies are not quoted: they may be large and say nothing useful.
         $data = json_decode($body, true);
@@ -181,30 +181,23 @@ final readonly class OpenAiCompatibleChatModel implements ChatModelInterface
     }
 
     /**
-     * Keeps the client's exception as the cause unless a message in its chain contains a credential; then a redacted
-     * copy of its message replaces the whole chain. A kept PSR-18 exception may still hold the request (getRequest()),
-     * including its Authorization header.
+     * Never keeps the client's exception: PSR-18 request and network exceptions hold the request with its credential
+     * headers, and any exception thrown inside sendRequest() recorded the request among its trace arguments. The cause
+     * is a ProviderException naming the client's exception type and its redacted message; the parameter is sensitive,
+     * so the client's exception does not reach the traces of the new exceptions either.
      */
-    private function transportError(ClientExceptionInterface $exception): ProviderException
+    private function transportError(#[SensitiveParameter] ClientExceptionInterface $exception): ProviderException
     {
         $message = UntrustedText::quote($this->config->redact($exception->getMessage()));
-        $cause = $exception;
-        for ($current = $exception; $current instanceof Throwable; $current = $current->getPrevious()) {
-            if ($this->config->redact($current->getMessage()) !== $current->getMessage()) {
-                $cause = new ProviderException($message);
 
-                break;
-            }
-        }
-
-        return new ProviderException(\sprintf('Could not reach %s at %s: %s', $this->config->name, $this->config->endpoint(), $message), 0, $cause);
+        return new ProviderException(\sprintf('Could not reach %s at %s: %s', $this->config->name, $this->config->endpoint(), $message), 0, new ProviderException(\sprintf('%s: %s', get_debug_type($exception), $message)));
     }
 
     /**
      * @throws ProviderException
      * @return array<mixed>
      */
-    private function decode(string $body): array
+    private function decode(#[SensitiveParameter] string $body): array
     {
         try {
             $data = json_decode($body, true, flags: \JSON_THROW_ON_ERROR);

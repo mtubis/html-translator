@@ -64,4 +64,13 @@ final readonly class ChatScenario
     {
         return new self(ChatScenarioKind::TransportError, errorMessage: $errorMessage);
     }
+
+    /**
+     * The fake transport must throw a PSR-18 NetworkExceptionInterface with $errorMessage that holds the request it
+     * received: adapters must not keep it as the cause, since the request carries the credential headers.
+     */
+    public static function networkError(string $errorMessage): self
+    {
+        return new self(ChatScenarioKind::NetworkError, errorMessage: $errorMessage);
+    }
 }

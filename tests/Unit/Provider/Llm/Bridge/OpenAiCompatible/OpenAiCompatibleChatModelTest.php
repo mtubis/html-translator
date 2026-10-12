@@ -15,6 +15,8 @@ use HtmlTranslator\Provider\Llm\ChatRole;
 use HtmlTranslator\Provider\Llm\FinishReason;
 use HtmlTranslator\Tests\Support\FakeClientException;
 use HtmlTranslator\Tests\Support\FakeHttpClient;
+use HtmlTranslator\Tests\Support\FakeNetworkException;
+use HtmlTranslator\Tests\Support\FakeRequestException;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Nyholm\Psr7\Response;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -22,6 +24,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Client\NetworkExceptionInterface;
+use Psr\Http\Client\RequestExceptionInterface;
 use Psr\Http\Message\RequestInterface;
 use RuntimeException;
 use Throwable;
@@ -279,12 +283,14 @@ final class OpenAiCompatibleChatModelTest extends TestCase
     }
 
     #[Test]
-    public function it_wraps_transport_errors_and_keeps_a_clean_cause(): void
+    public function it_never_keeps_the_client_exception_whose_trace_recorded_the_request(): void
     {
         $cause = new FakeClientException('Connection refused');
         $exception = $this->failure($this->model(new FakeHttpClient(static fn(): never => throw $cause)));
 
-        self::assertSame($cause, $exception->getPrevious());
+        self::assertNotSame($cause, $exception->getPrevious());
+        self::assertInstanceOf(ProviderException::class, $exception->getPrevious());
+        self::assertSame(FakeClientException::class . ': Connection refused', $exception->getPrevious()->getMessage());
         self::assertSame('Could not reach openai at https://api.openai.com/v1/chat/completions: Connection refused', $exception->getMessage());
         self::assertSame(0, $exception->getCode());
     }
@@ -298,7 +304,7 @@ final class OpenAiCompatibleChatModelTest extends TestCase
             self::assertStringNotContainsString(self::API_KEY, $current->getMessage());
         }
 
-        self::assertSame('Failed for [redacted]', $exception->getPrevious()?->getMessage());
+        self::assertSame(FakeClientException::class . ': Failed for [redacted]', $exception->getPrevious()?->getMessage());
         self::assertSame(0, $exception->getPrevious()->getCode());
     }
 
@@ -314,13 +320,46 @@ final class OpenAiCompatibleChatModelTest extends TestCase
         }
 
         self::assertNotSame($error, $exception->getPrevious());
-        self::assertSame('cURL error 28: timed out', $exception->getPrevious()?->getMessage());
+        self::assertSame(FakeClientException::class . ': cURL error 28: timed out', $exception->getPrevious()?->getMessage());
     }
 
     #[Test]
     public function it_names_the_configured_model(): void
     {
         self::assertSame('openai:gpt-4o-mini', $this->model($this->client(200, 'success.json'))->modelId());
+    }
+
+    #[Test]
+    public function it_replaces_a_network_exception_that_holds_the_request(): void
+    {
+        $model = $this->model(new FakeHttpClient(static fn(RequestInterface $request): Response => throw new FakeNetworkException('Operation timed out', $request)));
+
+        $exception = $this->failure($model);
+
+        self::assertStringContainsString('Operation timed out', $exception->getMessage());
+        self::assertSame(FakeNetworkException::class . ': Operation timed out', $exception->getPrevious()?->getMessage());
+        $this->assertNoRequestInChain($exception);
+    }
+
+    #[Test]
+    public function it_replaces_a_client_exception_wrapping_a_request_exception(): void
+    {
+        $model = $this->model(new FakeHttpClient(static fn(RequestInterface $request): Response => throw new FakeClientException('Transport failed', 0, new FakeRequestException('Invalid header', $request))));
+
+        $exception = $this->failure($model);
+
+        self::assertSame(FakeClientException::class . ': Transport failed', $exception->getPrevious()?->getMessage());
+        $this->assertNoRequestInChain($exception);
+    }
+
+    private function assertNoRequestInChain(ProviderException $exception): void
+    {
+        self::assertNotNull($exception->getPrevious(), 'The transport error must be kept in a safe form.');
+        for ($current = $exception; $current instanceof Throwable; $current = $current->getPrevious()) {
+            self::assertNotInstanceOf(NetworkExceptionInterface::class, $current);
+            self::assertNotInstanceOf(RequestExceptionInterface::class, $current);
+            self::assertNotInstanceOf(FakeClientException::class, $current);
+        }
     }
 
     private function model(FakeHttpClient $client, ?OpenAiCompatibleConfig $config = null): OpenAiCompatibleChatModel
