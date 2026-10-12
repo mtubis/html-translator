@@ -7,6 +7,9 @@ namespace HtmlTranslator\Tests\Unit;
 use HtmlTranslator\Domain\Locale;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\FallbackStrategy;
+use HtmlTranslator\Profile\Glossary;
+use HtmlTranslator\Profile\ProfileText;
+use HtmlTranslator\Profile\TranslationProfile;
 use HtmlTranslator\Progress;
 use HtmlTranslator\TranslationOptions;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -17,6 +20,9 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(TranslationOptions::class)]
 #[UsesClass(Locale::class)]
 #[UsesClass(InvalidArgumentException::class)]
+#[UsesClass(TranslationProfile::class)]
+#[UsesClass(Glossary::class)]
+#[UsesClass(ProfileText::class)]
 final class TranslationOptionsTest extends TestCase
 {
     #[Test]
@@ -42,6 +48,15 @@ final class TranslationOptionsTest extends TestCase
         self::assertSame(0, $options->maxCorrectiveRetries);
         self::assertSame(1, $options->batchSize);
         self::assertSame($onProgress, $options->onProgress);
+    }
+
+    #[Test]
+    public function it_uses_the_default_profile_unless_given_one(): void
+    {
+        $profile = TranslationProfile::technical();
+
+        self::assertEquals(TranslationProfile::default(), new TranslationOptions()->profile);
+        self::assertSame($profile, new TranslationOptions(profile: $profile)->profile);
     }
 
     #[Test]

@@ -14,6 +14,10 @@ use HtmlTranslator\Domain\UnitKind;
 use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Profile\Glossary;
+use HtmlTranslator\Profile\GlossaryEntry;
+use HtmlTranslator\Profile\ProfileText;
+use HtmlTranslator\Profile\TranslationProfile;
 use HtmlTranslator\Provider\BatchResult;
 use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\Testing\PseudoLocalizationProvider;
@@ -36,6 +40,10 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(UnitText::class)]
 #[UsesClass(UnitTextToken::class)]
 #[UsesClass(InvalidArgumentException::class)]
+#[UsesClass(Glossary::class)]
+#[UsesClass(TranslationProfile::class)]
+#[UsesClass(GlossaryEntry::class)]
+#[UsesClass(ProfileText::class)]
 final class PseudoLocalizationProviderTest extends TestCase
 {
     /**
@@ -64,6 +72,21 @@ final class PseudoLocalizationProviderTest extends TestCase
 
         self::assertSame(['u1' => $expected], $provider->translate($batch)->translations);
         self::assertSame(['u1' => $expected], $provider->translate($batch)->translations);
+    }
+
+    #[Test]
+    public function it_ignores_the_translation_profile(): void
+    {
+        $provider = new PseudoLocalizationProvider();
+        $units = [$this->unit('u1', 'Open a pull <g1>request</g1>.')];
+        $profile = TranslationProfile::legal()
+            ->withGlossary(Glossary::fromArray(['pull request' => 'pull request']))
+            ->withDoNotTranslate('GitHub');
+
+        self::assertEquals(
+            $provider->translate($this->batch($units)),
+            $provider->translate(new TranslationBatch($this->batch($units)->locales, $units, profile: $profile)),
+        );
     }
 
     #[Test]

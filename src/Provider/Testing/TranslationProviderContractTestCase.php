@@ -12,6 +12,10 @@ use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitKind;
 use HtmlTranslator\Exception\ProviderException;
+use HtmlTranslator\Profile\Formality;
+use HtmlTranslator\Profile\Glossary;
+use HtmlTranslator\Profile\TermPolicy;
+use HtmlTranslator\Profile\TranslationProfile;
 use HtmlTranslator\Provider\BatchResult;
 use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\TranslationBatch;
@@ -165,6 +169,26 @@ abstract class TranslationProviderContractTestCase extends TestCase
                 'u2' => Correction::forMissingUnit(),
             ],
         );
+
+        $this->assertTranslatesEverything($batch, $this->provider()->translate($batch));
+    }
+
+    /**
+     * Providers that cannot be steered ignore the profile; the others must still keep the structure.
+     */
+    #[Test]
+    public function it_translates_a_batch_with_a_profile(): void
+    {
+        $profile = TranslationProfile::technical()
+            ->withFormality(Formality::Formal)
+            ->withTermPolicy(TermPolicy::KeepOriginal)
+            ->withGlossary(Glossary::fromArray(['link' => 'odnośnik']))
+            ->withDoNotTranslate('GitHub')
+            ->withInstructions("Address the reader directly.\nUse short sentences.");
+        $batch = new TranslationBatch($this->locales(), [
+            $this->unit('u1', 'Follow <g1>the link</g1> to GitHub.', [InlineTag::of(1, InlineTagKind::Paired)]),
+            $this->unit('a1', 'Company logo', kind: UnitKind::Attribute),
+        ], profile: $profile);
 
         $this->assertTranslatesEverything($batch, $this->provider()->translate($batch));
     }

@@ -12,6 +12,10 @@ use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
 use HtmlTranslator\Exception\ProviderException;
+use HtmlTranslator\Profile\Glossary;
+use HtmlTranslator\Profile\GlossaryEntry;
+use HtmlTranslator\Profile\ProfileText;
+use HtmlTranslator\Profile\TranslationProfile;
 use HtmlTranslator\Provider\BatchResult;
 use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\Llm\ChatMessage;
@@ -59,6 +63,10 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(StructureValidator::class)]
 #[UsesClass(TagNesting::class)]
 #[UsesClass(ValidationResult::class)]
+#[UsesClass(Glossary::class)]
+#[UsesClass(TranslationProfile::class)]
+#[UsesClass(GlossaryEntry::class)]
+#[UsesClass(ProfileText::class)]
 final class LlmTranslationProviderContractTest extends TranslationProviderContractTestCase
 {
     protected function provider(): TranslationProviderInterface

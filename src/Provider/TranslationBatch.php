@@ -7,17 +7,21 @@ namespace HtmlTranslator\Provider;
 use HtmlTranslator\Domain\LocalePair;
 use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Profile\TranslationProfile;
 
 /**
  * Units sent to a provider in one call; on a corrective retry, corrections say what was wrong before.
- * Built by the core, read by providers; it will gain properties (translation profile, document context)
- * in later versions, with defaults.
+ * Built by the core, read by providers; it will gain properties (document context) in later versions, with defaults.
  */
 final readonly class TranslationBatch
 {
+    /** How the units are translated; providers that cannot be steered ignore it. */
+    public TranslationProfile $profile;
+
     /**
      * @param list<TranslationUnit> $units
      * @param array<string, Correction> $corrections unit id → feedback, only for units of this batch
+     * @param TranslationProfile|null $profile null means TranslationProfile::default()
      *
      * @throws InvalidArgumentException when there are no units, an id repeats, or a correction belongs to no unit of the batch
      */
@@ -25,6 +29,7 @@ final readonly class TranslationBatch
         public LocalePair $locales,
         public array $units,
         public array $corrections = [],
+        ?TranslationProfile $profile = null,
     ) {
         if ([] === $units) {
             throw new InvalidArgumentException('A translation batch needs at least one unit.');
@@ -38,5 +43,7 @@ final readonly class TranslationBatch
         foreach (array_diff(array_keys($corrections), $ids) as $id) {
             throw new InvalidArgumentException(\sprintf('Correction for unit "%s", which is not in the batch.', $id));
         }
+
+        $this->profile = $profile ?? TranslationProfile::default();
     }
 }

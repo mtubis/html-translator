@@ -30,6 +30,9 @@ use HtmlTranslator\Html\SkipRules;
 use HtmlTranslator\Html\TranslatableAttributes;
 use HtmlTranslator\HtmlTranslator;
 use HtmlTranslator\Issue;
+use HtmlTranslator\Profile\Glossary;
+use HtmlTranslator\Profile\ProfileText;
+use HtmlTranslator\Profile\TranslationProfile;
 use HtmlTranslator\Progress;
 use HtmlTranslator\Provider\BatchResult;
 use HtmlTranslator\Provider\Correction;
@@ -87,6 +90,9 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(InvalidArgumentException::class)]
 #[UsesClass(InvalidHtmlException::class)]
 #[UsesClass(ProviderException::class)]
+#[UsesClass(TranslationProfile::class)]
+#[UsesClass(Glossary::class)]
+#[UsesClass(ProfileText::class)]
 final class HtmlTranslatorTest extends TestCase
 {
     private const string FIXTURES = __DIR__ . '/../Fixtures/roundtrip';
@@ -543,6 +549,24 @@ final class HtmlTranslatorTest extends TestCase
         self::assertSame(5, $result->stats()->units);
         self::assertSame(0, $result->stats()->retries);
         self::assertGreaterThanOrEqual(0.0, $result->stats()->durationSeconds);
+    }
+
+    #[Test]
+    public function it_passes_the_profile_to_every_provider_call(): void
+    {
+        $profile = TranslationProfile::technical();
+        $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => PseudoLocalizationProvider::corruptingEvery(1, persistent: true)->translate($batch));
+
+        new HtmlTranslator($provider)->translate(
+            '<p>Hello <b>world</b></p>',
+            Locale::fromString('pl'),
+            new TranslationOptions(fallback: FallbackStrategy::TextNodesOnly, maxCorrectiveRetries: 1, profile: $profile),
+        );
+
+        self::assertCount(3, $provider->batches, 'first call, corrective retry, text-node fallback');
+        foreach ($provider->batches as $batch) {
+            self::assertSame($profile, $batch->profile);
+        }
     }
 
     #[Test]

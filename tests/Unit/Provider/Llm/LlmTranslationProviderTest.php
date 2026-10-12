@@ -9,7 +9,11 @@ use HtmlTranslator\Domain\LocalePair;
 use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitKind;
+use HtmlTranslator\Domain\UnitText;
+use HtmlTranslator\Domain\UnitTextToken;
 use HtmlTranslator\Exception\ProviderException;
+use HtmlTranslator\Profile\Glossary;
+use HtmlTranslator\Profile\TranslationProfile;
 use HtmlTranslator\Provider\BatchResult;
 use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\Llm\ChatMessage;
@@ -42,6 +46,10 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(LocalePair::class)]
 #[UsesClass(TranslationUnit::class)]
 #[UsesClass(UnitId::class)]
+#[UsesClass(UnitText::class)]
+#[UsesClass(UnitTextToken::class)]
+#[UsesClass(Glossary::class)]
+#[UsesClass(TranslationProfile::class)]
 final class LlmTranslationProviderTest extends TestCase
 {
     private const string ANSWER = '{"units": [{"id": "u1", "text": "Jeden"}, {"id": "u2", "text": "Dwa"}]}';
