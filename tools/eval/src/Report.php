@@ -43,11 +43,17 @@ final readonly class Report
             \sprintf('- Started: %s', $this->startedAt->format(DATE_ATOM)),
             \sprintf('- PHP: %s', PHP_VERSION),
             \sprintf('- Complete: %d of %d fixtures', $complete, \count($this->results)),
-            \sprintf('- Issues: %d, retried units: %d, model calls: %d', $this->sum(static fn(FixtureResult $result): int => $result->issueCount()), $this->sum(static fn(FixtureResult $result): int => $result->retries), $this->sum(static fn(FixtureResult $result): int => $result->calls)),
+            \sprintf(
+                '- Issues: %d, retried units: %d, model calls: %d (%d with context hints)',
+                $this->sum(static fn(FixtureResult $result): int => $result->issueCount()),
+                $this->sum(static fn(FixtureResult $result): int => $result->retries),
+                $this->sum(static fn(FixtureResult $result): int => $result->calls),
+                $this->sum(static fn(FixtureResult $result): int => $result->callsWithContext),
+            ),
             \sprintf('- Tokens: %s in, %s out', $this->tokens(array_map(static fn(FixtureResult $result): ?int => $result->inputTokens, $this->results)), $this->tokens(array_map(static fn(FixtureResult $result): ?int => $result->outputTokens, $this->results))),
             '',
-            '| Fixture | Complete | Issues | Units | Batches | Retried | Calls | Tokens in | Tokens out | Seconds |',
-            '|---|---|---|---|---|---|---|---|---|---|',
+            '| Fixture | Complete | Issues | Units | Batches | Retried | Calls | Context | Tokens in | Tokens out | Seconds |',
+            '|---|---|---|---|---|---|---|---|---|---|---|',
         ];
 
         foreach ($this->results as $result) {
@@ -55,13 +61,15 @@ final readonly class Report
                 ? 'error: ' . str_replace(['|', "\n"], ['\|', ' '], $result->error)
                 : ([] === $result->issues ? '–' : implode(', ', array_map(static fn(string $type, int $count): string => $type . ' ' . $count, array_keys($result->issues), $result->issues)));
             $lines[] = \sprintf(
-                '| %s | %s | %s | %d | %d | %d | %d | %s | %s | %.1f |',
+                '| %s | %s | %s | %d | %d | %d | %d | %d/%d | %s | %s | %.1f |',
                 $result->fixture,
                 $result->complete ? 'yes' : 'no',
                 $issues,
                 $result->units,
                 $result->batches,
                 $result->retries,
+                $result->calls,
+                $result->callsWithContext,
                 $result->calls,
                 $result->inputTokens ?? '–',
                 $result->outputTokens ?? '–',

@@ -34,6 +34,7 @@ use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\ProfileText;
 use HtmlTranslator\Profile\TranslationProfile;
 use HtmlTranslator\Progress;
+use HtmlTranslator\Provider\BatchContext;
 use HtmlTranslator\Provider\BatchResult;
 use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\Testing\PseudoLocalizationProvider;
@@ -63,6 +64,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(PseudoLocalizationProvider::class)]
 #[UsesClass(TranslationBatch::class)]
 #[UsesClass(BatchResult::class)]
+#[UsesClass(BatchContext::class)]
 #[UsesClass(Correction::class)]
 #[UsesClass(HtmlLoader::class)]
 #[UsesClass(LoadedDocument::class)]
@@ -567,6 +569,60 @@ final class HtmlTranslatorTest extends TestCase
         foreach ($provider->batches as $batch) {
             self::assertSame($profile, $batch->profile);
         }
+    }
+
+    #[Test]
+    public function it_passes_document_context_to_every_provider_call(): void
+    {
+        $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => PseudoLocalizationProvider::corruptingEvery(1, persistent: true)->translate($batch));
+        $html = '<!DOCTYPE html><title>Shop</title><h2>Plans</h2><p>Pick <b>one</b></p><h2>Support</h2><p>Mail <i>us</i></p>';
+
+        new HtmlTranslator($provider)->translate($html, Locale::fromString('pl'), new TranslationOptions(fallback: FallbackStrategy::TextNodesOnly, maxCorrectiveRetries: 1));
+
+        [$first, $retry, $fallback] = $provider->batches + [null, null, null];
+        self::assertInstanceOf(TranslationBatch::class, $first);
+        self::assertInstanceOf(TranslationBatch::class, $retry);
+        self::assertInstanceOf(TranslationBatch::class, $fallback);
+        self::assertCount(3, $provider->batches, 'first call, corrective retry, text-node fallback');
+
+        self::assertSame('Shop', $first->context->title);
+        self::assertSame(['Plans', 'Support'], $first->context->headings);
+        // u4 is the heading "Support" itself, so it belongs to the section before it.
+        self::assertSame(['u3' => 0, 'u4' => 0, 'u5' => 1], $first->context->unitHeadings);
+
+        self::assertSame('Shop', $retry->context->title);
+        self::assertSame(['Plans', 'Support'], $retry->context->headings);
+        self::assertSame(['u3' => 0, 'u4' => 0, 'u5' => 1], $retry->context->unitHeadings);
+
+        self::assertSame('Shop', $fallback->context->title);
+        self::assertSame(['Plans', 'Support'], $fallback->context->headings);
+        self::assertSame(0, $fallback->context->unitHeadings['u3-1'] ?? null, 'a text node inherits the heading of its unit');
+        self::assertSame(1, $fallback->context->unitHeadings['u5-1'] ?? null);
+        self::assertArrayNotHasKey('u1-1', $fallback->context->unitHeadings);
+    }
+
+    #[Test]
+    public function it_sends_only_the_headings_of_the_units_retried(): void
+    {
+        $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => PseudoLocalizationProvider::corruptingEvery(2)->translate($batch));
+
+        new HtmlTranslator($provider)->translate('<h2>A</h2><p>One</p><h2>B</h2><p>Two</p>', Locale::fromString('pl'));
+
+        $retry = $provider->batches[1] ?? self::fail('No corrective retry.');
+        self::assertSame(['u2', 'u4'], array_map(static fn(TranslationUnit $unit): string => $unit->id->toString(), $retry->units));
+        self::assertSame(['A', 'B'], $retry->context->headings);
+        self::assertSame(['u2' => 0, 'u4' => 1], $retry->context->unitHeadings);
+    }
+
+    #[Test]
+    public function it_sends_no_context_for_a_fragment_without_headings(): void
+    {
+        $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => new PseudoLocalizationProvider()->translate($batch));
+
+        new HtmlTranslator($provider)->translate('<p>A</p><p>B</p>', Locale::fromString('pl'));
+
+        $batch = $provider->batches[0] ?? self::fail('No batch.');
+        self::assertTrue($batch->context->isEmpty());
     }
 
     #[Test]

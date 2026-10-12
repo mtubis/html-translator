@@ -12,6 +12,7 @@ use HtmlTranslator\Domain\UnitKind;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\TranslationProfile;
+use HtmlTranslator\Provider\BatchContext;
 use HtmlTranslator\Provider\BatchResult;
 use HtmlTranslator\Provider\Llm\ChatResponse;
 use HtmlTranslator\Provider\Llm\FinishReason;
@@ -34,6 +35,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(UnitId::class)]
 #[UsesClass(Glossary::class)]
 #[UsesClass(TranslationProfile::class)]
+#[UsesClass(BatchContext::class)]
 final class ResponseParserTest extends TestCase
 {
     /**

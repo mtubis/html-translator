@@ -43,6 +43,17 @@ final class EvalRunnerTest extends TestCase
     }
 
     #[Test]
+    public function it_records_whether_context_hints_were_sent(): void
+    {
+        $fixtures = array_intersect_key(GoldenFixtures::all(), array_flip(['blog-article', 'emoji']));
+
+        $results = new EvalRunner(new TokenCountingChatModel(PseudoLocalizingChatModel::create()))->run($fixtures);
+
+        $withContext = array_column(array_map(static fn(FixtureResult $result): array => [$result->fixture, $result->callsWithContext], $results), 1, 0);
+        self::assertSame(['blog-article' => 1, 'emoji' => 0], $withContext);
+    }
+
+    #[Test]
     public function it_counts_issues_by_type(): void
     {
         $fixtures = array_intersect_key(GoldenFixtures::all(), array_flip(['emoji']));

@@ -36,7 +36,7 @@ final class TokenCountingChatModelTest extends TestCase
 
         self::assertSame('a', $response->content);
         self::assertSame('fake:counted', $model->modelId());
-        self::assertSame(['calls' => 3, 'inputTokens' => 150, 'outputTokens' => 15], $model->usage());
+        self::assertSame(['calls' => 3, 'inputTokens' => 150, 'outputTokens' => 15, 'callsWithContext' => 0], $model->usage());
     }
 
     #[Test]
@@ -45,11 +45,23 @@ final class TokenCountingChatModelTest extends TestCase
         $model = new TokenCountingChatModel(FakeChatModel::withResponses(new ChatResponse('a', 'm'), new ChatResponse('b', 'm', 0, 0)));
 
         $model->complete($this->request());
-        self::assertSame(['calls' => 1, 'inputTokens' => null, 'outputTokens' => null], $model->usage());
+        self::assertSame(['calls' => 1, 'inputTokens' => null, 'outputTokens' => null, 'callsWithContext' => 0], $model->usage());
 
         $model->reset();
         $model->complete($this->request());
-        self::assertSame(['calls' => 1, 'inputTokens' => 0, 'outputTokens' => 0], $model->usage());
+        self::assertSame(['calls' => 1, 'inputTokens' => 0, 'outputTokens' => 0, 'callsWithContext' => 0], $model->usage());
+    }
+
+    #[Test]
+    public function it_counts_calls_that_carry_context_hints(): void
+    {
+        $model = new TokenCountingChatModel(FakeChatModel::withResponses(new ChatResponse('a', 'm'), new ChatResponse('b', 'm')));
+
+        $model->complete(new ChatRequest([new ChatMessage(ChatRole::System, 'Translate.'), new ChatMessage(ChatRole::User, "{\"context\": {\"title\":\"Shop\"},\n\"units\": []}")]));
+        $model->complete(new ChatRequest([new ChatMessage(ChatRole::System, 'Translate.'), new ChatMessage(ChatRole::User, '{"units": []}')]));
+
+        self::assertSame(2, $model->usage()['calls']);
+        self::assertSame(1, $model->usage()['callsWithContext']);
     }
 
     #[Test]
@@ -61,7 +73,7 @@ final class TokenCountingChatModelTest extends TestCase
             $model->complete($this->request());
             self::fail('Expected a ProviderException.');
         } catch (ProviderException) {
-            self::assertSame(['calls' => 1, 'inputTokens' => null, 'outputTokens' => null], $model->usage());
+            self::assertSame(['calls' => 1, 'inputTokens' => null, 'outputTokens' => null, 'callsWithContext' => 0], $model->usage());
         }
     }
 
