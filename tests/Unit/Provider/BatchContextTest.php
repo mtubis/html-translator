@@ -4,15 +4,12 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Tests\Unit\Provider;
 
-use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Provider\BatchContext;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(BatchContext::class)]
-#[UsesClass(InvalidArgumentException::class)]
 final class BatchContextTest extends TestCase
 {
     #[Test]
@@ -65,20 +62,11 @@ final class BatchContextTest extends TestCase
     }
 
     #[Test]
-    public function it_rejects_a_heading_index_outside_the_list(): void
+    public function it_treats_an_empty_title_or_heading_as_none(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('"u1"');
+        $context = BatchContext::forUnits('', ['u1' => '', 'u2' => null]);
 
-        new BatchContext(null, ['Install'], ['u1' => 1]);
-    }
-
-    #[Test]
-    public function it_rejects_headings_no_unit_uses(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('"Use"');
-
-        new BatchContext(null, ['Install', 'Use'], ['u1' => 0]);
+        self::assertTrue($context->isEmpty());
+        self::assertSame([], $context->unitHeadings);
     }
 }

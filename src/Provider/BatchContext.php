@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Provider;
 
-use HtmlTranslator\Exception\InvalidArgumentException;
-
 /**
  * Document context hints for the units of one batch (ARCHITECTURE §6.3): the page title and the section heading
  * each unit belongs to, as plain source-language text. They help with short ambiguous texts such as button labels;
@@ -14,26 +12,16 @@ use HtmlTranslator\Exception\InvalidArgumentException;
 final readonly class BatchContext
 {
     /**
+     * Built only by the named constructors, so headings are distinct, non-empty and each used by a unit.
+     *
      * @param list<string> $headings distinct section headings of the batch's units, in order of first use
      * @param array<string, int> $unitHeadings unit id → index into $headings; units without a heading are left out
-     *
-     * @throws InvalidArgumentException when an index points outside $headings or a heading belongs to no unit
      */
-    public function __construct(
+    private function __construct(
         public ?string $title,
         public array $headings,
         public array $unitHeadings,
-    ) {
-        foreach ($unitHeadings as $id => $index) {
-            if (!isset($headings[$index])) {
-                throw new InvalidArgumentException(\sprintf('Unit "%s" refers to heading %d, which does not exist.', $id, $index));
-            }
-        }
-
-        foreach (array_diff_key($headings, array_flip($unitHeadings)) as $heading) {
-            throw new InvalidArgumentException(\sprintf('The heading "%s" belongs to no unit.', $heading));
-        }
-    }
+    ) {}
 
     public static function none(): self
     {
@@ -41,14 +29,15 @@ final readonly class BatchContext
     }
 
     /**
-     * @param array<string, ?string> $headingByUnit unit id → its section heading, in batch order
+     * @param ?string $title page title; an empty one counts as none
+     * @param array<string, ?string> $headingByUnit unit id → its section heading, in batch order; an empty one counts as none
      */
     public static function forUnits(?string $title, array $headingByUnit): self
     {
         $headings = [];
         $unitHeadings = [];
         foreach ($headingByUnit as $id => $heading) {
-            if (null === $heading) {
+            if (null === $heading || '' === $heading) {
                 continue;
             }
 
@@ -61,7 +50,7 @@ final readonly class BatchContext
             $unitHeadings[$id] = $index;
         }
 
-        return new self($title, $headings, $unitHeadings);
+        return new self('' === $title ? null : $title, $headings, $unitHeadings);
     }
 
     /**

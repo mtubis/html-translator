@@ -214,7 +214,7 @@ final readonly class HtmlTranslator
      */
     private function contextOf(BatchContext $documentContext, array $units): BatchContext
     {
-        $ids = array_map(strval(...), array_keys($units));
+        $ids = array_keys($units);
 
         return $documentContext->select(array_combine($ids, $ids));
     }

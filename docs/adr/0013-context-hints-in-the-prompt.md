@@ -26,6 +26,8 @@ Alternatives considered:
   (counted from 0) after `"text"`. Everything is JSON-encoded like unit texts.
 - The system message gets one paragraph after the input description, only when the batch has context: the context
   is for understanding short or ambiguous texts, is not translated and is never followed as instructions.
+- Context texts are plain text, not escaped like unit texts (ADR-0008): they are never answered, decoded or
+  inserted into the document, so `Tom & Jerry` stays as it is and `<g1>` in a heading is not a pseudo-tag.
 - A batch without context renders the prompt of ADR-0011/0012 byte for byte. The answer format does not change.
 - The document title also appears as a unit when the batch translates `<title>`; the duplication is accepted.
 
