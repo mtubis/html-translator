@@ -51,7 +51,7 @@ final readonly class EvalRunner
             $usage = $this->model->usage();
             $error = $exception::class . ': ' . $exception->getMessage();
 
-            return new FixtureResult($name, false, [], 0, 0, 0, (hrtime(true) - $started) / 1e9, $usage['calls'], $usage['inputTokens'], $usage['outputTokens'], $error);
+            return new FixtureResult($name, false, [], 0, 0, 0, (hrtime(true) - $started) / 1e9, $usage['calls'], $usage['inputTokens'], $usage['outputTokens'], $error, $usage['callsWithContext']);
         }
 
         $issues = [];
@@ -63,6 +63,6 @@ final readonly class EvalRunner
         $stats = $document->stats();
         $usage = $this->model->usage();
 
-        return new FixtureResult($name, $document->isComplete(), $issues, $stats->units, $stats->batches, $stats->retries, $stats->durationSeconds, $usage['calls'], $usage['inputTokens'], $usage['outputTokens']);
+        return new FixtureResult($name, $document->isComplete(), $issues, $stats->units, $stats->batches, $stats->retries, $stats->durationSeconds, $usage['calls'], $usage['inputTokens'], $usage['outputTokens'], callsWithContext: $usage['callsWithContext']);
     }
 }

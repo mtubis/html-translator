@@ -26,6 +26,7 @@ Options: `--provider` (`openai`, `gemini`, `ollama`, `vllm`, `lmstudio`, `pseudo
 | Units, Batches | from `TranslationStats` |
 | Retried | units sent again with feedback |
 | Calls | requests to the model, including corrective retries, parse retries and failed requests |
+| Context | calls whose prompt carried context hints (page title, section headings; ADR-0013) out of all calls |
 | Tokens in / out | as reported by the model; `–` when it reports none |
 | Seconds | wall time of the translation |
 
