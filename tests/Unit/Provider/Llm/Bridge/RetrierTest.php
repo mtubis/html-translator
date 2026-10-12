@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Tests\Unit\Provider\Llm\Bridge;
 
+use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Provider\Llm\Bridge\RetriedResponse;
 use HtmlTranslator\Provider\Llm\Bridge\Retrier;
 use HtmlTranslator\Provider\Llm\Bridge\RetryPolicy;
 use HtmlTranslator\Provider\Llm\Bridge\TransportFailure;
+use HtmlTranslator\Provider\Llm\Testing\FakeSleeper;
 use HtmlTranslator\Tests\Support\FakeClientException;
 use HtmlTranslator\Tests\Support\FakeHttpClient;
 use HtmlTranslator\Tests\Support\FakeNetworkException;
-use HtmlTranslator\Tests\Support\FakeSleeper;
+use HtmlTranslator\Tests\Support\NonSeekableStream;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Nyholm\Psr7\Response;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -29,6 +31,8 @@ use Throwable;
 #[CoversClass(RetriedResponse::class)]
 #[CoversClass(TransportFailure::class)]
 #[UsesClass(RetryPolicy::class)]
+#[UsesClass(InvalidArgumentException::class)]
+#[UsesClass(FakeSleeper::class)]
 final class RetrierTest extends TestCase
 {
     private const string API_KEY = 'sk-test-SECRET-0123456789';
@@ -64,6 +68,23 @@ final class RetrierTest extends TestCase
         self::assertSame([5000], $this->sleeper->delays);
     }
 
+    #[Test]
+    public function it_reads_retry_after_dates_in_gmt_whatever_the_default_timezone(): void
+    {
+        $previous = date_default_timezone_get();
+        date_default_timezone_set('Europe/Warsaw');
+
+        try {
+            // Across the end of daylight saving time in Warsaw: two hours in GMT.
+            $limited = new Response(503, ['Date' => 'Sun, 25 Oct 2026 00:30:00 GMT', 'Retry-After' => 'Sun, 25 Oct 2026 00:30:20 GMT']);
+            $this->retrier()->send($this->client([$limited, new Response(200)]), $this->request());
+        } finally {
+            date_default_timezone_set($previous);
+        }
+
+        self::assertSame([20_000], $this->sleeper->delays);
+    }
+
     /**
      * @return iterable<string, array{array<string, string>}>
      */
@@ -73,6 +94,9 @@ final class RetrierTest extends TestCase
         yield 'garbage' => [['Retry-After' => 'soon']];
         yield 'negative' => [['Retry-After' => '-3']];
         yield 'date equal to the response date' => [['Date' => 'Mon, 12 Oct 2026 10:00:05 GMT', 'Retry-After' => 'Mon, 12 Oct 2026 10:00:05 GMT']];
+        yield 'empty' => [['Retry-After' => '']];
+        yield 'day 32' => [['Date' => 'Mon, 12 Oct 2026 10:00:00 GMT', 'Retry-After' => 'Wed, 32 Oct 2026 10:00:00 GMT']];
+        yield 'wrong weekday' => [['Date' => 'Mon, 12 Oct 2026 10:00:00 GMT', 'Retry-After' => 'Fri, 12 Oct 2026 10:00:05 GMT']];
         yield 'date in the past' => [['Date' => 'Mon, 12 Oct 2026 10:00:05 GMT', 'Retry-After' => 'Mon, 12 Oct 2026 10:00:00 GMT']];
     }
 
@@ -90,10 +114,20 @@ final class RetrierTest extends TestCase
         self::assertLessThanOrEqual(1000, $this->sleeper->delays[0]);
     }
 
-    #[Test]
-    public function it_caps_retry_after_at_the_maximum_delay(): void
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function longRetryAfter(): iterable
     {
-        $this->retrier(new RetryPolicy(maxDelayMilliseconds: 5000))->send($this->client([new Response(429, ['Retry-After' => '3600']), new Response(200)]), $this->request());
+        yield 'an hour' => ['3600'];
+        yield 'more seconds than an integer holds' => ['99999999999999999999999'];
+    }
+
+    #[Test]
+    #[DataProvider('longRetryAfter')]
+    public function it_caps_retry_after_at_the_maximum_delay(string $retryAfter): void
+    {
+        $this->retrier(new RetryPolicy(maxDelayMilliseconds: 5000))->send($this->client([new Response(429, ['Retry-After' => $retryAfter]), new Response(200)]), $this->request());
 
         self::assertSame([5000], $this->sleeper->delays);
     }
@@ -127,6 +161,7 @@ final class RetrierTest extends TestCase
         self::assertSame(500, $result->response->getStatusCode());
         self::assertSame(3, $result->attempts);
         self::assertCount(2, $this->sleeper->delays);
+        self::assertGreaterThanOrEqual(500, $this->sleeper->delays[0]);
         self::assertLessThanOrEqual(1000, $this->sleeper->delays[0]);
         self::assertGreaterThanOrEqual(1000, $this->sleeper->delays[1]);
         self::assertLessThanOrEqual(2000, $this->sleeper->delays[1]);
@@ -140,6 +175,32 @@ final class RetrierTest extends TestCase
         self::assertSame(200, $result->response->getStatusCode());
         self::assertSame(3, $result->attempts);
         self::assertCount(2, $this->sleeper->delays, 'It backs off between network errors too.');
+    }
+
+    #[Test]
+    public function it_counts_attempts_across_server_and_network_errors(): void
+    {
+        $result = $this->retrier()->send($this->client([new Response(503), 'network', new Response(200)]), $this->request());
+
+        self::assertSame(3, $result->attempts);
+        self::assertCount(2, $this->sleeper->delays);
+        self::assertGreaterThanOrEqual(1000, $this->sleeper->delays[1], 'The second wait backs off further.');
+    }
+
+    #[Test]
+    public function it_does_not_retry_a_body_it_cannot_rewind(): void
+    {
+        $factory = new Psr17Factory();
+        $resource = fopen('php://memory', 'r+');
+        self::assertIsResource($resource);
+        fwrite($resource, '{"model":"m"}');
+        rewind($resource);
+        $request = $factory->createRequest('POST', 'https://api.example.test/v1/messages')->withBody(new NonSeekableStream($factory->createStreamFromResource($resource)));
+
+        $result = $this->retrier()->send($this->client([new Response(503), new Response(200)]), $request);
+
+        self::assertSame(503, $result->response->getStatusCode());
+        self::assertSame(1, $result->attempts);
     }
 
     #[Test]
@@ -215,6 +276,14 @@ final class RetrierTest extends TestCase
         } finally {
             ini_set('zend.exception_ignore_args', false === $previous ? '1' : $previous);
         }
+    }
+
+    #[Test]
+    public function it_needs_at_least_one_attempt_for_a_response(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new RetriedResponse(new Response(200), 0);
     }
 
     private function retrier(?RetryPolicy $policy = null): Retrier

@@ -14,6 +14,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 use Random\Engine\Mt19937;
 use Random\Randomizer;
+use ReflectionClass;
 
 #[CoversClass(RetryPolicy::class)]
 #[UsesClass(InvalidArgumentException::class)]
@@ -110,7 +111,22 @@ final class RetryPolicyTest extends TestCase
     #[Test]
     public function it_accepts_the_bounds_of_the_error_statuses(): void
     {
-        self::assertSame([300, 599], new RetryPolicy(retryableStatuses: [300, 599])->retryableStatuses);
+        self::assertSame([400, 599], new RetryPolicy(retryableStatuses: [400, 599])->retryableStatuses);
+    }
+
+    #[Test]
+    public function it_accepts_the_bounds_of_the_attempts_and_the_delay(): void
+    {
+        $policy = new RetryPolicy(maxAttempts: RetryPolicy::MAX_ATTEMPTS, maxDelayMilliseconds: RetryPolicy::MAX_DELAY_MILLISECONDS);
+
+        self::assertSame(10, $policy->maxAttempts);
+        self::assertSame(3_600_000, $policy->maxDelayMilliseconds);
+    }
+
+    #[Test]
+    public function it_lists_each_status_once(): void
+    {
+        self::assertSame([429, 503], new RetryPolicy(retryableStatuses: [429, 429, 503])->retryableStatuses);
     }
 
     #[Test]
@@ -129,7 +145,11 @@ final class RetryPolicyTest extends TestCase
         yield 'maximum below the base' => [static fn(): RetryPolicy => new RetryPolicy(baseDelayMilliseconds: 2000, maxDelayMilliseconds: 1000)];
         yield 'success status as retryable' => [static fn(): RetryPolicy => new RetryPolicy(retryableStatuses: [200])];
         yield 'status outside HTTP' => [static fn(): RetryPolicy => new RetryPolicy(retryableStatuses: [700])];
-        yield 'status just below the errors' => [static fn(): RetryPolicy => new RetryPolicy(retryableStatuses: [299])];
+        yield 'redirect status' => [static fn(): RetryPolicy => new RetryPolicy(retryableStatuses: [399])];
+        // Reflection, because a string status is what untyped configuration delivers, not what the signature allows.
+        yield 'status as a string' => [static fn(): RetryPolicy => new ReflectionClass(RetryPolicy::class)->newInstanceArgs(['retryableStatuses' => ['429']])];
+        yield 'too many attempts' => [static fn(): RetryPolicy => new RetryPolicy(maxAttempts: 11)];
+        yield 'maximum delay over an hour' => [static fn(): RetryPolicy => new RetryPolicy(maxDelayMilliseconds: 3_600_001)];
         yield 'status just above the errors' => [static fn(): RetryPolicy => new RetryPolicy(retryableStatuses: [600])];
     }
 

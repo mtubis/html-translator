@@ -25,6 +25,8 @@ use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig;
+use HtmlTranslator\Provider\Llm\Bridge\Retrier;
+use HtmlTranslator\Provider\Llm\Bridge\RetryPolicy;
 use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatRequest;
 use HtmlTranslator\Provider\Llm\ChatRole;
@@ -81,10 +83,10 @@ final class UntrustedMessagesTest extends TestCase
         yield 'OpenAI-compatible name' => [static fn(): OpenAiCompatibleConfig => new OpenAiCompatibleConfig($hostile, '/relative', 'model')];
         yield 'OpenAI-compatible header name' => [static fn(): OpenAiCompatibleConfig => new OpenAiCompatibleConfig('x', 'https://api.example.test/v1', 'model', extraHeaders: [str_repeat('X', 1_000_000) => "bad\nvalue"])];
         yield 'Anthropic header name' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', 'sk-ant-1', extraHeaders: [str_repeat('X', 1_000_000) => "bad\nvalue"])];
-        yield 'OpenAI-compatible vendor message' => [static fn(): mixed => new OpenAiCompatibleChatModel($openAiVendorError, $factory, $factory, OpenAiCompatibleConfig::ollama('llama3.1'))->complete($request)];
-        yield 'OpenAI-compatible transport error' => [static fn(): mixed => new OpenAiCompatibleChatModel($transportError, $factory, $factory, OpenAiCompatibleConfig::ollama('llama3.1'))->complete($request)];
-        yield 'Anthropic vendor message' => [static fn(): mixed => new AnthropicChatModel($vendorError, $factory, $factory, new AnthropicConfig('claude-opus-5-5', 'sk-ant-1'))->complete($request)];
-        yield 'Anthropic transport error' => [static fn(): mixed => new AnthropicChatModel($transportError, $factory, $factory, new AnthropicConfig('claude-opus-5-5', 'sk-ant-1'))->complete($request)];
+        yield 'OpenAI-compatible vendor message' => [static fn(): mixed => new OpenAiCompatibleChatModel($openAiVendorError, $factory, $factory, OpenAiCompatibleConfig::ollama('llama3.1'), new Retrier(RetryPolicy::none()))->complete($request)];
+        yield 'OpenAI-compatible transport error' => [static fn(): mixed => new OpenAiCompatibleChatModel($transportError, $factory, $factory, OpenAiCompatibleConfig::ollama('llama3.1'), new Retrier(RetryPolicy::none()))->complete($request)];
+        yield 'Anthropic vendor message' => [static fn(): mixed => new AnthropicChatModel($vendorError, $factory, $factory, new AnthropicConfig('claude-opus-5-5', 'sk-ant-1'), new Retrier(RetryPolicy::none()))->complete($request)];
+        yield 'Anthropic transport error' => [static fn(): mixed => new AnthropicChatModel($transportError, $factory, $factory, new AnthropicConfig('claude-opus-5-5', 'sk-ant-1'), new Retrier(RetryPolicy::none()))->complete($request)];
     }
 
     /**

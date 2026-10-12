@@ -22,11 +22,11 @@ use HtmlTranslator\Provider\Llm\JsonSchema;
 use HtmlTranslator\Provider\Llm\Testing\ChatModelContractTestCase;
 use HtmlTranslator\Provider\Llm\Testing\ChatScenario;
 use HtmlTranslator\Provider\Llm\Testing\ChatScenarioKind;
+use HtmlTranslator\Provider\Llm\Testing\FakeSleeper;
 use HtmlTranslator\Provider\Llm\Testing\RecordedChatRequest;
 use HtmlTranslator\Tests\Support\FakeClientException;
 use HtmlTranslator\Tests\Support\FakeHttpClient;
 use HtmlTranslator\Tests\Support\FakeNetworkException;
-use HtmlTranslator\Tests\Support\FakeSleeper;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Nyholm\Psr7\Response;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -52,6 +52,7 @@ use Psr\Http\Message\RequestInterface;
 #[UsesClass(RetryPolicy::class)]
 #[UsesClass(RetriedResponse::class)]
 #[UsesClass(TransportFailure::class)]
+#[UsesClass(FakeSleeper::class)]
 final class OpenAiCompatibleChatModelContractTest extends ChatModelContractTestCase
 {
     private const string MODEL = 'contract-configured-model';

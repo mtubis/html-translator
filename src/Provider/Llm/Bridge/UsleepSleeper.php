@@ -7,7 +7,7 @@ namespace HtmlTranslator\Provider\Llm\Bridge;
 /**
  * Blocks the process for the given time.
  */
-final readonly class UsleepSleeper implements Sleeper
+final readonly class UsleepSleeper implements SleeperInterface
 {
     public function sleep(int $milliseconds): void
     {

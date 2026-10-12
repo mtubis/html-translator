@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HtmlTranslator\Provider\Llm\Bridge;
 
 use DateTimeImmutable;
+use DateTimeZone;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Client\NetworkExceptionInterface;
@@ -20,26 +21,32 @@ use SensitiveParameter;
  */
 final readonly class Retrier
 {
-    private RetryPolicy $policy;
+    /** IMF-fixdate (RFC 9110), the format of Date and Retry-After; DATE_RFC7231 is deprecated as of PHP 8.5. */
+    /** IMF-fixdate (RFC 9110), parsed from midnight so no field comes from the current time. */
+    private const string HTTP_DATE = '!D, d M Y H:i:s \\G\\M\\T';
+
+    private const string HTTP_DATE_OUT = 'D, d M Y H:i:s \\G\\M\\T';
 
     public function __construct(
-        ?RetryPolicy $policy = null,
-        private Sleeper $sleeper = new UsleepSleeper(),
+        private RetryPolicy $policy = new RetryPolicy(),
+        private SleeperInterface $sleeper = new UsleepSleeper(),
         private Randomizer $randomizer = new Randomizer(),
-    ) {
-        $this->policy = $policy ?? RetryPolicy::default();
-    }
+    ) {}
 
     /**
      * @param RequestInterface $request sensitive: its headers carry the API key
      *
-     * @throws TransportFailure when the client fails on the last attempt, or with an error that is not worth retrying
+     * @throws TransportFailure when the client fails on the last attempt, or with an error that is not worth retrying;
+     *                          turn it into a ProviderException (see TransportFailure)
      */
     public function send(ClientInterface $client, #[SensitiveParameter] RequestInterface $request): RetriedResponse
     {
+        // The request is immutable, but its body stream is shared between attempts: one that cannot be rewound would
+        // be sent empty the second time.
+        $body = $request->getBody();
+        $maxAttempts = $body->isSeekable() ? $this->policy->maxAttempts : 1;
+
         for ($attempt = 1; ; ++$attempt) {
-            // The request is immutable, but its body stream is shared between attempts.
-            $body = $request->getBody();
             if ($body->isSeekable()) {
                 $body->rewind();
             }
@@ -47,7 +54,7 @@ final readonly class Retrier
             try {
                 $response = $client->sendRequest($request);
             } catch (ClientExceptionInterface $exception) {
-                if (!$exception instanceof NetworkExceptionInterface || !$this->policy->retryNetworkErrors || $attempt >= $this->policy->maxAttempts) {
+                if (!$exception instanceof NetworkExceptionInterface || !$this->policy->retryNetworkErrors || $attempt >= $maxAttempts) {
                     throw new TransportFailure($attempt, $exception);
                 }
 
@@ -56,7 +63,7 @@ final readonly class Retrier
                 continue;
             }
 
-            if ($attempt >= $this->policy->maxAttempts || !$this->policy->retries($response->getStatusCode())) {
+            if ($attempt >= $maxAttempts || !$this->policy->retries($response->getStatusCode())) {
                 return new RetriedResponse($response, $attempt);
             }
 
@@ -69,21 +76,29 @@ final readonly class Retrier
 
     private function retryAfterMilliseconds(ResponseInterface $response): ?int
     {
-        $value = trim($response->getHeaderLine('Retry-After'));
-        if ('' === $value) {
-            return null;
-        }
-
+        // PSR-7 implementations trim header values.
+        $value = $response->getHeaderLine('Retry-After');
         if (ctype_digit($value)) {
             return min((int) $value, intdiv(\PHP_INT_MAX, 1000)) * 1000;
         }
 
-        $retryAt = DateTimeImmutable::createFromFormat(\DATE_RFC7231, $value);
-        $sentAt = DateTimeImmutable::createFromFormat(\DATE_RFC7231, trim($response->getHeaderLine('Date')));
-        if (false === $retryAt || false === $sentAt || $retryAt <= $sentAt) {
+        $retryAt = $this->httpDate($value);
+        $sentAt = $this->httpDate($response->getHeaderLine('Date'));
+        if (!$retryAt instanceof DateTimeImmutable || !$sentAt instanceof DateTimeImmutable || $retryAt <= $sentAt) {
             return null;
         }
 
         return ($retryAt->getTimestamp() - $sentAt->getTimestamp()) * 1000;
+    }
+
+    /**
+     * A strict IMF-fixdate in GMT. createFromFormat() quietly rolls over a day 32 and follows a wrong weekday to another
+     * date, so the parsed date must format back to the same text.
+     */
+    private function httpDate(string $value): ?DateTimeImmutable
+    {
+        $date = DateTimeImmutable::createFromFormat(self::HTTP_DATE, $value, new DateTimeZone('UTC'));
+
+        return false !== $date && $date->format(self::HTTP_DATE_OUT) === $value ? $date : null;
     }
 }

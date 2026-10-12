@@ -21,11 +21,11 @@ use HtmlTranslator\Provider\Llm\ChatResponse;
 use HtmlTranslator\Provider\Llm\ChatRole;
 use HtmlTranslator\Provider\Llm\FinishReason;
 use HtmlTranslator\Provider\Llm\JsonSchema;
+use HtmlTranslator\Provider\Llm\Testing\FakeSleeper;
 use HtmlTranslator\Tests\Support\FakeClientException;
 use HtmlTranslator\Tests\Support\FakeHttpClient;
 use HtmlTranslator\Tests\Support\FakeNetworkException;
 use HtmlTranslator\Tests\Support\FakeRequestException;
-use HtmlTranslator\Tests\Support\FakeSleeper;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Nyholm\Psr7\Response;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -56,6 +56,7 @@ use Throwable;
 #[UsesClass(RetryPolicy::class)]
 #[UsesClass(RetriedResponse::class)]
 #[UsesClass(TransportFailure::class)]
+#[UsesClass(FakeSleeper::class)]
 final class AnthropicChatModelTest extends TestCase
 {
     private const string API_KEY = 'sk-ant-test-SECRET-0123456789';
@@ -309,7 +310,7 @@ final class AnthropicChatModelTest extends TestCase
         $client = $this->client(200, 'success.json');
         $config = new AnthropicConfig('claude-opus-5-5', self::API_KEY, effort: AnthropicEffort::Low, refusalFallbacks: true);
 
-        new AnthropicChatModel($client, new Psr17Factory(), new Psr17Factory(), $config)->complete(new ChatRequest(
+        new AnthropicChatModel($client, new Psr17Factory(), new Psr17Factory(), $config, new Retrier(RetryPolicy::none()))->complete(new ChatRequest(
             [new ChatMessage(ChatRole::User, 'Answer in JSON.')],
             jsonResponse: true,
             jsonSchema: JsonSchema::fromJson(self::SCHEMA),
