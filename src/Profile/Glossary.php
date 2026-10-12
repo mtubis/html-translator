@@ -16,9 +16,7 @@ final readonly class Glossary
 
     private const string SCRIPTS_WITHOUT_SPACES = '[\p{Han}\p{Hiragana}\p{Katakana}\p{Thai}\p{Lao}\p{Khmer}\p{Myanmar}]';
 
-    private const string NO_WORD_CHARACTER_BEFORE = '(?<![\p{L}\p{M}\p{N}_])';
-
-    private const string NO_WORD_CHARACTER_AFTER = '(?![\p{L}\p{M}\p{N}_])';
+    private const string WORD_CHARACTER = '[\p{L}\p{M}\p{N}_]';
 
     /**
      * @param list<GlossaryEntry> $entries
@@ -83,9 +81,9 @@ final readonly class Glossary
     /**
      * The entries whose source term occurs in one of the texts, so a prompt carries only the terms it needs.
      *
-     * Matching ignores case and differences in whitespace, and needs whole words: "art" does not match "party".
-     * Scripts written without spaces between words (Chinese, Japanese, Thai, …) have no word boundaries to check,
-     * so their terms match anywhere. A term never matches across two texts.
+     * Matching ignores case (full case folding) and differences in whitespace, and needs whole words: "art" does not
+     * match "party". Scripts written without spaces between words (Chinese, Japanese, Thai, …) have no word boundaries
+     * to check, so their terms match anywhere. A term never matches across two texts.
      *
      * @param list<string> $texts plain text, without markup
      */
@@ -113,21 +111,25 @@ final readonly class Glossary
     }
 
     /**
-     * Lower case with every run of whitespace as one space; texts and terms are compared in this form.
+     * Case-folded (so "STRASSE" equals "straße") with every run of whitespace as one space; texts and terms are
+     * compared in this form. Unicode normalization (NFC/NFD) is not applied.
      */
     private static function fold(string $text): string
     {
         // preg_replace() fails only on invalid UTF-8; such a text keeps its whitespace and can still be compared.
-        return mb_strtolower(preg_replace('/[\s\p{Z}]+/u', ' ', $text) ?? $text);
+        return mb_convert_case(preg_replace('/[\s\p{Z}]+/u', ' ', $text) ?? $text, \MB_CASE_FOLD);
     }
 
     /**
-     * Requires a word boundary at each edge of the term, unless that edge is in a script written without spaces.
+     * Requires a word boundary at each edge of the term that is a word character, unless it is in a script written
+     * without spaces; an edge such as the dot of ".NET" or the plus of "C++" needs none ("ASP.NET", "C++20").
      */
     private static function pattern(string $term): string
     {
-        $before = 1 === preg_match('/^' . self::SCRIPTS_WITHOUT_SPACES . '/u', $term) ? '' : self::NO_WORD_CHARACTER_BEFORE;
-        $after = 1 === preg_match('/' . self::SCRIPTS_WITHOUT_SPACES . '$/u', $term) ? '' : self::NO_WORD_CHARACTER_AFTER;
+        $boundedStart = '/^(?!' . self::SCRIPTS_WITHOUT_SPACES . ')' . self::WORD_CHARACTER . '/u';
+        $boundedEnd = '/(?!' . self::SCRIPTS_WITHOUT_SPACES . ')' . self::WORD_CHARACTER . '$/u';
+        $before = 1 === preg_match($boundedStart, $term) ? '(?<!' . self::WORD_CHARACTER . ')' : '';
+        $after = 1 === preg_match($boundedEnd, $term) ? '(?!' . self::WORD_CHARACTER . ')' : '';
 
         return '/' . $before . preg_quote($term, '/') . $after . '/u';
     }

@@ -136,6 +136,7 @@ final class GlossaryTest extends TestCase
         yield 'different case' => [['Open a Pull Request.'], 'pull request', true];
         yield 'inside a longer word' => [['Join the party.'], 'art', false];
         yield 'as a prefix of a longer word' => [['Artists welcome.'], 'art', false];
+        yield 'as a suffix of a longer word' => [['Restart now.'], 'start', false];
         yield 'at the start' => [['Commit often.'], 'commit', true];
         yield 'at the end' => [['Then commit'], 'commit', true];
         yield 'whole text' => [['commit'], 'commit', true];
@@ -150,6 +151,12 @@ final class GlossaryTest extends TestCase
         yield 'Chinese inside a sentence' => [['请打开设置页面'], '设置', true];
         yield 'regex characters' => [['Written in C++ and .NET.'], 'C++', true];
         yield 'regex characters not as a pattern' => [['Written in Cxx.'], 'C++', false];
+        yield 'dot not as a wildcard' => [['Use XNET today.'], '.NET', false];
+        yield 'term starting with punctuation after a word' => [['Built on ASP.NET Core.'], '.NET', true];
+        yield 'term ending with punctuation before a word' => [['Compiled as C++20.'], 'C++', true];
+        yield 'German sharp s by case folding' => [['STRASSE GESPERRT'], 'straße', true];
+        yield 'Greek final sigma' => [['ΛΌΓΟΣ'], 'λόγος', true];
+        yield 'mixed script term needs a boundary on its Latin side' => [['XAPI設定を開く'], 'API設定', false];
         yield 'no texts' => [[], 'commit', false];
         yield 'empty text' => [[''], 'commit', false];
     }
