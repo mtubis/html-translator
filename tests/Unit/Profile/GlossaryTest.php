@@ -128,6 +128,55 @@ final class GlossaryTest extends TestCase
     }
 
     /**
+     * @return iterable<string, array{list<string>, string, bool}>
+     */
+    public static function termOccurrences(): iterable
+    {
+        yield 'exact' => [['Open a pull request.'], 'pull request', true];
+        yield 'different case' => [['Open a Pull Request.'], 'pull request', true];
+        yield 'inside a longer word' => [['Join the party.'], 'art', false];
+        yield 'as a prefix of a longer word' => [['Artists welcome.'], 'art', false];
+        yield 'at the start' => [['Commit often.'], 'commit', true];
+        yield 'at the end' => [['Then commit'], 'commit', true];
+        yield 'whole text' => [['commit'], 'commit', true];
+        yield 'extra whitespace between words' => [["Open a pull  \n request."], 'pull request', true];
+        yield 'next to punctuation' => [['(branch), "branch".'], 'branch', true];
+        yield 'with digits around' => [['Use 2FA2 here.'], 'FA', false];
+        yield 'in the second text' => [['Nothing here.', 'Create a branch.'], 'branch', true];
+        yield 'Cyrillic' => [['Наш сервер работает.'], 'сервер', true];
+        yield 'Cyrillic inside a longer word' => [['Серверная готова.'], 'сервер', false];
+        yield 'Polish upper-case multibyte' => [['UWAGA: ŻÓŁW!'], 'żółw', true];
+        yield 'Japanese inside a sentence' => [['設定を変更する'], '設定', true];
+        yield 'Chinese inside a sentence' => [['请打开设置页面'], '设置', true];
+        yield 'regex characters' => [['Written in C++ and .NET.'], 'C++', true];
+        yield 'regex characters not as a pattern' => [['Written in Cxx.'], 'C++', false];
+        yield 'no texts' => [[], 'commit', false];
+        yield 'empty text' => [[''], 'commit', false];
+    }
+
+    /**
+     * @param list<string> $texts
+     */
+    #[Test]
+    #[DataProvider('termOccurrences')]
+    public function it_matches_entries_found_in_texts(array $texts, string $term, bool $expected): void
+    {
+        $matching = Glossary::fromArray([$term => 'x'])->matching($texts);
+
+        self::assertSame($expected, !$matching->isEmpty());
+    }
+
+    #[Test]
+    public function it_keeps_insertion_order_and_returns_each_entry_once_when_matching(): void
+    {
+        $glossary = Glossary::fromArray(['commit' => 'commit', 'merge' => 'scalenie', 'branch' => 'gałąź']);
+
+        $matching = $glossary->matching(['Create a branch, then commit.', 'Commit again on the branch.']);
+
+        self::assertSame([['commit', 'commit'], ['branch', 'gałąź']], $this->pairs($matching));
+    }
+
+    /**
      * @return list<array{string, string}>
      */
     private function pairs(Glossary $glossary): array

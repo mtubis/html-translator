@@ -14,6 +14,12 @@ final readonly class Glossary
     /** Keeps the prompt bounded; only the entries that occur in a batch are sent to the model. */
     public const int MAX_ENTRIES = 500;
 
+    private const string SCRIPTS_WITHOUT_SPACES = '[\p{Han}\p{Hiragana}\p{Katakana}\p{Thai}\p{Lao}\p{Khmer}\p{Myanmar}]';
+
+    private const string NO_WORD_CHARACTER_BEFORE = '(?<![\p{L}\p{M}\p{N}_])';
+
+    private const string NO_WORD_CHARACTER_AFTER = '(?![\p{L}\p{M}\p{N}_])';
+
     /**
      * @param list<GlossaryEntry> $entries
      *
@@ -75,6 +81,25 @@ final readonly class Glossary
     }
 
     /**
+     * The entries whose source term occurs in one of the texts, so a prompt carries only the terms it needs.
+     *
+     * Matching ignores case and differences in whitespace, and needs whole words: "art" does not match "party".
+     * Scripts written without spaces between words (Chinese, Japanese, Thai, …) have no word boundaries to check,
+     * so their terms match anywhere. A term never matches across two texts.
+     *
+     * @param list<string> $texts plain text, without markup
+     */
+    public function matching(array $texts): self
+    {
+        $haystack = implode("\n", array_map(self::fold(...), $texts));
+
+        return new self(array_values(array_filter(
+            $this->entries,
+            static fn(GlossaryEntry $entry): bool => 1 === preg_match(self::pattern(self::fold($entry->source)), $haystack),
+        )));
+    }
+
+    /**
      * @return list<GlossaryEntry> in insertion order
      */
     public function entries(): array
@@ -85,5 +110,25 @@ final readonly class Glossary
     public function isEmpty(): bool
     {
         return [] === $this->entries;
+    }
+
+    /**
+     * Lower case with every run of whitespace as one space; texts and terms are compared in this form.
+     */
+    private static function fold(string $text): string
+    {
+        // preg_replace() fails only on invalid UTF-8; such a text keeps its whitespace and can still be compared.
+        return mb_strtolower(preg_replace('/[\s\p{Z}]+/u', ' ', $text) ?? $text);
+    }
+
+    /**
+     * Requires a word boundary at each edge of the term, unless that edge is in a script written without spaces.
+     */
+    private static function pattern(string $term): string
+    {
+        $before = 1 === preg_match('/^' . self::SCRIPTS_WITHOUT_SPACES . '/u', $term) ? '' : self::NO_WORD_CHARACTER_BEFORE;
+        $after = 1 === preg_match('/' . self::SCRIPTS_WITHOUT_SPACES . '$/u', $term) ? '' : self::NO_WORD_CHARACTER_AFTER;
+
+        return '/' . $before . preg_quote($term, '/') . $after . '/u';
     }
 }
