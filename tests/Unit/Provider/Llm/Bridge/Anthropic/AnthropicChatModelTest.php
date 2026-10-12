@@ -11,12 +11,17 @@ use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicEffort;
 use HtmlTranslator\Provider\Llm\Bridge\HttpSecrets;
+use HtmlTranslator\Provider\Llm\Bridge\RetriedResponse;
+use HtmlTranslator\Provider\Llm\Bridge\Retrier;
+use HtmlTranslator\Provider\Llm\Bridge\RetryPolicy;
+use HtmlTranslator\Provider\Llm\Bridge\TransportFailure;
 use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatRequest;
 use HtmlTranslator\Provider\Llm\ChatResponse;
 use HtmlTranslator\Provider\Llm\ChatRole;
 use HtmlTranslator\Provider\Llm\FinishReason;
 use HtmlTranslator\Provider\Llm\JsonSchema;
+use HtmlTranslator\Provider\Llm\Testing\FakeSleeper;
 use HtmlTranslator\Tests\Support\FakeClientException;
 use HtmlTranslator\Tests\Support\FakeHttpClient;
 use HtmlTranslator\Tests\Support\FakeNetworkException;
@@ -47,6 +52,11 @@ use Throwable;
 #[UsesClass(InvalidArgumentException::class)]
 #[UsesClass(UntrustedText::class)]
 #[UsesClass(HttpSecrets::class)]
+#[UsesClass(Retrier::class)]
+#[UsesClass(RetryPolicy::class)]
+#[UsesClass(RetriedResponse::class)]
+#[UsesClass(TransportFailure::class)]
+#[UsesClass(FakeSleeper::class)]
 final class AnthropicChatModelTest extends TestCase
 {
     private const string API_KEY = 'sk-ant-test-SECRET-0123456789';
@@ -300,7 +310,7 @@ final class AnthropicChatModelTest extends TestCase
         $client = $this->client(200, 'success.json');
         $config = new AnthropicConfig('claude-opus-5-5', self::API_KEY, effort: AnthropicEffort::Low, refusalFallbacks: true);
 
-        new AnthropicChatModel($client, new Psr17Factory(), new Psr17Factory(), $config)->complete(new ChatRequest(
+        new AnthropicChatModel($client, new Psr17Factory(), new Psr17Factory(), $config, new Retrier(RetryPolicy::none()))->complete(new ChatRequest(
             [new ChatMessage(ChatRole::User, 'Answer in JSON.')],
             jsonResponse: true,
             jsonSchema: JsonSchema::fromJson(self::SCHEMA),
@@ -424,6 +434,41 @@ final class AnthropicChatModelTest extends TestCase
     }
 
     #[Test]
+    public function it_retries_an_overloaded_api_and_says_how_often_it_tried(): void
+    {
+        $sleeper = new FakeSleeper();
+
+        $exception = $this->failure($this->model($this->client(529, 'error-529.json'), new Retrier(sleeper: $sleeper)));
+
+        self::assertSame(529, $exception->statusCode);
+        self::assertSame('overloaded_error', $exception->vendorCode);
+        self::assertSame('anthropic returned HTTP 529 after 3 attempts (request req_011CSHoEeqs5C35K2UUqR7Fy): Overloaded', $exception->getMessage());
+        self::assertCount(2, $sleeper->delays);
+    }
+
+    #[Test]
+    public function it_succeeds_when_a_retry_succeeds(): void
+    {
+        $answers = [new Response(429, ['Retry-After' => '1']), new Response(200, [], (string) file_get_contents(self::FIXTURES . '/success.json'))];
+        $sleeper = new FakeSleeper();
+
+        $response = $this->model(new FakeHttpClient(static function () use (&$answers): Response {
+            return array_shift($answers) ?? self::fail('No answer left.');
+        }), new Retrier(sleeper: $sleeper))->complete($this->request());
+
+        self::assertSame('claude-opus-5-5', $response->model);
+        self::assertSame([1000], $sleeper->delays);
+    }
+
+    #[Test]
+    public function it_says_how_often_it_tried_to_reach_the_api(): void
+    {
+        $model = $this->model(new FakeHttpClient(static fn(RequestInterface $request): Response => throw new FakeNetworkException('Connection reset', $request)), new Retrier(sleeper: new FakeSleeper()));
+
+        self::assertStringStartsWith('Could not reach anthropic at https://api.anthropic.com/v1/messages after 3 attempts: Connection reset', $this->failure($model)->getMessage());
+    }
+
+    #[Test]
     public function it_names_the_configured_model(): void
     {
         self::assertSame('anthropic:claude-opus-5-5', $this->model($this->client(200, 'success.json'))->modelId());
@@ -462,11 +507,14 @@ final class AnthropicChatModelTest extends TestCase
         }
     }
 
-    private function model(FakeHttpClient $client): AnthropicChatModel
+    /**
+     * Without retries, so every scripted response is the one the adapter reports; retries have their own tests.
+     */
+    private function model(FakeHttpClient $client, ?Retrier $retrier = null): AnthropicChatModel
     {
         $factory = new Psr17Factory();
 
-        return new AnthropicChatModel($client, $factory, $factory, new AnthropicConfig('claude-opus-5-5', self::API_KEY));
+        return new AnthropicChatModel($client, $factory, $factory, new AnthropicConfig('claude-opus-5-5', self::API_KEY), $retrier ?? new Retrier(RetryPolicy::none()));
     }
 
     private function client(int $status, string $fixture): FakeHttpClient

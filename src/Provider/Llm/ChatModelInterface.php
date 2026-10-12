@@ -12,8 +12,8 @@ use HtmlTranslator\Exception\ProviderException;
  * and parsing are shared, so a vendor adapter is just a mapping to the vendor's HTTP API on PSR-18/17 (ADR-0002).
  *
  * Adapters
- * - may retry transient transport failures themselves (429/5xx with backoff, ARCHITECTURE §6.8; a shared helper
- *   arrives in 0.4); the core never retries a call that threw;
+ * - may retry transient transport failures themselves (429/5xx with backoff, ARCHITECTURE §6.8; use
+ *   Provider\Llm\Bridge\Retrier); the core never retries a call that threw;
  * - throw ProviderException for every failure, with ProviderException::fromHttpResponse() when there is an HTTP
  *   status, and wrap transport and decoding errors in it;
  * - never put API keys, tokens or other credentials into exception messages or traces (#[\SensitiveParameter]);

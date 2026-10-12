@@ -7,6 +7,8 @@ namespace HtmlTranslator\Provider\Llm\Bridge\Anthropic;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Exception\UntrustedText;
+use HtmlTranslator\Provider\Llm\Bridge\Retrier;
+use HtmlTranslator\Provider\Llm\Bridge\TransportFailure;
 use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatModelInterface;
 use HtmlTranslator\Provider\Llm\ChatRequest;
@@ -15,7 +17,6 @@ use HtmlTranslator\Provider\Llm\ChatRole;
 use HtmlTranslator\Provider\Llm\FinishReason;
 use HtmlTranslator\Provider\Llm\JsonSchema;
 use JsonException;
-use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
@@ -51,6 +52,7 @@ final readonly class AnthropicChatModel implements ChatModelInterface
         private RequestFactoryInterface $requestFactory,
         private StreamFactoryInterface $streamFactory,
         private AnthropicConfig $config,
+        private Retrier $retrier = new Retrier(),
     ) {}
 
     public function modelId(): string
@@ -71,15 +73,16 @@ final readonly class AnthropicChatModel implements ChatModelInterface
         }
 
         try {
-            $response = $this->client->sendRequest($httpRequest);
-        } catch (ClientExceptionInterface $exception) {
-            throw $this->transportError($exception);
+            $retried = $this->retrier->send($this->client, $httpRequest);
+        } catch (TransportFailure $failure) {
+            throw $this->transportError($failure);
         }
 
+        $response = $retried->response;
         $status = $response->getStatusCode();
         $body = (string) $response->getBody();
         if ($status < 200 || $status > 299) {
-            throw $this->httpError($status, $body, $response->getHeaderLine('request-id'));
+            throw $this->httpError($status, $body, $response->getHeaderLine('request-id'), $retried->attempts);
         }
 
         return $this->answer($body);
@@ -194,7 +197,7 @@ final readonly class AnthropicChatModel implements ChatModelInterface
      * Error bodies are {"type": "error", "error": {"type", "message"}, "request_id"}. The request id (also sent as the
      * request-id header) is what Anthropic support asks for, so it goes into the message; it is not a secret.
      */
-    private function httpError(int $status, #[SensitiveParameter] string $body, string $requestIdHeader): ProviderException
+    private function httpError(int $status, #[SensitiveParameter] string $body, string $requestIdHeader, int $attempts): ProviderException
     {
         // Proxy pages and other non-JSON bodies are not quoted: they may be large and say nothing useful.
         $data = json_decode($body, true);
@@ -204,7 +207,7 @@ final readonly class AnthropicChatModel implements ChatModelInterface
         $vendorMessage = \is_string($error['message'] ?? null) ? UntrustedText::quote($this->config->redact($error['message']), self::VENDOR_MESSAGE_LENGTH) : '';
 
         $requestId = \is_array($data) && \is_string($data['request_id'] ?? null) && '' !== $data['request_id'] ? $data['request_id'] : $requestIdHeader;
-        $message = \sprintf('anthropic returned HTTP %d', $status);
+        $message = \sprintf('anthropic returned HTTP %d', $status) . $this->afterAttempts($attempts);
         // Only a plain id is quoted: the header could be anything a proxy sends.
         if (1 === preg_match('/^[A-Za-z0-9_-]{1,100}$/D', $requestId)) {
             $message .= \sprintf(' (request %s)', $requestId);
@@ -219,11 +222,11 @@ final readonly class AnthropicChatModel implements ChatModelInterface
      * is a ProviderException naming the client's exception type and its redacted message; the parameter is sensitive,
      * so the client's exception does not reach the traces of the new exceptions either.
      */
-    private function transportError(#[SensitiveParameter] ClientExceptionInterface $exception): ProviderException
+    private function transportError(#[SensitiveParameter] TransportFailure $failure): ProviderException
     {
-        $message = UntrustedText::quote($this->config->redact($exception->getMessage()));
+        $message = UntrustedText::quote($this->config->redact($failure->getMessage()));
 
-        return new ProviderException(\sprintf('Could not reach anthropic at %s: %s', $this->config->endpoint(), $message), 0, new ProviderException(\sprintf('%s: %s', get_debug_type($exception), $message)));
+        return new ProviderException(\sprintf('Could not reach anthropic at %s%s: %s', $this->config->endpoint(), $this->afterAttempts($failure->attempts), $message), 0, new ProviderException(\sprintf('%s: %s', get_debug_type($failure->getPrevious()), $message)));
     }
 
     /**
@@ -243,5 +246,13 @@ final readonly class AnthropicChatModel implements ChatModelInterface
         }
 
         return $data;
+    }
+
+    /**
+     * " after N attempts" when the Retrier tried more than once, so the message says the failure was not a one-off.
+     */
+    private function afterAttempts(int $attempts): string
+    {
+        return $attempts > 1 ? \sprintf(' after %d attempts', $attempts) : '';
     }
 }

@@ -106,7 +106,11 @@ final class HttpSecretsTest extends TestCase
         } catch (InvalidArgumentException $exception) {
             self::assertSame($message, $exception->getMessage());
             self::assertStringNotContainsString(self::API_KEY, $exception->getTraceAsString());
-            self::assertStringNotContainsString(self::API_KEY, print_r($exception->getTrace(), true));
+            // Only the library's frames: the runner's frames hold the whole PHPUnit object graph, and dumping them
+            // exhausts memory with some PHPUnit versions.
+            $frames = array_filter($exception->getTrace(), static fn(array $frame): bool => str_starts_with($frame['class'] ?? '', 'HtmlTranslator\\Provider\\'));
+            self::assertNotSame([], $frames);
+            self::assertStringNotContainsString(self::API_KEY, print_r(array_column($frames, 'args'), true));
         }
     }
 
