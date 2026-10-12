@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible;
 
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use SensitiveParameter;
 use SensitiveParameterValue;
 
@@ -23,6 +24,8 @@ final readonly class OpenAiCompatibleConfig
     public const string MAX_COMPLETION_TOKENS = 'max_completion_tokens';
 
     private const string REDACTED = '[redacted]';
+
+    private const int MAX_NAME_LENGTH = 100;
 
     /** Headers the adapter sets itself. */
     private const array RESERVED_HEADERS = ['authorization', 'content-type', 'accept'];
@@ -70,6 +73,15 @@ final readonly class OpenAiCompatibleConfig
             throw new InvalidArgumentException('An OpenAI-compatible configuration needs a name.');
         }
 
+        // The name and the URL appear in every error message of the adapter.
+        if (mb_strlen($name) > self::MAX_NAME_LENGTH || 1 === preg_match('/[\p{Cc}\x{2028}\x{2029}]/u', $name) || !mb_check_encoding($name, 'UTF-8')) {
+            throw new InvalidArgumentException(\sprintf('The configuration name "%s" must be at most %d characters on one line.', UntrustedText::quote($name), self::MAX_NAME_LENGTH));
+        }
+
+        if (1 === preg_match('/[\x00-\x20\x7F]/', $baseUrl)) {
+            throw new InvalidArgumentException(\sprintf('The base URL of "%s" contains whitespace or control characters.', $name));
+        }
+
         // The URL is not quoted: it may contain a credential (user info, ?key=).
         $parts = parse_url($baseUrl);
         if (false === $parts || !\in_array($parts['scheme'] ?? null, ['http', 'https'], true) || !isset($parts['host'])) {
@@ -89,7 +101,7 @@ final readonly class OpenAiCompatibleConfig
         }
 
         if (!\in_array($maxTokensField, [self::MAX_TOKENS, self::MAX_COMPLETION_TOKENS], true)) {
-            throw new InvalidArgumentException(\sprintf('"%s" is not a supported output limit field.', $maxTokensField));
+            throw new InvalidArgumentException(\sprintf('"%s" is not a supported output limit field.', UntrustedText::quote($maxTokensField)));
         }
 
         $headers = [];
@@ -100,11 +112,11 @@ final readonly class OpenAiCompatibleConfig
             }
 
             if (\in_array(strtolower($header), self::RESERVED_HEADERS, true)) {
-                throw new InvalidArgumentException(\sprintf('The header "%s" is set by the adapter.', $header));
+                throw new InvalidArgumentException(\sprintf('The header "%s" is set by the adapter.', UntrustedText::quote($header)));
             }
 
             if (1 !== preg_match(self::HEADER_VALUE, $value)) {
-                throw new InvalidArgumentException(\sprintf('The value of header "%s" contains line breaks or control characters.', $header));
+                throw new InvalidArgumentException(\sprintf('The value of header "%s" contains line breaks or control characters.', UntrustedText::quote($header)));
             }
 
             $headers[$header] = new SensitiveParameterValue($value);

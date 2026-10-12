@@ -14,6 +14,7 @@ use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
 use HtmlTranslator\Domain\UnitTextTokenKind;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 
 /**
  * Writes translations back into the segmented document (ADR-0003, ARCHITECTURE §6.6).
@@ -57,7 +58,7 @@ final readonly class Reassembler
         $claimed = [];
 
         foreach ($translations as $id => $translated) {
-            $unit = $units[$id] ?? throw new InvalidArgumentException(\sprintf('Unknown unit id "%s".', $id));
+            $unit = $units[$id] ?? throw new InvalidArgumentException(\sprintf('Unknown unit id "%s".', UntrustedText::quote((string) $id)));
             $anchor = $segmented->anchorFor($unit->id);
             $tokens = UnitText::tokenize($translated);
 

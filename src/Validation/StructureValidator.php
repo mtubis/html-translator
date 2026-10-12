@@ -10,6 +10,7 @@ use HtmlTranslator\Domain\UnitKind;
 use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
 use HtmlTranslator\Domain\UnitTextTokenKind;
+use HtmlTranslator\Exception\UntrustedText;
 
 /**
  * Checks that a translation keeps the structure of its source unit (ADR-0003, ARCHITECTURE §6.5).
@@ -54,9 +55,11 @@ final readonly class StructureValidator
         $violations = [];
         $tagReported = false;
 
+        $markup = [];
+
         foreach ($tokens as $token) {
             if (UnitTextTokenKind::RawMarkup === $token->kind) {
-                $violations[] = $this->rawMarkup($token);
+                $violations = $this->rawMarkupOnce($violations, $markup, $token);
             } elseif (UnitTextTokenKind::Text !== $token->kind && !$tagReported) {
                 $violations[] = new Violation(ViolationType::TagsInPlainText, 'Remove all tags such as <g1>, </g1> and <x1/>: this text is plain text.');
                 $tagReported = true;
@@ -83,9 +86,11 @@ final readonly class StructureValidator
         $occurrences = [];
         $nesting = new TagNesting();
 
+        $markup = [];
+
         foreach ($tokens as $token) {
             if (UnitTextTokenKind::RawMarkup === $token->kind) {
-                $violations[] = $this->rawMarkup($token);
+                $violations = $this->rawMarkupOnce($violations, $markup, $token);
 
                 continue;
             }
@@ -173,11 +178,30 @@ final readonly class StructureValidator
         return $violations;
     }
 
+    /**
+     * The same markup repeated in an answer is one problem, not one per occurrence.
+     *
+     * @param list<Violation> $violations
+     * @param array<string, true> $reported raw markup already reported
+     *
+     * @param-out array<string, true> $reported
+     *
+     * @return list<Violation>
+     */
+    private function rawMarkupOnce(array $violations, array &$reported, UnitTextToken $token): array
+    {
+        if (!isset($reported[$token->text])) {
+            $violations[] = $this->rawMarkup($token);
+            $reported[$token->text] = true;
+        }
+
+        return $violations;
+    }
+
     private function rawMarkup(UnitTextToken $token): Violation
     {
-        $snippet = mb_strlen($token->text, 'UTF-8') > self::SNIPPET_LENGTH
-            ? mb_substr($token->text, 0, self::SNIPPET_LENGTH - 1, 'UTF-8') . '…'
-            : $token->text;
+        // Model output, quoted back to the model and into issues: bounded and on one line.
+        $snippet = UntrustedText::quote($token->text, self::SNIPPET_LENGTH);
 
         return new Violation(ViolationType::RawMarkup, \sprintf('Remove the markup "%s": use only the tags from the source text, and write a literal "<" as &lt;.', $snippet));
     }

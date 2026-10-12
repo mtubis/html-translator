@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HtmlTranslator\Tests\Unit\Provider\Llm\Bridge\OpenAiCompatible;
 
 use HtmlTranslator\Exception\ProviderException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig;
 use HtmlTranslator\Provider\Llm\ChatMessage;
@@ -35,6 +36,7 @@ use Throwable;
 #[UsesClass(ChatMessage::class)]
 #[UsesClass(ChatResponse::class)]
 #[UsesClass(ProviderException::class)]
+#[UsesClass(UntrustedText::class)]
 final class OpenAiCompatibleChatModelTest extends TestCase
 {
     private const string API_KEY = 'sk-test-SECRET-0123456789';

@@ -11,6 +11,7 @@ use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitKind;
 use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Validation\StructureValidator;
 use HtmlTranslator\Validation\TagNesting;
 use HtmlTranslator\Validation\ValidationResult;
@@ -30,6 +31,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(InlineTag::class)]
 #[UsesClass(UnitText::class)]
 #[UsesClass(UnitTextToken::class)]
+#[UsesClass(UntrustedText::class)]
 final class StructureValidatorTest extends TestCase
 {
     /** Tags 1–3 paired, 4 void, 5 opaque (see block()). */
@@ -322,6 +324,34 @@ final class StructureValidatorTest extends TestCase
         $source = TranslationUnit::fromText(UnitId::fromString('a1'), $kind, 'Company logo');
 
         self::assertSame([['EmptyTranslation', 'Translate the text; the translation must not be empty.']], $this->describe(new StructureValidator()->validate($source, " \u{00A0}")));
+    }
+
+    #[Test]
+    public function it_reports_the_same_raw_markup_once(): void
+    {
+        $result = new StructureValidator()->validate($this->block('Hello'), 'Witaj ' . str_repeat('<b>', 100_000));
+
+        self::assertSame(
+            [['RawMarkup', 'Remove the markup "<b>": use only the tags from the source text, and write a literal "<" as &lt;.']],
+            $this->describe($result),
+        );
+    }
+
+    #[Test]
+    public function it_keeps_the_description_of_many_problems_short(): void
+    {
+        $answer = 'Witaj';
+        for ($number = 900; $number < 950; ++$number) {
+            $answer .= \sprintf(' <x%d/>', $number);
+        }
+
+        $result = new StructureValidator()->validate($this->block('Hello'), $answer);
+
+        self::assertCount(50, $result->violations());
+        $lines = explode("\n", $result->describe());
+        self::assertCount(11, $lines);
+        self::assertSame('- Remove <x900/>: there is no tag 900 in the source text.', $lines[0]);
+        self::assertSame('- …and 40 more problems.', $lines[10]);
     }
 
     /**

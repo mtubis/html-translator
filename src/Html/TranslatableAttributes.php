@@ -6,6 +6,7 @@ namespace HtmlTranslator\Html;
 
 use Dom\Element;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 
 /**
  * Decides which attributes of an element become attribute units (ARCHITECTURE §6.2).
@@ -142,7 +143,7 @@ final readonly class TranslatableAttributes
         $normalized = strtolower($name);
 
         if (1 !== preg_match(self::ATTRIBUTE_NAME, $normalized)) {
-            throw new InvalidArgumentException(\sprintf('"%s" is not a valid attribute name; expected e.g. "alt" or "data-tooltip".', $name));
+            throw new InvalidArgumentException(\sprintf('"%s" is not a valid attribute name; expected e.g. "alt" or "data-tooltip".', UntrustedText::quote($name)));
         }
 
         return $normalized;
@@ -151,7 +152,7 @@ final readonly class TranslatableAttributes
     private function metaName(string $name): string
     {
         if ('' === $name || false !== strpbrk($name, self::HTML_WHITESPACE)) {
-            throw new InvalidArgumentException(\sprintf('"%s" is not a valid meta name; expected e.g. "description" or "og:title".', $name));
+            throw new InvalidArgumentException(\sprintf('"%s" is not a valid meta name; expected e.g. "description" or "og:title".', UntrustedText::quote($name)));
         }
 
         return strtolower($name);

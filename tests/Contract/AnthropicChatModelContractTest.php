@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HtmlTranslator\Tests\Contract;
 
 use HtmlTranslator\Exception\ProviderException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
 use HtmlTranslator\Provider\Llm\ChatMessage;
@@ -38,6 +39,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(ChatResponse::class)]
 #[UsesClass(JsonSchema::class)]
 #[UsesClass(ProviderException::class)]
+#[UsesClass(UntrustedText::class)]
 final class AnthropicChatModelContractTest extends ChatModelContractTestCase
 {
     private const string MODEL = 'contract-configured-model';

@@ -7,6 +7,7 @@ namespace HtmlTranslator\Tests\Unit\Html;
 use Dom\Element;
 use Dom\HTMLDocument;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Html\SkipRules;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -16,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 
 #[CoversClass(SkipRules::class)]
 #[UsesClass(InvalidArgumentException::class)]
+#[UsesClass(UntrustedText::class)]
 final class SkipRulesTest extends TestCase
 {
     /**

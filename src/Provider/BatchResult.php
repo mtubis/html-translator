@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HtmlTranslator\Provider;
 
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 
 /**
  * What a provider made of a batch, keyed by unit id ($unit->id->toString()):
@@ -32,12 +33,12 @@ final readonly class BatchResult
     ) {
         $overlap = array_keys(array_intersect_key($translations, $failures) + array_intersect_key($translations, $permanentFailures) + array_intersect_key($failures, $permanentFailures));
         foreach ($overlap as $id) {
-            throw new InvalidArgumentException(\sprintf('Unit "%s" is reported more than once (translated, failed or permanently failed).', $id));
+            throw new InvalidArgumentException(\sprintf('Unit "%s" is reported more than once (translated, failed or permanently failed).', UntrustedText::quote((string) $id)));
         }
 
         foreach ($failures + $permanentFailures as $id => $reason) {
             if ('' === trim($reason)) {
-                throw new InvalidArgumentException(\sprintf('The failure of unit "%s" needs a reason.', $id));
+                throw new InvalidArgumentException(\sprintf('The failure of unit "%s" needs a reason.', UntrustedText::quote((string) $id)));
             }
         }
     }

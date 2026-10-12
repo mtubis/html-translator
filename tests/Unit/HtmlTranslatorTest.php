@@ -15,6 +15,7 @@ use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\InvalidHtmlException;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Exception\StructureValidationException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\FallbackStrategy;
 use HtmlTranslator\Html\AttributeAnchor;
 use HtmlTranslator\Html\EncodedRun;
@@ -95,6 +96,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(TranslationProfile::class)]
 #[UsesClass(Glossary::class)]
 #[UsesClass(ProfileText::class)]
+#[UsesClass(UntrustedText::class)]
 final class HtmlTranslatorTest extends TestCase
 {
     private const string FIXTURES = __DIR__ . '/../Fixtures/roundtrip';

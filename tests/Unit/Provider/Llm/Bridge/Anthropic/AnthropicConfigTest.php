@@ -7,6 +7,7 @@ namespace HtmlTranslator\Tests\Unit\Provider\Llm\Bridge\Anthropic;
 use Closure;
 use Exception;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicEffort;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -17,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 
 #[CoversClass(AnthropicConfig::class)]
 #[UsesClass(InvalidArgumentException::class)]
+#[UsesClass(UntrustedText::class)]
 final class AnthropicConfigTest extends TestCase
 {
     private const string API_KEY = 'sk-ant-test-SECRET-0123456789';

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible;
 
 use HtmlTranslator\Exception\ProviderException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatModelInterface;
 use HtmlTranslator\Provider\Llm\ChatRequest;
@@ -172,10 +173,7 @@ final readonly class OpenAiCompatibleChatModel implements ChatModelInterface
             }
         }
 
-        $vendorMessage = \is_string($error['message'] ?? null) ? $this->config->redact($error['message']) : '';
-        if (mb_strlen($vendorMessage) > self::VENDOR_MESSAGE_LENGTH) {
-            $vendorMessage = mb_substr($vendorMessage, 0, self::VENDOR_MESSAGE_LENGTH - 1) . '…';
-        }
+        $vendorMessage = \is_string($error['message'] ?? null) ? UntrustedText::quote($this->config->redact($error['message']), self::VENDOR_MESSAGE_LENGTH) : '';
 
         $message = \sprintf('%s returned HTTP %d', $this->config->name, $status);
 
@@ -189,7 +187,7 @@ final readonly class OpenAiCompatibleChatModel implements ChatModelInterface
      */
     private function transportError(ClientExceptionInterface $exception): ProviderException
     {
-        $message = $this->config->redact($exception->getMessage());
+        $message = UntrustedText::quote($this->config->redact($exception->getMessage()));
         $cause = $exception;
         for ($current = $exception; $current instanceof Throwable; $current = $current->getPrevious()) {
             if ($this->config->redact($current->getMessage()) !== $current->getMessage()) {

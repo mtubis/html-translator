@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HtmlTranslator\Domain;
 
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use Stringable;
 
 /**
@@ -34,7 +35,7 @@ final readonly class Locale implements Stringable
         $normalized = str_replace('_', '-', trim($tag));
 
         if (1 !== preg_match(self::PATTERN, $normalized, $matches)) {
-            throw new InvalidArgumentException(\sprintf('"%s" is not a valid locale; expected e.g. "pl", "pt-BR" or "zh-Hant-TW".', $tag));
+            throw new InvalidArgumentException(\sprintf('"%s" is not a valid locale; expected e.g. "pl", "pt-BR" or "zh-Hant-TW".', UntrustedText::quote($tag)));
         }
 
         $script = '' !== ($matches['script'] ?? '') ? ucfirst(strtolower($matches['script'])) : null;

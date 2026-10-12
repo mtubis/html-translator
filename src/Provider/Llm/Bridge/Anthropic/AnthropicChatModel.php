@@ -6,6 +6,7 @@ namespace HtmlTranslator\Provider\Llm\Bridge\Anthropic;
 
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\ProviderException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatModelInterface;
 use HtmlTranslator\Provider\Llm\ChatRequest;
@@ -200,10 +201,7 @@ final readonly class AnthropicChatModel implements ChatModelInterface
         $error = \is_array($data) && \is_array($data['error'] ?? null) ? $data['error'] : [];
 
         $vendorCode = \is_string($error['type'] ?? null) && '' !== $error['type'] ? $error['type'] : null;
-        $vendorMessage = \is_string($error['message'] ?? null) ? $this->config->redact($error['message']) : '';
-        if (mb_strlen($vendorMessage) > self::VENDOR_MESSAGE_LENGTH) {
-            $vendorMessage = mb_substr($vendorMessage, 0, self::VENDOR_MESSAGE_LENGTH - 1) . '…';
-        }
+        $vendorMessage = \is_string($error['message'] ?? null) ? UntrustedText::quote($this->config->redact($error['message']), self::VENDOR_MESSAGE_LENGTH) : '';
 
         $requestId = \is_array($data) && \is_string($data['request_id'] ?? null) && '' !== $data['request_id'] ? $data['request_id'] : $requestIdHeader;
         $message = \sprintf('anthropic returned HTTP %d', $status);
@@ -222,7 +220,7 @@ final readonly class AnthropicChatModel implements ChatModelInterface
      */
     private function transportError(ClientExceptionInterface $exception): ProviderException
     {
-        $message = $this->config->redact($exception->getMessage());
+        $message = UntrustedText::quote($this->config->redact($exception->getMessage()));
         $cause = $exception;
         for ($current = $exception; $current instanceof Throwable; $current = $current->getPrevious()) {
             if ($this->config->redact($current->getMessage()) !== $current->getMessage()) {

@@ -7,13 +7,16 @@ namespace HtmlTranslator\Tests\Unit\Domain;
 use HtmlTranslator\Domain\Locale;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\TranslatorException;
+use HtmlTranslator\Exception\UntrustedText;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(Locale::class)]
 #[CoversClass(InvalidArgumentException::class)]
+#[UsesClass(UntrustedText::class)]
 final class LocaleTest extends TestCase
 {
     /**

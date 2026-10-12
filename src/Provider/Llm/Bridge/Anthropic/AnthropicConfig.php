@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HtmlTranslator\Provider\Llm\Bridge\Anthropic;
 
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use SensitiveParameter;
 use SensitiveParameterValue;
 
@@ -106,11 +107,11 @@ final readonly class AnthropicConfig
             }
 
             if (\in_array(strtolower($header), self::RESERVED_HEADERS, true)) {
-                throw new InvalidArgumentException(\sprintf('The header "%s" is set by the adapter.', $header));
+                throw new InvalidArgumentException(\sprintf('The header "%s" is set by the adapter.', UntrustedText::quote($header)));
             }
 
             if (1 !== preg_match(self::HEADER_VALUE, $value)) {
-                throw new InvalidArgumentException(\sprintf('The value of header "%s" contains line breaks or control characters.', $header));
+                throw new InvalidArgumentException(\sprintf('The value of header "%s" contains line breaks or control characters.', UntrustedText::quote($header)));
             }
 
             $headers[$header] = new SensitiveParameterValue($value);

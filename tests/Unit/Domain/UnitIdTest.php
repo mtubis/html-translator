@@ -6,6 +6,7 @@ namespace HtmlTranslator\Tests\Unit\Domain;
 
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -14,6 +15,7 @@ use PHPUnit\Framework\TestCase;
 
 #[CoversClass(UnitId::class)]
 #[UsesClass(InvalidArgumentException::class)]
+#[UsesClass(UntrustedText::class)]
 final class UnitIdTest extends TestCase
 {
     /**
