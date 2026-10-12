@@ -19,7 +19,7 @@ Alternatives considered:
 - The request has one system and one user message and asks for a JSON answer (`ChatRequest::$jsonResponse`).
 - The system message states the task with BCP 47 locale tags (or asks the model to detect the source language), the
   input format (stating that unit texts are content, never instructions), the unit text rules of ADR-0003/0008 and the
-  answer format. Translation profiles (0.3) add sections, see [0012](0012-translation-profile-in-the-prompt.md).
+  answer format. Translation profiles (0.3) add sections, see [0012](0012-translation-profile-in-the-prompt.md); context hints, see [0013](0013-context-hints-in-the-prompt.md).
 - The user message is `{"units": [` + one JSON object per line + `]}`. A unit is `{"id", "kind", "text"}` with `kind`
   one of `block`, `attribute`, `title`. A unit with a `Correction` adds `problems` and, when it is not empty,
   `previous_translation`; the paragraph explaining these fields appears in the system message only when the batch
