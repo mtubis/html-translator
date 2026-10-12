@@ -8,6 +8,7 @@ use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitKind;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 
 /**
  * Units of a document in document order, plus where each one lives in the DOM (ADR-0007), and context hints for
@@ -46,11 +47,11 @@ final readonly class SegmentedDocument
         }
 
         foreach (array_diff(array_keys($anchors), $unitIds) as $id) {
-            throw new InvalidArgumentException(\sprintf('Anchor "%s" belongs to no unit.', $id));
+            throw new InvalidArgumentException(\sprintf('Anchor "%s" belongs to no unit.', UntrustedText::quote((string) $id)));
         }
 
         foreach (array_diff(array_keys($sectionHeadings), $unitIds) as $id) {
-            throw new InvalidArgumentException(\sprintf('Section heading "%s" belongs to no unit.', $id));
+            throw new InvalidArgumentException(\sprintf('Section heading "%s" belongs to no unit.', UntrustedText::quote((string) $id)));
         }
     }
 

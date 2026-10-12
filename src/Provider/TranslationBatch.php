@@ -7,6 +7,7 @@ namespace HtmlTranslator\Provider;
 use HtmlTranslator\Domain\LocalePair;
 use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Profile\TranslationProfile;
 
 /**
@@ -47,14 +48,14 @@ final readonly class TranslationBatch
         }
 
         foreach (array_diff(array_keys($corrections), $ids) as $id) {
-            throw new InvalidArgumentException(\sprintf('Correction for unit "%s", which is not in the batch.', $id));
+            throw new InvalidArgumentException(\sprintf('Correction for unit "%s", which is not in the batch.', UntrustedText::quote((string) $id)));
         }
 
         $this->profile = $profile ?? TranslationProfile::default();
         $this->context = $context ?? BatchContext::none();
 
         foreach (array_diff(array_keys($this->context->unitHeadings), $ids) as $id) {
-            throw new InvalidArgumentException(\sprintf('Context heading for unit "%s", which is not in the batch.', $id));
+            throw new InvalidArgumentException(\sprintf('Context heading for unit "%s", which is not in the batch.', UntrustedText::quote((string) $id)));
         }
     }
 }

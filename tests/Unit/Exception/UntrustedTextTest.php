@@ -53,6 +53,7 @@ final class UntrustedTextTest extends TestCase
     {
         self::assertSame('abcd…', UntrustedText::quote('abcdefgh', 5));
         self::assertSame('abcde', UntrustedText::quote('abcde', 5));
+        self::assertSame('…', UntrustedText::quote('abcde', 0), 'A limit below 1 counts as 1.');
     }
 
     #[Test]

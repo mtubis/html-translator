@@ -10,6 +10,7 @@ use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitKind;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\ProfileText;
 use HtmlTranslator\Profile\TranslationProfile;
@@ -32,6 +33,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(TranslationProfile::class)]
 #[UsesClass(Glossary::class)]
 #[UsesClass(ProfileText::class)]
+#[UsesClass(UntrustedText::class)]
 final class TranslationBatchTest extends TestCase
 {
     #[Test]

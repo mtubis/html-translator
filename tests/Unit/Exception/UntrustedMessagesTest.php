@@ -8,14 +8,19 @@ use Closure;
 use HtmlTranslator\Domain\InlineTag;
 use HtmlTranslator\Domain\InlineTagKind;
 use HtmlTranslator\Domain\Locale;
+use HtmlTranslator\Domain\LocalePair;
 use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitKind;
+use HtmlTranslator\Exception\TranslatorException;
+use HtmlTranslator\FallbackStrategy;
 use HtmlTranslator\Html\SkipRules;
 use HtmlTranslator\Html\TranslatableAttributes;
 use HtmlTranslator\HtmlTranslator;
 use HtmlTranslator\Issue;
+use HtmlTranslator\IssueType;
 use HtmlTranslator\Provider\BatchResult;
+use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleChatModel;
@@ -27,6 +32,7 @@ use HtmlTranslator\Provider\TranslationBatch;
 use HtmlTranslator\Tests\Support\CallbackProvider;
 use HtmlTranslator\Tests\Support\FakeClientException;
 use HtmlTranslator\Tests\Support\FakeHttpClient;
+use HtmlTranslator\TranslationOptions;
 use HtmlTranslator\Validation\StructureValidator;
 use HtmlTranslator\Validation\Violation;
 use Nyholm\Psr7\Factory\Psr17Factory;
@@ -62,6 +68,9 @@ final class UntrustedMessagesTest extends TestCase
         $openAiVendorError = new FakeHttpClient(static fn(): Response => new Response(400, [], json_encode(['error' => ['message' => $hostile, 'code' => 'bad']], \JSON_THROW_ON_ERROR)));
         $transportError = new FakeHttpClient(static fn(): Response => throw new FakeClientException($hostile));
 
+        yield 'unit id key of a batch result' => [static fn(): BatchResult => new BatchResult([$hostile => 'a'], [$hostile => 'b'])];
+        yield 'correction key of a batch' => [static fn(): TranslationBatch => new TranslationBatch(LocalePair::of(null, Locale::fromString('pl')), [TranslationUnit::fromText(UnitId::fromString('u1'), UnitKind::Block, 'Hi')], [$hostile => new Correction('x', 'y')])];
+        yield 'OpenAI-compatible base URL with a line break' => [static fn(): OpenAiCompatibleConfig => new OpenAiCompatibleConfig('x', "https://api.example.test/v1\n" . $hostile, 'model')];
         yield 'locale' => [static fn(): Locale => Locale::fromString($hostile)];
         yield 'unit id' => [static fn(): UnitId => UnitId::fromString($hostile)];
         yield 'skipped element' => [static fn(): SkipRules => SkipRules::defaults()->withElement($hostile)];
@@ -88,6 +97,7 @@ final class UntrustedMessagesTest extends TestCase
         try {
             $call();
         } catch (Throwable $exception) {
+            self::assertInstanceOf(TranslatorException::class, $exception);
             for ($current = $exception; $current instanceof Throwable; $current = $current->getPrevious()) {
                 if ($current !== $exception && (!str_starts_with($current::class, 'HtmlTranslator\\') || str_starts_with($current::class, 'HtmlTranslator\\Tests\\'))) {
                     continue; // The client's own exception is kept as it is; only the library's messages are checked.
@@ -129,6 +139,32 @@ final class UntrustedMessagesTest extends TestCase
             self::assertInstanceOf(Issue::class, $issue);
             $this->assertSafe($issue->message);
         }
+    }
+
+    #[Test]
+    public function it_bounds_the_reasons_of_text_nodes_kept_in_the_fallback(): void
+    {
+        $hostile = self::hostile();
+        $provider = new CallbackProvider(static function (TranslationBatch $batch) use ($hostile): BatchResult {
+            $failures = [];
+            foreach ($batch->units as $unit) {
+                // A reason per text node, each distinct and huge.
+                $failures[$unit->id->toString()] = $unit->id->toString() . $hostile;
+            }
+
+            return new BatchResult([], $failures);
+        });
+
+        $result = new HtmlTranslator($provider)->translate(
+            '<p>' . str_repeat('word <b>bold</b> ', 20) . '</p>',
+            Locale::fromString('pl'),
+            new TranslationOptions(fallback: FallbackStrategy::TextNodesOnly, maxCorrectiveRetries: 0),
+        );
+
+        $partial = array_values(array_filter($result->issues(), static fn(Issue $issue): bool => IssueType::PartiallyTranslated === $issue->type));
+        self::assertCount(1, $partial);
+        $this->assertSafe($partial[0]->message);
+        self::assertStringContainsString('; and 37 more', $partial[0]->message);
     }
 
     private function assertSafe(string $message): void

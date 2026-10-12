@@ -9,6 +9,7 @@ use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitKind;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Html\AttributeAnchor;
 use HtmlTranslator\Html\HtmlLoader;
 use HtmlTranslator\Html\LoadedDocument;
@@ -27,6 +28,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(TranslationUnit::class)]
 #[UsesClass(UnitId::class)]
 #[UsesClass(InvalidArgumentException::class)]
+#[UsesClass(UntrustedText::class)]
 final class SegmentedDocumentTest extends TestCase
 {
     #[Test]

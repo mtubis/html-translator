@@ -19,10 +19,15 @@ final class UntrustedText
     private const array ESCAPES = ["\n" => '\n', "\r" => '\r', "\t" => '\t'];
 
     /**
-     * @param int $maxLength characters of the original text kept, the ellipsis included
+     * Backslashes are not escaped, so a literal "\n" in the text reads like an escaped line break; neither can break
+     * a log line.
+     *
+     * @param int $maxLength characters of the original text kept, the ellipsis included; at least 1
      */
     public static function quote(string $text, int $maxLength = 200): string
     {
+        $maxLength = max(1, $maxLength);
+
         if (!mb_check_encoding($text, 'UTF-8')) {
             // U+FFFD for each invalid sequence, as the HTML parser does; mb_scrub() would depend on a global setting.
             $decoded = json_decode(json_encode($text, \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_THROW_ON_ERROR), flags: \JSON_THROW_ON_ERROR);

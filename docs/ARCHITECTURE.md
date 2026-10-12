@@ -188,7 +188,7 @@ tools/eval/                     manual quality evaluation against real models (n
 
 Dependency rule (checked by the `architecture-reviewer` agent and later by a PHPStan rule / deptrac):
 
-- `Domain`, `Profile` depend on nothing else in `src/` except `Exception`.
+- `Domain`, `Profile` depend on nothing else in `src/` except `Exception`; every namespace may depend on `Exception` (exceptions and `UntrustedText`, which bounds untrusted text in messages).
 - `Html`, `Validation`, `Batching` depend on `Domain`, `Profile`.
 - `Provider\Llm\Bridge\*` are the only places allowed to use PSR-18/17.
 - Nothing in `src/` depends on a framework, a vendor SDK or a concrete HTTP client.

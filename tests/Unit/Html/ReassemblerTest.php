@@ -14,6 +14,7 @@ use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\InvalidHtmlException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Html\AttributeAnchor;
 use HtmlTranslator\Html\EncodedRun;
 use HtmlTranslator\Html\HtmlLoader;
@@ -53,6 +54,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(Locale::class)]
 #[UsesClass(InvalidArgumentException::class)]
 #[UsesClass(InvalidHtmlException::class)]
+#[UsesClass(UntrustedText::class)]
 final class ReassemblerTest extends TestCase
 {
     use DomAssertions;

@@ -123,6 +123,10 @@ final class OpenAiCompatibleConfigTest extends TestCase
      */
     public static function invalidConfigs(): iterable
     {
+        yield 'name over 100 characters' => [static fn(): OpenAiCompatibleConfig => new OpenAiCompatibleConfig(str_repeat('n', 101), 'https://api.example.test/v1', 'model')];
+        yield 'name with a line break' => [static fn(): OpenAiCompatibleConfig => new OpenAiCompatibleConfig("my\nproxy", 'https://api.example.test/v1', 'model')];
+        yield 'base URL with a line break' => [static fn(): OpenAiCompatibleConfig => new OpenAiCompatibleConfig('x', "https://api.example.test/v1\nX", 'model')];
+        yield 'base URL with a space' => [static fn(): OpenAiCompatibleConfig => new OpenAiCompatibleConfig('x', 'https://api.example.test/my api/v1', 'model')];
         yield 'blank name' => [static fn(): OpenAiCompatibleConfig => new OpenAiCompatibleConfig(' ', 'https://api.example.test/v1', 'model')];
         yield 'relative URL' => [static fn(): OpenAiCompatibleConfig => new OpenAiCompatibleConfig('x', '/v1', 'model')];
         yield 'not HTTP' => [static fn(): OpenAiCompatibleConfig => new OpenAiCompatibleConfig('x', 'ftp://api.example.test/v1', 'model')];
@@ -183,6 +187,12 @@ final class OpenAiCompatibleConfigTest extends TestCase
             self::assertStringNotContainsString(self::API_KEY, $exception->getMessage());
             self::assertStringNotContainsString(self::API_KEY, $exception->getTraceAsString());
         }
+    }
+
+    #[Test]
+    public function it_accepts_a_name_of_100_characters(): void
+    {
+        self::assertSame(str_repeat('n', 100), new OpenAiCompatibleConfig(str_repeat('n', 100), 'https://api.example.test/v1', 'model')->name);
     }
 
     #[Test]
