@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Security
+- Chat model adapters no longer keep the PSR-18 client exception as the cause of a transport `ProviderException`: it
+  holds or recorded the request with the API key header. The cause names the client exception's type and its redacted
+  message, and parameters that receive secrets are `#[\SensitiveParameter]`, so dumps show no key even with
+  `zend.exception_ignore_args` off (#52).
+- Messages that quote untrusted text (caller input, configuration, vendor and transport errors, model output) are
+  bounded and kept on one line (`Exception\UntrustedText`, #43).
+
+### Changed
+- `ChatModelContractTestCase` has a new scenario, `ChatScenarioKind::NetworkError` / `ChatScenario::networkError()`.
+  Contract tests of third-party adapters that match the kinds exhaustively must handle it (#52).
+
 ### Added
 - Project skeleton, architecture documentation and ADRs 0001–0010.
 - Domain value objects: `Locale`, `LocalePair`, `UnitId`, `InlineTag`, `TranslationUnit`, `UnitText`.

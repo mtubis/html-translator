@@ -17,11 +17,9 @@ use HtmlTranslator\Provider\Llm\JsonSchema;
 use JsonException;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
-use Psr\Http\Client\NetworkExceptionInterface;
-use Psr\Http\Client\RequestExceptionInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
-use Throwable;
+use SensitiveParameter;
 
 /**
  * ChatModelInterface for the Claude Messages API (POST {baseUrl}/messages, anthropic-version 2023-06-01, API shape as
@@ -196,7 +194,7 @@ final readonly class AnthropicChatModel implements ChatModelInterface
      * Error bodies are {"type": "error", "error": {"type", "message"}, "request_id"}. The request id (also sent as the
      * request-id header) is what Anthropic support asks for, so it goes into the message; it is not a secret.
      */
-    private function httpError(int $status, string $body, string $requestIdHeader): ProviderException
+    private function httpError(int $status, #[SensitiveParameter] string $body, string $requestIdHeader): ProviderException
     {
         // Proxy pages and other non-JSON bodies are not quoted: they may be large and say nothing useful.
         $data = json_decode($body, true);
@@ -216,32 +214,23 @@ final readonly class AnthropicChatModel implements ChatModelInterface
     }
 
     /**
-     * Keeps the client's exception as the cause only when that is safe: no exception in its chain may hold the request
-     * (PSR-18 request and network exceptions expose getRequest(), with the x-api-key header) or contain a credential in
-     * its message. Otherwise a ProviderException naming the client's exception class and its redacted message
-     * replaces the whole chain.
+     * Never keeps the client's exception: PSR-18 request and network exceptions hold the request with its credential
+     * headers, and any exception thrown inside sendRequest() recorded the request among its trace arguments. The cause
+     * is a ProviderException naming the client's exception type and its redacted message; the parameter is sensitive,
+     * so the client's exception does not reach the traces of the new exceptions either.
      */
-    private function transportError(ClientExceptionInterface $exception): ProviderException
+    private function transportError(#[SensitiveParameter] ClientExceptionInterface $exception): ProviderException
     {
         $message = UntrustedText::quote($this->config->redact($exception->getMessage()));
-        $cause = $exception;
-        for ($current = $exception; $current instanceof Throwable; $current = $current->getPrevious()) {
-            $holdsRequest = $current instanceof RequestExceptionInterface || $current instanceof NetworkExceptionInterface;
-            if ($holdsRequest || $this->config->redact($current->getMessage()) !== $current->getMessage()) {
-                $cause = new ProviderException(\sprintf('%s: %s', $exception::class, $message));
 
-                break;
-            }
-        }
-
-        return new ProviderException(\sprintf('Could not reach anthropic at %s: %s', $this->config->endpoint(), $message), 0, $cause);
+        return new ProviderException(\sprintf('Could not reach anthropic at %s: %s', $this->config->endpoint(), $message), 0, new ProviderException(\sprintf('%s: %s', get_debug_type($exception), $message)));
     }
 
     /**
      * @throws ProviderException
      * @return array<mixed>
      */
-    private function decode(string $body): array
+    private function decode(#[SensitiveParameter] string $body): array
     {
         try {
             $data = json_decode($body, true, flags: \JSON_THROW_ON_ERROR);

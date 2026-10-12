@@ -16,6 +16,7 @@ use HtmlTranslator\Provider\Llm\FinishReason;
 use HtmlTranslator\Tests\Support\FakeClientException;
 use HtmlTranslator\Tests\Support\FakeHttpClient;
 use HtmlTranslator\Tests\Support\FakeNetworkException;
+use HtmlTranslator\Tests\Support\FakeRequestException;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Nyholm\Psr7\Response;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -282,12 +283,14 @@ final class OpenAiCompatibleChatModelTest extends TestCase
     }
 
     #[Test]
-    public function it_wraps_transport_errors_and_keeps_a_clean_cause(): void
+    public function it_never_keeps_the_client_exception_whose_trace_recorded_the_request(): void
     {
         $cause = new FakeClientException('Connection refused');
         $exception = $this->failure($this->model(new FakeHttpClient(static fn(): never => throw $cause)));
 
-        self::assertSame($cause, $exception->getPrevious());
+        self::assertNotSame($cause, $exception->getPrevious());
+        self::assertInstanceOf(ProviderException::class, $exception->getPrevious());
+        self::assertSame(FakeClientException::class . ': Connection refused', $exception->getPrevious()->getMessage());
         self::assertSame('Could not reach openai at https://api.openai.com/v1/chat/completions: Connection refused', $exception->getMessage());
         self::assertSame(0, $exception->getCode());
     }
@@ -339,9 +342,9 @@ final class OpenAiCompatibleChatModelTest extends TestCase
     }
 
     #[Test]
-    public function it_replaces_a_request_exception_deeper_in_the_chain(): void
+    public function it_replaces_a_client_exception_wrapping_a_request_exception(): void
     {
-        $model = $this->model(new FakeHttpClient(static fn(RequestInterface $request): Response => throw new FakeClientException('Transport failed', 0, new FakeNetworkException('Connection reset', $request))));
+        $model = $this->model(new FakeHttpClient(static fn(RequestInterface $request): Response => throw new FakeClientException('Transport failed', 0, new FakeRequestException('Invalid header', $request))));
 
         $exception = $this->failure($model);
 
@@ -355,6 +358,7 @@ final class OpenAiCompatibleChatModelTest extends TestCase
         for ($current = $exception; $current instanceof Throwable; $current = $current->getPrevious()) {
             self::assertNotInstanceOf(NetworkExceptionInterface::class, $current);
             self::assertNotInstanceOf(RequestExceptionInterface::class, $current);
+            self::assertNotInstanceOf(FakeClientException::class, $current);
         }
     }
 

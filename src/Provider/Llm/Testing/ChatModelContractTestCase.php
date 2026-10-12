@@ -14,8 +14,6 @@ use HtmlTranslator\Provider\Llm\JsonSchema;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use Psr\Http\Client\NetworkExceptionInterface;
-use Psr\Http\Client\RequestExceptionInterface;
 use Throwable;
 
 /**
@@ -200,8 +198,9 @@ abstract class ChatModelContractTestCase extends TestCase
     {
         $exception = $this->failureOf(ChatScenario::transportError('cURL error 7: Failed to connect to https://api.example.test/v1/chat?key=' . static::API_KEY));
 
-        self::assertNotNull($exception->getPrevious(), 'The transport error must be kept as the previous exception.');
+        self::assertNotNull($exception->getPrevious(), 'The transport error must be kept as the previous exception, in a safe form.');
         $this->assertNoCredentials($exception);
+        $this->assertNoRequestInChain($exception);
     }
 
     #[Test]
@@ -209,13 +208,34 @@ abstract class ChatModelContractTestCase extends TestCase
     {
         $exception = $this->failureOf(ChatScenario::networkError('Operation timed out after 30001 milliseconds'));
 
-        for ($current = $exception; $current instanceof Throwable; $current = $current->getPrevious()) {
-            self::assertNotInstanceOf(RequestExceptionInterface::class, $current, 'A cause that holds the request (and its credential headers) must not be kept.');
-            self::assertNotInstanceOf(NetworkExceptionInterface::class, $current, 'A cause that holds the request (and its credential headers) must not be kept.');
-        }
-
-        self::assertStringContainsString('Operation timed out', $exception->getMessage());
+        self::assertStringContainsString('Operation timed out', $exception->getMessage(), 'The transport message must be named.');
         $this->assertNoCredentials($exception);
+        $this->assertNoRequestInChain($exception);
+    }
+
+    /**
+     * Neither the chain nor the arguments recorded in its traces (setUp() records them) may hold the request, a
+     * client exception (which holds or recorded the request) or the credential: debug tools and error reporters dump
+     * them. Only frames of the library itself are inspected; the test runner's frames hold the test case.
+     */
+    private function assertNoRequestInChain(Throwable $exception): void
+    {
+        for ($current = $exception; $current instanceof Throwable; $current = $current->getPrevious()) {
+            self::assertFalse(method_exists($current, 'getRequest'), \sprintf('%s holds the request with its credential headers; it must not be kept.', $current::class));
+
+            foreach ($current->getTrace() as $frame) {
+                $class = $frame['class'] ?? '';
+                if (!str_starts_with($class, 'HtmlTranslator\\') || str_starts_with($class, 'HtmlTranslator\\Tests\\')) {
+                    continue;
+                }
+
+                foreach ($frame['args'] ?? [] as $argument) {
+                    $where = \sprintf('An argument of %s::%s() recorded in the trace of %s', $class, $frame['function'], $current::class);
+                    self::assertFalse(\is_object($argument) && ($argument instanceof Throwable || method_exists($argument, 'getRequest') || method_exists($argument, 'getHeaders')), $where . ' holds the request or a client exception; mark the parameter #[\\SensitiveParameter].');
+                    self::assertFalse(\is_string($argument) && str_contains($argument, static::API_KEY), $where . ' contains the credential; mark the parameter #[\\SensitiveParameter].');
+                }
+            }
+        }
     }
 
     private function failureOf(ChatScenario $scenario): ProviderException
