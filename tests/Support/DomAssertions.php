@@ -80,7 +80,13 @@ trait DomAssertions
         $document = HTMLDocument::createFromString('<!DOCTYPE html><html><head></head><body></body></html>', \LIBXML_NOERROR, 'UTF-8');
         $container = $document->body ?? self::fail('Empty skeleton document has no <body>.');
 
-        if (1 === preg_match('/^(?:\s|<!--.*?-->|<\?[^>]*>)*<(tr|td|th|thead|tbody|tfoot|caption|colgroup|col)[\s>\/]/is', $html, $match)) {
+        // Possessive and without lazy quantifiers, so a long leading comment cannot exhaust the backtrack limit.
+        $tablePart = preg_match('/^(?:\s++|<!--[^-]*+(?:-(?!->)[^-]*+)*+-->|<\?[^>]*+>)*+<(tr|td|th|thead|tbody|tfoot|caption|colgroup|col)[\s>\/]/i', $html, $match);
+        if (false === $tablePart) {
+            self::fail('Could not check the fragment for a table part: ' . preg_last_error_msg());
+        }
+
+        if (1 === $tablePart) {
             $chain = match (strtolower($match[1])) {
                 'tr' => ['table', 'tbody'],
                 'td', 'th' => ['table', 'tbody', 'tr'],

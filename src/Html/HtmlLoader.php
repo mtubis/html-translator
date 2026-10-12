@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Html;
 
+use Dom\Element;
 use Dom\HTMLDocument;
+use Dom\Text;
 use HtmlTranslator\Exception\InvalidHtmlException;
 
 /**
@@ -17,8 +19,12 @@ use HtmlTranslator\Exception\InvalidHtmlException;
  * Fragments are parsed in a <body> context, except when the first element is a table part outside a <table>
  * (<tr>, <td>, <thead>, <col>, …): then the context is the element it belongs in, so rows and cells of a CMS field
  * or template partial survive instead of being dropped. The first element decides; later content is parsed as it
- * would be inside that element (e.g. a <p> after rows stays where it is, while <thead> followed by <tr> gets an
- * implied <tbody>, as in a browser).
+ * would be inside that element, as in a browser:
+ * - other content after rows (e.g. a <p>) is foster-parented, which in a fragment leaves it where it is;
+ * - content that does not fit is restructured, its text kept: <thead> followed by <tr> gets an implied <tbody>, and
+ *   a <tr> after cells, a <tfoot> after rows or a nested <table> are dropped while their cells and rows stay.
+ * Leading <col>s are parsed in a <colgroup> only when nothing but columns follows; a <colgroup> context drops any
+ * other content, text included, so otherwise they are parsed in a <table> and get an implied <colgroup>.
  */
 final class HtmlLoader
 {
@@ -44,7 +50,7 @@ final class HtmlLoader
     private const string TABLE_PART_START = '/\G<(tr|td|th|thead|tbody|tfoot|caption|colgroup|col)(?=[\s>\/]|\z)/i';
 
     /**
-     * Table part → the elements to parse it in, outermost first (under <body>).
+     * Table part → the elements to parse it in, outermost first (under <body>). <col> is decided by holdsOnlyColumns().
      */
     private const array TABLE_CONTEXTS = [
         'tr' => ['table', 'tbody'],
@@ -55,7 +61,6 @@ final class HtmlLoader
         'tfoot' => ['table'],
         'caption' => ['table'],
         'colgroup' => ['table'],
-        'col' => ['table', 'colgroup'],
     ];
 
     /**
@@ -76,12 +81,17 @@ final class HtmlLoader
             return LoadedDocument::document(HTMLDocument::createFromString($html, \LIBXML_NOERROR, 'UTF-8'));
         }
 
-        $context = [];
-        if (null !== $contentStart && 1 === preg_match(self::TABLE_PART_START, $html, $match, offset: $contentStart)) {
-            $context = self::TABLE_CONTEXTS[strtolower($match[1])] ?? [];
+        $tablePart = null !== $contentStart && 1 === preg_match(self::TABLE_PART_START, $html, $match, offset: $contentStart)
+            ? strtolower($match[1])
+            : null;
+
+        if ('col' === $tablePart) {
+            $inTable = $this->loadFragment($html, ['table']);
+
+            return $this->holdsOnlyColumns($inTable->root()) ? $this->loadFragment($html, ['table', 'colgroup']) : $inTable;
         }
 
-        return $this->loadFragment($html, $context);
+        return $this->loadFragment($html, null === $tablePart ? [] : self::TABLE_CONTEXTS[$tablePart]);
     }
 
     /**
@@ -114,6 +124,25 @@ final class HtmlLoader
         }
 
         return $offset;
+    }
+
+    /**
+     * Whether a fragment parsed in a <table> is nothing but its implied <colgroup> (plus whitespace and comments), so
+     * parsing it in a <colgroup> keeps everything.
+     */
+    private function holdsOnlyColumns(Element $table): bool
+    {
+        if (1 !== $table->childElementCount || 'colgroup' !== $table->firstElementChild?->localName) {
+            return false;
+        }
+
+        foreach ($table->childNodes as $child) {
+            if ($child instanceof Text && \strlen($child->data) !== strspn($child->data, self::HTML_WHITESPACE)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
