@@ -155,7 +155,7 @@ Adapters are written on **PSR-18 / PSR-17**, not vendor SDKs ([ADR-0002](adr/000
 - Optional PSR-6 pool. Key = hash of (normalized unit text, locale pair, profile fingerprint, provider/model id, prompt version). Unit-level caching makes re-translating a slightly edited page cheap.
 
 ### 6.8 Reliability
-- Transport-level retries with exponential backoff and jitter for 408/429/5xx/529 and network errors live in the chat-model adapters, not in the core: `Provider\Llm\Bridge\Retrier` with a `RetryPolicy` and a `Sleeper` port, honouring `Retry-After` (docs/providers.md).
+- Transport-level retries with exponential backoff and jitter for 408/429/5xx/529 and network errors live in the chat-model adapters, not in the core: `Provider\Llm\Bridge\Retrier` with a `RetryPolicy` and a `SleeperInterface` port, honouring `Retry-After` (docs/providers.md).
 - `onProgress` is called after each batch.
 
 ## 7. Package layout
@@ -173,8 +173,9 @@ src/
   Provider/                     TranslationProviderInterface, TranslationBatch, BatchResult
   Provider/Llm/                 LlmTranslationProvider, PromptBuilder, ResponseParser, ChatModelInterface, ChatRequest, ChatResponse,
                                 ChatMessage, ChatRole, FinishReason, JsonSchema
-  Provider/Llm/Testing/         FakeChatModel, ChatModelContractTestCase (+ ChatScenario, RecordedChatRequest; needs phpunit, suggested)
-  Provider/Llm/Bridge/                    HttpSecrets (@internal: shared key, header and base URL rules of the configs)
+  Provider/Llm/Testing/         FakeChatModel, FakeSleeper, ChatModelContractTestCase (+ ChatScenario, RecordedChatRequest; needs phpunit, suggested)
+  Provider/Llm/Bridge/                    Retrier, RetryPolicy, RetriedResponse, TransportFailure, SleeperInterface, UsleepSleeper (transport retries, §6.8);
+                                          HttpSecrets (@internal: shared key, header and base URL rules of the configs)
   Provider/Llm/Bridge/OpenAiCompatible/   OpenAiCompatibleChatModel, OpenAiCompatibleConfig
   Provider/Llm/Bridge/Anthropic/          AnthropicChatModel, AnthropicConfig
   Provider/Testing/             PseudoLocalizationProvider, TranslationProviderContractTestCase (needs phpunit, suggested)

@@ -143,10 +143,15 @@ Both adapters retry transient failures through a `Retrier` (ARCHITECTURE §6.8):
 
 - **What:** HTTP 408, 429, 500, 502, 503, 504 and 529 (Anthropic's overload), and PSR-18 network errors. Permanent
   errors such as 400, 401 or 404 are never retried.
-- **How often:** 3 attempts in total by default.
-- **How long:** the server's `Retry-After` (seconds, or an HTTP date measured against its `Date` header) when it sends
-  one, otherwise exponential backoff with jitter: 0.5–1 s before the second attempt, 1–2 s before the third, … Each
-  wait is capped at 30 s, so a call takes at most about `attempts × 30 s` plus the requests themselves.
+- **How often:** 3 attempts in total by default (at most 10). A request whose body stream cannot be rewound is sent
+  once.
+- **How long:** the server's `Retry-After` (seconds, or an HTTP date in GMT measured against its `Date` header) when it
+  sends one, otherwise exponential backoff with jitter: 0.5–1 s before the second attempt, 1–2 s before the third, …
+  Every wait, including a longer `Retry-After`, is capped at the maximum delay (30 s by default, at most one hour). A
+  call therefore waits at most `(attempts − 1) × maximum delay`, plus `attempts ×` the client timeout for the requests.
+- **Cost:** a 5xx or a network error can come after the API already ran and billed the request, so a retry may pay for
+  it twice. Pass `new RetryPolicy(retryNetworkErrors: false)` or `RetryPolicy::none()` when that matters more than
+  availability.
 - **Messages:** a failure after several attempts says so (`… returned HTTP 529 after 3 attempts …`); status and vendor
   code are those of the last response.
 
@@ -161,8 +166,8 @@ $model = new AnthropicChatModel($http, $http, $http, $config, new Retrier(new Re
 $model = new OpenAiCompatibleChatModel($http, $http, $http, $config, new Retrier(RetryPolicy::none()));
 ```
 
-Waiting goes through the `Sleeper` port (default `UsleepSleeper`, which blocks); event-loop applications and tests
-can pass their own: `new Retrier(sleeper: $sleeper)`.
+Waiting goes through the `SleeperInterface` port (default `UsleepSleeper`, which blocks); event-loop applications can
+pass their own, and tests `Provider\Llm\Testing\FakeSleeper`, which records the delays: `new Retrier(sleeper: $sleeper)`.
 
 ## Writing your own
 
@@ -171,5 +176,8 @@ can pass their own: `new Retrier(sleeper: $sleeper)`.
   Since 0.4 its scenarios include `ChatScenarioKind::NetworkError`: the fake transport throws a PSR-18
   `NetworkExceptionInterface` holding the request. The adapter must name the transport message, and neither its
   exception chain nor the arguments recorded in its traces may hold the request, a client exception or the key.
+  Send through `Provider\Llm\Bridge\Retrier` for transport retries: `send()` returns a `RetriedResponse` (the last
+  response and the number of attempts) and throws a `TransportFailure` when the client fails; turn that into a
+  `ProviderException` at once without keeping it, since its previous exception holds the request.
 - **A non-LLM engine**: implement `Provider\TranslationProviderInterface` and pass
   `Provider\Testing\TranslationProviderContractTestCase`.

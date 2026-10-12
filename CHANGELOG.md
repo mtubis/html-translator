@@ -21,7 +21,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 - Transport retries in both chat model adapters: `Retrier`, `RetryPolicy` (backoff with jitter, `Retry-After`) and the
-  `Sleeper` port with `UsleepSleeper` (#61).
+  `SleeperInterface` port with `UsleepSleeper`, and `FakeSleeper` for tests (#61).
 - Project skeleton, architecture documentation and ADRs 0001–0010.
 - Domain value objects: `Locale`, `LocalePair`, `UnitId`, `InlineTag`, `TranslationUnit`, `UnitText`.
 - HTML pipeline: `HtmlLoader`, `SkipRules`, `TranslatableAttributes`, `Segmenter`, `InlineEncoder`, `Reassembler`.
