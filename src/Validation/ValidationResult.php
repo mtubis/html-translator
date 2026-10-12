@@ -6,6 +6,9 @@ namespace HtmlTranslator\Validation;
 
 final readonly class ValidationResult
 {
+    /** Problems named in describe(); a hostile answer can have thousands, and the description goes back to the model. */
+    private const int MAX_DESCRIBED = 10;
+
     /**
      * @param list<Violation> $violations
      */
@@ -27,10 +30,17 @@ final readonly class ValidationResult
     }
 
     /**
-     * One "- message" line per violation, ready for a corrective-retry prompt; empty when valid.
+     * One "- message" line per violation, ready for a corrective-retry prompt; empty when valid. At most
+     * MAX_DESCRIBED violations are named, then one line counts the rest; violations() keeps them all.
      */
     public function describe(): string
     {
-        return implode("\n", array_map(static fn(Violation $violation): string => '- ' . $violation->message, $this->violations));
+        $lines = array_map(static fn(Violation $violation): string => '- ' . $violation->message, \array_slice($this->violations, 0, self::MAX_DESCRIBED));
+        $more = \count($this->violations) - self::MAX_DESCRIBED;
+        if ($more > 0) {
+            $lines[] = \sprintf('- …and %d more %s.', $more, 1 === $more ? 'problem' : 'problems');
+        }
+
+        return implode("\n", $lines);
     }
 }

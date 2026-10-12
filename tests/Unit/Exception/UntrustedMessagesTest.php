@@ -141,6 +141,29 @@ final class UntrustedMessagesTest extends TestCase
         }
     }
 
+    /**
+     * The problems of an invalid answer are a list (one per line, sent back to the model), so only their number is
+     * bounded here; each line is checked by the other tests.
+     */
+    #[Test]
+    public function it_bounds_the_problems_of_a_hostile_answer_in_issues(): void
+    {
+        $answer = 'Witaj';
+        for ($number = 100; $number < 100_000; ++$number) {
+            $answer .= \sprintf('<x%d/>', $number);
+        }
+
+        $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => new BatchResult(['u1' => $answer]));
+
+        $result = new HtmlTranslator($provider)->translate('<p>Hello</p>', Locale::fromString('pl'), new TranslationOptions(maxCorrectiveRetries: 0));
+
+        self::assertNotSame([], $result->issues());
+        foreach ($result->issues() as $issue) {
+            self::assertLessThan(4000, \strlen($issue->message));
+            self::assertDoesNotMatchRegularExpression('/[\r\x1B]/', $issue->message);
+        }
+    }
+
     #[Test]
     public function it_bounds_the_reasons_of_text_nodes_kept_in_the_fallback(): void
     {

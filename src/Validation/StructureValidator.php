@@ -55,9 +55,11 @@ final readonly class StructureValidator
         $violations = [];
         $tagReported = false;
 
+        $markup = [];
+
         foreach ($tokens as $token) {
             if (UnitTextTokenKind::RawMarkup === $token->kind) {
-                $violations[] = $this->rawMarkup($token);
+                $violations = $this->rawMarkupOnce($violations, $markup, $token);
             } elseif (UnitTextTokenKind::Text !== $token->kind && !$tagReported) {
                 $violations[] = new Violation(ViolationType::TagsInPlainText, 'Remove all tags such as <g1>, </g1> and <x1/>: this text is plain text.');
                 $tagReported = true;
@@ -84,9 +86,11 @@ final readonly class StructureValidator
         $occurrences = [];
         $nesting = new TagNesting();
 
+        $markup = [];
+
         foreach ($tokens as $token) {
             if (UnitTextTokenKind::RawMarkup === $token->kind) {
-                $violations[] = $this->rawMarkup($token);
+                $violations = $this->rawMarkupOnce($violations, $markup, $token);
 
                 continue;
             }
@@ -169,6 +173,26 @@ final readonly class StructureValidator
         if (!isset($reported[$type->name][$number])) {
             $violations[] = new Violation($type, $message);
             $reported[$type->name][$number] = true;
+        }
+
+        return $violations;
+    }
+
+    /**
+     * The same markup repeated in an answer is one problem, not one per occurrence.
+     *
+     * @param list<Violation> $violations
+     * @param array<string, true> $reported raw markup already reported
+     *
+     * @param-out array<string, true> $reported
+     *
+     * @return list<Violation>
+     */
+    private function rawMarkupOnce(array $violations, array &$reported, UnitTextToken $token): array
+    {
+        if (!isset($reported[$token->text])) {
+            $violations[] = $this->rawMarkup($token);
+            $reported[$token->text] = true;
         }
 
         return $violations;
