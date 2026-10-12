@@ -24,6 +24,7 @@ use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatRequest;
 use HtmlTranslator\Provider\Llm\ChatRole;
+use HtmlTranslator\Provider\Llm\JsonSchema;
 use HtmlTranslator\Provider\Llm\PromptBuilder;
 use HtmlTranslator\Provider\TranslationBatch;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -39,6 +40,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(PromptBuilder::class)]
 #[UsesClass(ChatRequest::class)]
 #[UsesClass(ChatMessage::class)]
+#[UsesClass(JsonSchema::class)]
 #[UsesClass(TranslationBatch::class)]
 #[UsesClass(Correction::class)]
 #[UsesClass(InlineTag::class)]
@@ -344,6 +346,25 @@ final class PromptBuilderTest extends TestCase
         self::assertStringNotContainsString('"context"', $this->content($without, 0) . $this->content($without, 1));
         self::assertStringContainsString('"context"', $this->content($with, 0));
         self::assertStringStartsWith('{"context": {"title":"Docs"},', $this->content($with, 1));
+    }
+
+    #[Test]
+    public function it_asks_for_the_answer_format_as_a_json_schema(): void
+    {
+        $request = new PromptBuilder()->build(self::batch([self::unit('u1', 'Hello')]));
+
+        self::assertTrue($request->jsonResponse);
+        self::assertNotNull($request->jsonSchema);
+        $schema = json_decode($request->jsonSchema->json, true, 16, \JSON_THROW_ON_ERROR);
+        self::assertIsArray($schema);
+        self::assertSame(['units'], $schema['required'] ?? null);
+        self::assertFalse($schema['additionalProperties'] ?? null);
+        self::assertIsArray($schema['properties'] ?? null);
+        self::assertIsArray($schema['properties']['units'] ?? null);
+        self::assertSame(
+            ['type' => 'object', 'properties' => ['id' => ['type' => 'string'], 'text' => ['type' => 'string']], 'required' => ['id', 'text'], 'additionalProperties' => false],
+            $schema['properties']['units']['items'] ?? null,
+        );
     }
 
     #[Test]

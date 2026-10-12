@@ -9,6 +9,7 @@ use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatModelInterface;
 use HtmlTranslator\Provider\Llm\ChatRequest;
 use HtmlTranslator\Provider\Llm\ChatResponse;
+use HtmlTranslator\Provider\Llm\JsonSchema;
 use HtmlTranslator\Provider\Llm\Testing\ChatModelContractTestCase;
 use HtmlTranslator\Provider\Llm\Testing\ChatScenario;
 use HtmlTranslator\Provider\Llm\Testing\ChatScenarioKind;
@@ -30,6 +31,7 @@ use RuntimeException;
 #[UsesClass(ChatScenario::class)]
 #[UsesClass(RecordedChatRequest::class)]
 #[UsesClass(ChatModelContractTestCase::class)]
+#[UsesClass(JsonSchema::class)]
 final class FakeChatModelContractTest extends ChatModelContractTestCase
 {
     private const string MODEL = 'contract-configured-model';

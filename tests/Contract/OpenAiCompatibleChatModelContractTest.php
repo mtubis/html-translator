@@ -12,6 +12,7 @@ use HtmlTranslator\Provider\Llm\ChatModelInterface;
 use HtmlTranslator\Provider\Llm\ChatRequest;
 use HtmlTranslator\Provider\Llm\ChatResponse;
 use HtmlTranslator\Provider\Llm\FinishReason;
+use HtmlTranslator\Provider\Llm\JsonSchema;
 use HtmlTranslator\Provider\Llm\Testing\ChatModelContractTestCase;
 use HtmlTranslator\Provider\Llm\Testing\ChatScenario;
 use HtmlTranslator\Provider\Llm\Testing\ChatScenarioKind;
@@ -35,6 +36,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(ChatMessage::class)]
 #[UsesClass(ChatResponse::class)]
 #[UsesClass(ProviderException::class)]
+#[UsesClass(JsonSchema::class)]
 final class OpenAiCompatibleChatModelContractTest extends ChatModelContractTestCase
 {
     private const string MODEL = 'contract-configured-model';

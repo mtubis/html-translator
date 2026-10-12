@@ -21,6 +21,8 @@ final readonly class ChatRequest
      * @param bool $jsonResponse ask for a JSON object (structured output / JSON mode where available); the answer must be
      *                           an object, not a top-level array, and the messages must mention "JSON"
      * @param int|null $maxOutputTokens upper bound for the answer; null leaves the vendor's default
+     * @param JsonSchema|null $jsonSchema schema of the JSON answer, only with $jsonResponse; adapters with structured
+     *                                    outputs enforce it, others ignore it (ADR-0014)
      *
      * @throws InvalidArgumentException when the messages break the rules above or a setting is out of range
      */
@@ -29,6 +31,7 @@ final readonly class ChatRequest
         public ?float $temperature = null,
         public bool $jsonResponse = false,
         public ?int $maxOutputTokens = null,
+        public ?JsonSchema $jsonSchema = null,
     ) {
         if (!array_is_list($messages)) {
             throw new InvalidArgumentException('Chat messages must be a list.');
@@ -48,6 +51,10 @@ final readonly class ChatRequest
             if (ChatRole::System !== $message->role) {
                 $hasConversation = true;
             }
+        }
+
+        if ($jsonSchema instanceof JsonSchema && !$jsonResponse) {
+            throw new InvalidArgumentException('A JSON schema needs jsonResponse: true.');
         }
 
         if (!$hasConversation) {

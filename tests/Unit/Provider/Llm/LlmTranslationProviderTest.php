@@ -21,6 +21,7 @@ use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatRequest;
 use HtmlTranslator\Provider\Llm\ChatResponse;
 use HtmlTranslator\Provider\Llm\FinishReason;
+use HtmlTranslator\Provider\Llm\JsonSchema;
 use HtmlTranslator\Provider\Llm\LlmTranslationProvider;
 use HtmlTranslator\Provider\Llm\PromptBuilder;
 use HtmlTranslator\Provider\Llm\ResponseParser;
@@ -52,6 +53,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(Glossary::class)]
 #[UsesClass(TranslationProfile::class)]
 #[UsesClass(BatchContext::class)]
+#[UsesClass(JsonSchema::class)]
 final class LlmTranslationProviderTest extends TestCase
 {
     private const string ANSWER = '{"units": [{"id": "u1", "text": "Jeden"}, {"id": "u2", "text": "Dwa"}]}';

@@ -22,6 +22,7 @@ use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatRequest;
 use HtmlTranslator\Provider\Llm\ChatResponse;
+use HtmlTranslator\Provider\Llm\JsonSchema;
 use HtmlTranslator\Provider\Llm\LlmTranslationProvider;
 use HtmlTranslator\Provider\Llm\PromptBuilder;
 use HtmlTranslator\Provider\Llm\ResponseParser;
@@ -69,6 +70,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(GlossaryEntry::class)]
 #[UsesClass(ProfileText::class)]
 #[UsesClass(BatchContext::class)]
+#[UsesClass(JsonSchema::class)]
 final class LlmTranslationProviderContractTest extends TranslationProviderContractTestCase
 {
     protected function provider(): TranslationProviderInterface

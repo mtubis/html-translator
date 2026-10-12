@@ -8,6 +8,7 @@ use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatRequest;
 use HtmlTranslator\Provider\Llm\ChatRole;
+use HtmlTranslator\Provider\Llm\JsonSchema;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -17,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(ChatRequest::class)]
 #[UsesClass(ChatMessage::class)]
 #[UsesClass(InvalidArgumentException::class)]
+#[UsesClass(JsonSchema::class)]
 final class ChatRequestTest extends TestCase
 {
     #[Test]
@@ -42,6 +44,26 @@ final class ChatRequestTest extends TestCase
         self::assertNull($request->temperature);
         self::assertFalse($request->jsonResponse);
         self::assertNull($request->maxOutputTokens);
+        self::assertNull($request->jsonSchema);
+    }
+
+    #[Test]
+    public function it_holds_a_json_schema_for_a_json_response(): void
+    {
+        $schema = JsonSchema::fromJson('{"type": "object"}');
+
+        $request = new ChatRequest([new ChatMessage(ChatRole::User, 'Answer in JSON.')], jsonResponse: true, jsonSchema: $schema);
+
+        self::assertSame($schema, $request->jsonSchema);
+    }
+
+    #[Test]
+    public function it_rejects_a_json_schema_without_a_json_response(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('jsonResponse');
+
+        new ChatRequest([new ChatMessage(ChatRole::User, 'Hi')], jsonSchema: JsonSchema::fromJson('{"type": "object"}'));
     }
 
     #[Test]
