@@ -8,6 +8,7 @@ use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
+use HtmlTranslator\Provider\Llm\Bridge\HttpSecrets;
 use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatModelInterface;
 use HtmlTranslator\Provider\Llm\ChatRequest;
@@ -42,6 +43,7 @@ use Psr\Http\Message\RequestInterface;
 #[UsesClass(JsonSchema::class)]
 #[UsesClass(ProviderException::class)]
 #[UsesClass(UntrustedText::class)]
+#[UsesClass(HttpSecrets::class)]
 final class AnthropicChatModelContractTest extends ChatModelContractTestCase
 {
     private const string MODEL = 'contract-configured-model';

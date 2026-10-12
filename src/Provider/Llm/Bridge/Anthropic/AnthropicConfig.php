@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace HtmlTranslator\Provider\Llm\Bridge\Anthropic;
 
 use HtmlTranslator\Exception\InvalidArgumentException;
-use HtmlTranslator\Exception\UntrustedText;
+use HtmlTranslator\Provider\Llm\Bridge\HttpSecrets;
 use SensitiveParameter;
-use SensitiveParameterValue;
 
 /**
  * Where and how AnthropicChatModel calls the Claude Messages API (docs/providers.md).
@@ -33,22 +32,10 @@ final readonly class AnthropicConfig
     /** Headers the adapter sets itself; Authorization stays free for a gateway in front of the API. */
     private const array RESERVED_HEADERS = ['x-api-key', 'anthropic-version', 'anthropic-beta', 'content-type', 'accept'];
 
-    /** A header name (RFC 9110 token). */
-    private const string HEADER_NAME = '/^[!#$%&\'*+.^_`|~0-9A-Za-z-]+$/D';
-
-    /** A header value: visible characters, spaces and tabs, no line breaks or other control characters. */
+    /** The API version is sent as a header value: visible characters, spaces and tabs, no line breaks. */
     private const string HEADER_VALUE = '/^[\x20\x09\x21-\x7E\x80-\xFF]*$/D';
 
-    /** An API key: visible ASCII only, which also rejects the line break of a key read from a file. */
-    private const string API_KEY = '/^[\x21-\x7E]+$/D';
-
-    /** Shorter header values are not removed from messages: they are not secrets and would garble the text. */
-    private const int MIN_REDACTED_LENGTH = 8;
-
-    private SensitiveParameterValue $apiKey;
-
-    /** @var array<string, SensitiveParameterValue> */
-    private array $extraHeaders;
+    private HttpSecrets $secrets;
 
     /**
      * @param string $model e.g. "claude-opus-5-5"; no default, so a model is always chosen on purpose
@@ -77,19 +64,7 @@ final readonly class AnthropicConfig
             throw new InvalidArgumentException('An Anthropic configuration needs a model.');
         }
 
-        if (1 !== preg_match(self::API_KEY, $apiKey)) {
-            throw new InvalidArgumentException('The API key must be visible ASCII characters without spaces or line breaks.');
-        }
-
-        // The URL is not quoted: it may contain a credential (user info, ?key=).
-        $parts = parse_url($baseUrl);
-        if (false === $parts || !\in_array($parts['scheme'] ?? null, ['http', 'https'], true) || !isset($parts['host'])) {
-            throw new InvalidArgumentException('The Anthropic base URL is not an absolute HTTP(S) URL.');
-        }
-
-        if (isset($parts['user']) || isset($parts['pass']) || isset($parts['query']) || isset($parts['fragment'])) {
-            throw new InvalidArgumentException('The Anthropic base URL must not contain credentials, a query or a fragment.');
-        }
+        HttpSecrets::checkBaseUrl($baseUrl, 'The Anthropic base URL');
 
         if ('' === trim($apiVersion) || 1 !== preg_match(self::HEADER_VALUE, $apiVersion)) {
             throw new InvalidArgumentException('The Anthropic API version must be a non-empty header value.');
@@ -99,26 +74,7 @@ final readonly class AnthropicConfig
             throw new InvalidArgumentException(\sprintf('The default output limit must be at least 1, got %d.', $defaultMaxOutputTokens));
         }
 
-        $headers = [];
-        foreach ($extraHeaders as $header => $value) {
-            $header = (string) $header;
-            if (1 !== preg_match(self::HEADER_NAME, $header)) {
-                throw new InvalidArgumentException('An extra header has an invalid name.');
-            }
-
-            if (\in_array(strtolower($header), self::RESERVED_HEADERS, true)) {
-                throw new InvalidArgumentException(\sprintf('The header "%s" is set by the adapter.', UntrustedText::quote($header)));
-            }
-
-            if (1 !== preg_match(self::HEADER_VALUE, $value)) {
-                throw new InvalidArgumentException(\sprintf('The value of header "%s" contains line breaks or control characters.', UntrustedText::quote($header)));
-            }
-
-            $headers[$header] = new SensitiveParameterValue($value);
-        }
-
-        $this->apiKey = new SensitiveParameterValue($apiKey);
-        $this->extraHeaders = $headers;
+        $this->secrets = new HttpSecrets($apiKey, $extraHeaders, self::RESERVED_HEADERS);
     }
 
     public function modelId(): string
@@ -143,11 +99,11 @@ final readonly class AnthropicConfig
      */
     public function headers(): array
     {
-        $headers = array_map($this->reveal(...), $this->extraHeaders) + [
+        $headers = $this->secrets->extraHeaders() + [
             'Content-Type' => 'application/json',
             'Accept' => 'application/json',
             'anthropic-version' => $this->apiVersion,
-            'x-api-key' => $this->reveal($this->apiKey),
+            'x-api-key' => $this->secrets->apiKey() ?? '',
         ];
         if ($this->refusalFallbacks) {
             $headers['anthropic-beta'] = self::REFUSAL_FALLBACKS_BETA;
@@ -157,18 +113,13 @@ final readonly class AnthropicConfig
     }
 
     /**
-     * The text without the API key and extra header values of at least MIN_REDACTED_LENGTH characters, for messages
-     * built from vendor or transport errors. Only exact copies are found.
+     * The text without the API key and extra header values, for messages built from vendor or transport errors.
      *
      * @internal for AnthropicChatModel
      */
     public function redact(string $text): string
     {
-        // The key is always removed; short header values are not secrets and would garble the text.
-        $secrets = array_filter(array_map($this->reveal(...), $this->extraHeaders), static fn(string $secret): bool => \strlen($secret) >= self::MIN_REDACTED_LENGTH);
-        $secrets[] = $this->reveal($this->apiKey);
-
-        return str_replace($secrets, self::REDACTED, $text);
+        return $this->secrets->redact($text);
     }
 
     /**
@@ -184,14 +135,7 @@ final readonly class AnthropicConfig
             'defaultMaxOutputTokens' => $this->defaultMaxOutputTokens,
             'effort' => $this->effort?->value,
             'refusalFallbacks' => $this->refusalFallbacks,
-            'extraHeaders' => array_map(static fn(): string => self::REDACTED, $this->extraHeaders),
+            'extraHeaders' => $this->secrets->maskedExtraHeaders(),
         ];
-    }
-
-    private function reveal(SensitiveParameterValue $secret): string
-    {
-        $value = $secret->getValue();
-
-        return \is_string($value) ? $value : '';
     }
 }
