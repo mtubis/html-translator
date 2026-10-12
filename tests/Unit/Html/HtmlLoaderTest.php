@@ -114,6 +114,69 @@ final class HtmlLoaderTest extends TestCase
         self::assertNotNull($root->ownerDocument?->querySelector('p'));
     }
 
+    /**
+     * @return iterable<string, array{string, string}> fragment, element the fragment is parsed in
+     */
+    public static function tablePartFragments(): iterable
+    {
+        yield 'rows' => ['<tr><th>Plan</th><td>Price <b>9 €</b></td></tr><tr><td>Pro</td><td>19 €</td></tr>', 'tbody'];
+        yield 'cells' => ['<td>A</td><th scope="row">B</th>', 'tr'];
+        yield 'header cell first' => ['<th>Name</th><td>Value</td>', 'tr'];
+        yield 'sections' => ['<thead><tr><th>H</th></tr></thead><tbody><tr><td>D</td></tr></tbody><tfoot><tr><td>F</td></tr></tfoot>', 'table'];
+        yield 'body section only' => ['<tbody><tr><td>D</td></tr></tbody>', 'table'];
+        yield 'foot section only' => ['<tfoot><tr><td>F</td></tr></tfoot>', 'table'];
+        yield 'caption and column group' => ['<caption>Prices</caption><colgroup><col span="2"></colgroup>', 'table'];
+        yield 'columns' => ['<col span="2"><col class="price">', 'colgroup'];
+        yield 'upper-case tag' => ['<TR><TD>A</TD></TR>', 'tbody'];
+        yield 'whitespace and comments first' => ["\n  <!-- rows --><?pi x?>\n<tr><td>A</td></tr>\n", 'tbody'];
+        yield 'rows followed by other content' => ['<tr><td>A</td></tr><p>After</p>', 'tbody'];
+    }
+
+    #[Test]
+    #[DataProvider('tablePartFragments')]
+    public function it_keeps_table_parts_at_the_start_of_a_fragment(string $html, string $context): void
+    {
+        $loaded = new HtmlLoader()->load($html);
+
+        self::assertTrue($loaded->isFragment());
+        self::assertSame($context, $loaded->root()->localName);
+        self::assertTrue($loaded->root()->isConnected);
+        self::assertSame(
+            str_replace(['<TR>', '</TR>', '<TD>', '</TD>', '<?pi x?>'], ['<tr>', '</tr>', '<td>', '</td>', '<!--?pi x?-->'], $html),
+            $loaded->serialize(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function bodyContextFragments(): iterable
+    {
+        yield 'table part after other content' => ['<p>x</p><tr><td>y</td></tr>', '<p>x</p>y'];
+        yield 'custom element starting with tr' => ['<tr-row>x</tr-row>', '<tr-row>x</tr-row>'];
+        yield 'custom element starting with col' => ['<col-span>x</col-span>', '<col-span>x</col-span>'];
+        yield 'table part after text' => ['Total <td>9</td>', 'Total 9'];
+        yield 'a whole table' => ['<table><tr><td>A</td></tr></table>', '<table><tbody><tr><td>A</td></tr></tbody></table>'];
+    }
+
+    #[Test]
+    #[DataProvider('bodyContextFragments')]
+    public function it_parses_other_fragments_in_a_body_as_before(string $html, string $expected): void
+    {
+        $loaded = new HtmlLoader()->load($html);
+
+        self::assertSame('body', $loaded->root()->localName);
+        self::assertSame($expected, $loaded->serialize());
+    }
+
+    #[Test]
+    public function it_detects_table_parts_after_a_very_long_leading_comment(): void
+    {
+        $loaded = new HtmlLoader()->load('<!--' . str_repeat('x', 2_000_000) . '--><tr><td>A</td></tr>');
+
+        self::assertSame('tbody', $loaded->root()->localName);
+    }
+
     #[Test]
     public function it_does_not_wrap_fragments_on_serialization(): void
     {

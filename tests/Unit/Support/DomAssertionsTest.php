@@ -29,6 +29,7 @@ final class DomAssertionsTest extends TestCase
         yield 'quoting style' => ["<img alt='a'>", '<img alt="a">'];
         yield 'entity vs character' => ['<p>a&nbsp;b &amp; c</p>', "<p>a\u{00A0}b &amp; c</p>"];
         yield 'tag case' => ['<P>x</P>', '<p>x</p>'];
+        yield 'table rows' => ['<tr><td>A</td></tr>', '<TR><TD>A</TD></TR>'];
     }
 
     #[Test]
@@ -55,6 +56,9 @@ final class DomAssertionsTest extends TestCase
         yield 'multibyte text' => ['<p>Zażółć</p>', '<p>Zazolc</p>'];
         yield 'added document wrapper' => ['<p>x</p>', '<html><head></head><body><p>x</p></body></html>'];
         yield 'added closing body' => ['<p>x</p>', '<p>x</p></body></html>'];
+        yield 'table rows lost' => ['<tr><td>A</td></tr>', 'A'];
+        yield 'table cells lost' => ['<td>A</td><td>B</td>', 'AB'];
+        yield 'table row text' => ['<tr><td>A</td></tr>', '<tr><td>B</td></tr>'];
     }
 
     #[Test]
