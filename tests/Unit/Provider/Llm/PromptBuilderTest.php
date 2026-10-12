@@ -19,6 +19,7 @@ use HtmlTranslator\Profile\GlossaryEntry;
 use HtmlTranslator\Profile\ProfileText;
 use HtmlTranslator\Profile\TermPolicy;
 use HtmlTranslator\Profile\TranslationProfile;
+use HtmlTranslator\Provider\BatchContext;
 use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatRequest;
@@ -51,6 +52,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(ProfileText::class)]
 #[UsesClass(UnitText::class)]
 #[UsesClass(UnitTextToken::class)]
+#[UsesClass(BatchContext::class)]
 final class PromptBuilderTest extends TestCase
 {
     private const string GOLDEN_DIRECTORY = __DIR__ . '/Fixtures/prompts';

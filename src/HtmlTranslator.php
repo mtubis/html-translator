@@ -23,6 +23,7 @@ use HtmlTranslator\Html\Segmenter;
 use HtmlTranslator\Html\SkipRules;
 use HtmlTranslator\Html\TranslatableAttributes;
 use HtmlTranslator\Profile\TranslationProfile;
+use HtmlTranslator\Provider\BatchContext;
 use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\TranslationBatch;
 use HtmlTranslator\Provider\TranslationProviderInterface;
@@ -71,6 +72,12 @@ final readonly class HtmlTranslator
         $locales = LocalePair::of($options->source, $target);
         $segmented = $this->segmenter->segment($this->loader->load($html), $this->skipRules, $this->translatableAttributes);
         $units = $segmented->units();
+        $headingByUnit = [];
+        foreach ($units as $unit) {
+            $headingByUnit[$unit->id->toString()] = $segmented->sectionHeadingOf($unit->id);
+        }
+
+        $documentContext = BatchContext::forUnits($segmented->title(), $headingByUnit);
         $batches = array_chunk($units, $options->batchSize);
 
         $translations = [];
@@ -80,12 +87,12 @@ final readonly class HtmlTranslator
         $unitsDone = 0;
 
         foreach ($batches as $index => $batchUnits) {
-            [$translated, $failures, $batchRetries] = $this->translateWithRetries($locales, $options->profile, $batchUnits, $options->maxCorrectiveRetries);
+            [$translated, $failures, $batchRetries] = $this->translateWithRetries($locales, $options->profile, $documentContext, $batchUnits, $options->maxCorrectiveRetries);
             $translations += $translated;
             $retries += $batchRetries;
 
             if ([] !== $failures) {
-                [$fallbackTranslations, $fallbackIssues, $fallbackComplete] = $this->applyFallback($locales, $failures, $options);
+                [$fallbackTranslations, $fallbackIssues, $fallbackComplete] = $this->applyFallback($locales, $documentContext, $failures, $options);
                 $translations += $fallbackTranslations;
                 array_push($issues, ...$fallbackIssues);
                 $complete = $complete && $fallbackComplete;
@@ -122,7 +129,7 @@ final readonly class HtmlTranslator
      * @return array{array<string, string>, array<string, Failure>, int} valid translations, the last failure of
      *                                                                   each failed unit in document order, units retried
      */
-    private function translateWithRetries(LocalePair $locales, TranslationProfile $profile, array $units, int $maxRetries): array
+    private function translateWithRetries(LocalePair $locales, TranslationProfile $profile, BatchContext $documentContext, array $units, int $maxRetries): array
     {
         $pending = [];
         foreach ($units as $unit) {
@@ -141,7 +148,7 @@ final readonly class HtmlTranslator
             }
 
             try {
-                $result = $this->provider->translate(new TranslationBatch($locales, array_values($pending), $corrections, $profile));
+                $result = $this->provider->translate(new TranslationBatch($locales, array_values($pending), $corrections, $profile, $this->contextOf($documentContext, $pending)));
             } catch (ProviderException $exception) {
                 if (0 === $attempt) {
                     throw $exception;
@@ -203,6 +210,16 @@ final readonly class HtmlTranslator
     }
 
     /**
+     * @param array<string, TranslationUnit> $units by id
+     */
+    private function contextOf(BatchContext $documentContext, array $units): BatchContext
+    {
+        $ids = array_map(strval(...), array_keys($units));
+
+        return $documentContext->select(array_combine($ids, $ids));
+    }
+
+    /**
      * @return Failure
      */
     private function failure(TranslationUnit $unit, IssueType $type, string $detail, bool $permanent = false, ?ProviderException $cause = null): array
@@ -215,7 +232,7 @@ final readonly class HtmlTranslator
      *
      * @return array{array<string, string>, list<Issue>, bool} translations, issues, whether every unit is translated
      */
-    private function applyFallback(LocalePair $locales, array $failures, TranslationOptions $options): array
+    private function applyFallback(LocalePair $locales, BatchContext $documentContext, array $failures, TranslationOptions $options): array
     {
         $issues = [];
         $failedUnits = [];
@@ -240,7 +257,7 @@ final readonly class HtmlTranslator
             return [[], $issues, false];
         }
 
-        [$translations, $partialIssues] = $this->translateTextNodes($locales, $options->profile, $failedUnits);
+        [$translations, $partialIssues] = $this->translateTextNodes($locales, $options->profile, $documentContext, $failedUnits);
 
         return [$translations, [...$issues, ...$partialIssues], [] === $partialIssues];
     }
@@ -269,10 +286,11 @@ final readonly class HtmlTranslator
      *
      * @return array{array<string, string>, list<Issue>}
      */
-    private function translateTextNodes(LocalePair $locales, TranslationProfile $profile, array $units): array
+    private function translateTextNodes(LocalePair $locales, TranslationProfile $profile, BatchContext $documentContext, array $units): array
     {
         $plans = [];
         $pieces = [];
+        $pieceSources = [];
 
         foreach ($units as $unit) {
             $plan = [];
@@ -282,6 +300,7 @@ final readonly class HtmlTranslator
                 if (UnitTextTokenKind::Text === $token->kind && UnitText::hasTranslatableCharacter($token->text)) {
                     $piece = TranslationUnit::fromText(UnitId::fromString(\sprintf('%s-%d', $unit->id, ++$number)), UnitKind::Block, UnitText::escape($token->text));
                     $pieces[] = $piece;
+                    $pieceSources[$piece->id->toString()] = $unit->id->toString();
                 }
 
                 $plan[] = [$token, $piece];
@@ -293,7 +312,7 @@ final readonly class HtmlTranslator
         $result = null;
         $providerError = 'no translation';
         try {
-            $result = [] === $pieces ? null : $this->provider->translate(new TranslationBatch($locales, $pieces, profile: $profile));
+            $result = [] === $pieces ? null : $this->provider->translate(new TranslationBatch($locales, $pieces, profile: $profile, context: $documentContext->select($pieceSources)));
         } catch (ProviderException $exception) {
             $providerError = $exception->getMessage();
         }

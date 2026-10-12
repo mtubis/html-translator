@@ -13,6 +13,7 @@ use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\ProfileText;
 use HtmlTranslator\Profile\TranslationProfile;
+use HtmlTranslator\Provider\BatchContext;
 use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\TranslationBatch;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -22,6 +23,7 @@ use PHPUnit\Framework\TestCase;
 
 #[CoversClass(TranslationBatch::class)]
 #[CoversClass(Correction::class)]
+#[UsesClass(BatchContext::class)]
 #[UsesClass(Locale::class)]
 #[UsesClass(LocalePair::class)]
 #[UsesClass(TranslationUnit::class)]
@@ -52,6 +54,24 @@ final class TranslationBatchTest extends TestCase
 
         self::assertEquals(TranslationProfile::default(), new TranslationBatch($this->locales(), [$this->unit('u1')])->profile);
         self::assertSame($profile, new TranslationBatch($this->locales(), [$this->unit('u1')], profile: $profile)->profile);
+    }
+
+    #[Test]
+    public function it_carries_no_context_unless_given_one(): void
+    {
+        $context = BatchContext::forUnits('Docs', ['u1' => 'Install']);
+
+        self::assertEquals(BatchContext::none(), new TranslationBatch($this->locales(), [$this->unit('u1')])->context);
+        self::assertSame($context, new TranslationBatch($this->locales(), [$this->unit('u1')], context: $context)->context);
+    }
+
+    #[Test]
+    public function it_rejects_context_for_a_unit_outside_the_batch(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('"u9"');
+
+        new TranslationBatch($this->locales(), [$this->unit('u1')], context: BatchContext::forUnits(null, ['u9' => 'Install']));
     }
 
     #[Test]

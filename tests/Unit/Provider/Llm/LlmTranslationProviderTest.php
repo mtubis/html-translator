@@ -14,6 +14,7 @@ use HtmlTranslator\Domain\UnitTextToken;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\TranslationProfile;
+use HtmlTranslator\Provider\BatchContext;
 use HtmlTranslator\Provider\BatchResult;
 use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\Llm\ChatMessage;
@@ -50,6 +51,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(UnitTextToken::class)]
 #[UsesClass(Glossary::class)]
 #[UsesClass(TranslationProfile::class)]
+#[UsesClass(BatchContext::class)]
 final class LlmTranslationProviderTest extends TestCase
 {
     private const string ANSWER = '{"units": [{"id": "u1", "text": "Jeden"}, {"id": "u2", "text": "Dwa"}]}';
