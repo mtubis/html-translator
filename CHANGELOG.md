@@ -13,6 +13,8 @@ All notable changes to this project are documented here. The format follows [Kee
   bounded and kept on one line (`Exception\UntrustedText`, #43).
 
 ### Changed
+- Units are no longer cut into fixed chunks of `batchSize`: a batch also closes at `tokenBudget`, so documents with
+  long units need more provider calls, which shows in `stats()->batches` and the `onProgress` totals (#58).
 - The chat model configs share their key, header and base URL rules (`Provider\Llm\Bridge\HttpSecrets`, #53).
   `AnthropicConfig` now also rejects a base URL with whitespace or control characters, and
   `OpenAiCompatibleConfig::redact()` removes the key whatever its length.
@@ -20,6 +22,9 @@ All notable changes to this project are documented here. The format follows [Kee
   Contract tests of third-party adapters that match the kinds exhaustively must handle it (#52).
 
 ### Added
+- Batches are sized by an approximate token budget: `TranslationOptions::$tokenBudget` (default 2,000), `Batcher`
+  and the `TokenEstimatorInterface` port with `CharacterTokenEstimator`; `batchSize` stays as the upper bound of units
+  per batch, and `HtmlTranslator` takes an optional `batcher` (ADR-0015, #58).
 - Transport retries in both chat model adapters: `Retrier`, `RetryPolicy` (backoff with jitter, `Retry-After`) and the
   `SleeperInterface` port with `UsleepSleeper`, and `FakeSleeper` for tests (#61).
 - Project skeleton, architecture documentation and ADRs 0001–0010.

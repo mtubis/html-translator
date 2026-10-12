@@ -47,7 +47,7 @@ $translator = new HtmlTranslator(
     cache: $psr6Pool,                    // ?CacheItemPoolInterface
     logger: $psr3Logger,                 // ?LoggerInterface
     // optional collaborators with sensible defaults:
-    // loader, segmenter, validator, reassembler, skipRules, translatableAttributes, clock
+    // loader, segmenter, validator, reassembler, skipRules, translatableAttributes, batcher, clock
 );
 // Named arguments beyond `provider`; positional order is not part of the API (ADR-0010).
 // cache and clock arrive in 0.4; the profile is a TranslationOptions argument.
@@ -62,7 +62,8 @@ $result = $translator->translate(
             ->withGlossary(Glossary::fromArray(['pull request' => 'pull request'])),
         fallback: FallbackStrategy::KeepOriginal,
         maxCorrectiveRetries: 2,
-        batchSize: 20,                             // provisional until the token-based Batcher (0.4)
+        tokenBudget: 2000,                         // approximate tokens of unit texts per call (ADR-0015)
+        batchSize: 20,                             // upper bound of units per call
         onProgress: static function (Progress $p): void { /* … */ },
     ),
 );
@@ -132,7 +133,7 @@ Adapters are written on **PSR-18 / PSR-17**, not vendor SDKs ([ADR-0002](adr/000
 - Context hints: the `SegmentedDocument` also records the document title and, per unit, the text of the nearest `h1`–`h6` before it (translated or not, also inside skipped subtrees), whitespace collapsed and capped at 200 characters. They are plain source-language strings; no DOM node leaves the `Html` layer.
 
 ### 6.3 Batching
-- Units are grouped into `TranslationBatch`es by an approximate token budget (configurable, conservative default). Order is preserved, units are never split.
+- `Batcher` groups units into `TranslationBatch`es by an approximate token budget (`TranslationOptions::$tokenBudget`, default 2,000 tokens of unit texts and their envelopes, not the instructions) and at most `batchSize` units. Order is preserved, units are never split; a unit over the budget gets a batch of its own. Tokens come from `TokenEstimatorInterface` (default `CharacterTokenEstimator`, a heuristic within 0.8–2.5× of real counts); see [ADR-0015](adr/0015-token-budget-batching.md).
 - Each batch carries document context hints (`BatchContext`): the page title and the section heading of each unit (helps the model with ambiguous short strings such as button labels). Corrective retries and the text-node fallback get the same hints; see [ADR-0013](adr/0013-context-hints-in-the-prompt.md).
 
 ### 6.4 Provider call (LLM)
@@ -169,7 +170,7 @@ src/
   Profile/                      TranslationProfile, TermPolicy, Formality, Glossary, GlossaryEntry
   Html/                         HtmlLoader, Segmenter, InlineEncoder, Reassembler, SkipRules, TranslatableAttributes
   Validation/                   StructureValidator, ValidationResult, Violation, ViolationType
-  Batching/                     Batcher, TokenEstimator
+  Batching/                     Batcher, TokenEstimatorInterface, CharacterTokenEstimator
   Provider/                     TranslationProviderInterface, TranslationBatch, BatchResult
   Provider/Llm/                 LlmTranslationProvider, PromptBuilder, ResponseParser, ChatModelInterface, ChatRequest, ChatResponse,
                                 ChatMessage, ChatRole, FinishReason, JsonSchema

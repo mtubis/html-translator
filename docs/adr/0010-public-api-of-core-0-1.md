@@ -1,6 +1,6 @@
 # 0010. Public API shape of Core 0.1
 
-- Status: accepted
+- Status: accepted; `batchSize` clause amended by [0015](0015-token-budget-batching.md)
 - Date: 2026-10-11
 
 ## Context
@@ -20,4 +20,4 @@ Alternatives considered:
 ## Consequences
 - Callers must use named arguments for everything but the provider; README and examples do.
 - Adding cache, clock and profile in later versions is not a breaking change.
-- `batchSize` users get a deprecation notice in 0.4 at the earliest.
+- `batchSize` users get a deprecation notice in 0.4 at the earliest. (Amended by ADR-0015: `batchSize` stays as the unit cap and is not deprecated.)
