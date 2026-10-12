@@ -129,6 +129,7 @@ Adapters are written on **PSR-18 / PSR-17**, not vendor SDKs ([ADR-0002](adr/000
 - **Forms**: interface text is translated (labels, legends, button content, option text, placeholders, button labels); form data is not (field values, `<textarea>` content, `option`/`button` `value` attributes, the `value` of a submit button with a `name`, which the backend receives). An `<option>` without `value` submits its text; the Reassembler keeps the original as `value` when it translates the text (#7).
 - `<title>` and `lang` / `dir` attributes: `<title>` is a unit; `<html lang>` is updated to the target locale; `dir` is set for RTL targets.
 - Whitespace: leading/trailing whitespace of a unit is stripped before sending and restored after.
+- Context hints: the `SegmentedDocument` also records the document title and, per unit, the text of the nearest `h1`–`h6` before it (translated or not, also inside skipped subtrees), whitespace collapsed and capped at 200 characters. They are plain source-language strings; no DOM node leaves the `Html` layer.
 
 ### 6.3 Batching
 - Units are grouped into `TranslationBatch`es by an approximate token budget (configurable, conservative default). Order is preserved, units are never split.

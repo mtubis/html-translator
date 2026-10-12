@@ -30,6 +30,10 @@ use WeakMap;
  *   become units), the translate state is carried down,
  *   and below a non-translating container elements are still visited, so translate="yes" re-enables them.
  * - Attribute units of an element come before its content; those of inline elements follow their run.
+ *
+ * Context hints (plain text, whitespace collapsed, at most 200 characters): the document title and, per unit, the
+ * nearest h1–h6 before it, whether or not that heading is translated, also inside a skipped subtree. A heading
+ * inside a skipped inline element within a sentence (opaque, never visited) is not seen; real markup has none.
  */
 final readonly class Segmenter
 {
@@ -48,6 +52,11 @@ final readonly class Segmenter
 
     private const string HTML_WHITESPACE = " \t\n\f\r";
 
+    private const array HEADINGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+
+    /** Keeps context hints short in prompts; a longer heading or title is cut and ends with "…". */
+    private const int MAX_CONTEXT_LENGTH = 200;
+
     public function __construct(
         private InlineEncoder $encoder = new InlineEncoder(),
     ) {}
@@ -60,7 +69,7 @@ final readonly class Segmenter
         $context = new SegmentationContext($rules, $attributes, $this->findBlockContainers($document->root()));
         $this->visitContainer($document->root(), true, $context);
 
-        return $context->build($document);
+        return $context->build($document, $this->documentTitle($document));
     }
 
     /**
@@ -101,7 +110,27 @@ final readonly class Segmenter
         return $containers;
     }
 
+    /**
+     * A heading is passed once its own content is segmented, so a heading unit belongs to the previous section.
+     * Only the outermost heading counts: a heading nested in it is part of its text, and reading the text of every
+     * nested heading would make deep nesting quadratic.
+     */
     private function visitContainer(Element $container, bool $parentTranslates, SegmentationContext $context): void
+    {
+        if (!$this->isHeading($container) || $context->insideHeading) {
+            $this->visitContent($container, $parentTranslates, $context);
+
+            return;
+        }
+
+        $context->insideHeading = true;
+        $this->visitContent($container, $parentTranslates, $context);
+        $context->insideHeading = false;
+
+        $context->enterSection($this->contextText($container->textContent ?? ''));
+    }
+
+    private function visitContent(Element $container, bool $parentTranslates, SegmentationContext $context): void
     {
         $translates = $context->rules->translates($container, $parentTranslates);
 
@@ -111,6 +140,15 @@ final readonly class Segmenter
         }
 
         if ($context->rules->skipsSubtree($container)) {
+            // Not segmented, but a heading in it (e.g. HTML inside <svg><foreignObject>) still names what follows.
+            // Inside a heading, the heading's own text names the section.
+            if (!$context->insideHeading) {
+                $headings = $container->querySelectorAll(implode(', ', self::HEADINGS));
+                if ($headings->length > 0) {
+                    $context->enterSection($this->contextText($headings->item($headings->length - 1)->textContent ?? ''));
+                }
+            }
+
             return;
         }
 
@@ -220,6 +258,36 @@ final readonly class Segmenter
     {
         return $this->isBlockElement($element)
             || (!$context->rules->skipsSubtree($element) && $context->containsBlock($element));
+    }
+
+    private function isHeading(Element $element): bool
+    {
+        return \in_array($element->localName, self::HEADINGS, true);
+    }
+
+    /**
+     * A fragment's root holds no <head>, so fragments have no title.
+     */
+    private function documentTitle(LoadedDocument $document): ?string
+    {
+        $title = $document->root()->querySelector('head > title');
+
+        return $title instanceof Element ? $this->contextText($title->textContent ?? '') : null;
+    }
+
+    /**
+     * Text as a reader sees it, for context hints: whitespace collapsed, capped on a character boundary; null when empty.
+     */
+    private function contextText(string $text): ?string
+    {
+        // textContent is valid UTF-8, so the replacement cannot fail.
+        $text = trim(preg_replace('/[\s\p{Z}]+/u', ' ', $text) ?? $text);
+
+        if ('' === $text) {
+            return null;
+        }
+
+        return mb_strlen($text) > self::MAX_CONTEXT_LENGTH ? rtrim(mb_substr($text, 0, self::MAX_CONTEXT_LENGTH - 1)) . '…' : $text;
     }
 
     /**
