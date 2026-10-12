@@ -12,7 +12,7 @@ model, and the adapter only maps one HTTP call.
 | vLLM | `OpenAiCompatibleChatModel` + `OpenAiCompatibleConfig::vllm()` | local, optional key |
 | LM Studio | `OpenAiCompatibleChatModel` + `OpenAiCompatibleConfig::lmStudio()` | local, no JSON mode (LM Studio only supports JSON schemas) |
 | Other OpenAI-compatible servers | `OpenAiCompatibleChatModel` + `new OpenAiCompatibleConfig(...)` | |
-| Anthropic | planned (0.3) | |
+| Anthropic | `AnthropicChatModel` + `AnthropicConfig` | Claude Messages API, structured output (JSON schema) |
 | No network (tests, demos) | `PseudoLocalizationProvider` | deterministic fake translation |
 
 ## OpenAI-compatible APIs
@@ -83,6 +83,52 @@ new OpenAiCompatibleConfig(
 - **Errors** are `ProviderException`s. HTTP errors carry `statusCode` and `vendorCode` (the vendor's `error.code`,
   `error.type` or Gemini's `status`). A refused or content-filtered batch is not an exception: its units are reported
   as issues and handled by the fallback strategy.
+
+## Anthropic
+
+`AnthropicChatModel` calls the Claude Messages API (`POST {baseUrl}/messages`, `anthropic-version: 2023-06-01`)
+through any PSR-18 client and PSR-17 factories:
+
+```php
+use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicChatModel;
+use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
+
+$http = new Psr18Client(HttpClient::create(['timeout' => 180]));
+$model = new AnthropicChatModel($http, $http, $http, new AnthropicConfig(
+    model: 'claude-opus-5-5',
+    apiKey: $_ENV['ANTHROPIC_API_KEY'],
+));
+
+$translator = new HtmlTranslator(new LlmTranslationProvider($model));
+```
+
+### Configuration
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `model` | — (required) | Model id, e.g. `claude-opus-5-5` or `claude-sonnet-5-5` |
+| `apiKey` | — (required) | Sent as `x-api-key`; treated as a secret like the OpenAI-compatible key |
+| `baseUrl` | `https://api.anthropic.com/v1` | API root, e.g. a gateway in front of the Claude API |
+| `apiVersion` | `2023-06-01` | The `anthropic-version` header |
+| `defaultMaxOutputTokens` | `16000` | `max_tokens` when a request sets none (the API requires a limit) |
+| `effort` | `null` (model default) | `low`, `medium`, `high`, `xhigh` or `max`: thinking depth and token spend |
+| `refusalFallbacks` | `false` | Let the API answer a refused request with a fallback model (`fallbacks: "default"`) |
+| `extraHeaders` | `[]` | Further headers; treated as secret |
+
+- **JSON**: `LlmTranslationProvider` asks for its answer format as a JSON schema, which the adapter sends as structured
+  output (`output_config.format`), so the answer is always valid JSON (ADR-0014). Current Claude models reject assistant
+  prefill; the adapter never uses it.
+- **Thinking**: current models think before answering (Claude Opus 5.5 always does); the adapter returns only the text
+  blocks. Lower `effort` (e.g. `low`) for cheaper and faster translations, raise it for hard texts. Requests can take a
+  while at higher effort: allow a generous client timeout (120 seconds or more).
+- **Temperature**: current Claude models reject sampling parameters with HTTP 400, and the adapter rejects
+  temperatures above 1. `LlmTranslationProvider` sends none.
+- **Refusals**: a declined request (`stop_reason: "refusal"`) becomes `FinishReason::Refusal`; its units are reported
+  as permanent failures. With `refusalFallbacks: true` the adapter sends the `server-side-fallback-2026-07-01` beta,
+  and the API may answer with a fallback model instead (`ChatResponse::$model` names it). Available on the Claude API
+  only; check that your model supports it.
+- **Errors** are `ProviderException`s with `statusCode` and `vendorCode` (`error.type`, e.g. `rate_limit_error`,
+  `overloaded_error` for HTTP 529). No transport retries yet (0.4).
 
 ## Writing your own
 

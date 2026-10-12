@@ -44,7 +44,8 @@ Alternatives considered:
   call, so `LlmTranslationProvider` (#28) should retry the call once when parsing fails, except when
   `ChatResponse::$finishReason` is `Length`: the same batch would be cut off again.
 - Adapters must deliver the whole JSON in `ChatResponse::$content`: one that prefills `{` (Anthropic has no JSON mode)
-  puts it back in front, and one whose API requires an output limit (Anthropic `max_tokens`) uses its own default,
+  puts it back in front (superseded: current Claude models reject prefill, see
+  [0014](0014-json-schema-in-chat-requests.md)), and one whose API requires an output limit (Anthropic `max_tokens`) uses its own default,
   since `PromptBuilder` leaves `maxOutputTokens` unset until token budgeting (0.4).
 - Prompt changes invalidate cached translations through `VERSION`; forgetting to bump it reuses translations made with
   the old prompt, which reviewers must watch for in golden-file diffs.
