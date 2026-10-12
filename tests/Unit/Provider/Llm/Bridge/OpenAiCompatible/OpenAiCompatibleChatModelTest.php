@@ -9,6 +9,10 @@ use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\HttpSecrets;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig;
+use HtmlTranslator\Provider\Llm\Bridge\RetriedResponse;
+use HtmlTranslator\Provider\Llm\Bridge\Retrier;
+use HtmlTranslator\Provider\Llm\Bridge\RetryPolicy;
+use HtmlTranslator\Provider\Llm\Bridge\TransportFailure;
 use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatRequest;
 use HtmlTranslator\Provider\Llm\ChatResponse;
@@ -18,6 +22,7 @@ use HtmlTranslator\Tests\Support\FakeClientException;
 use HtmlTranslator\Tests\Support\FakeHttpClient;
 use HtmlTranslator\Tests\Support\FakeNetworkException;
 use HtmlTranslator\Tests\Support\FakeRequestException;
+use HtmlTranslator\Tests\Support\FakeSleeper;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Nyholm\Psr7\Response;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -43,6 +48,10 @@ use Throwable;
 #[UsesClass(ProviderException::class)]
 #[UsesClass(UntrustedText::class)]
 #[UsesClass(HttpSecrets::class)]
+#[UsesClass(Retrier::class)]
+#[UsesClass(RetryPolicy::class)]
+#[UsesClass(RetriedResponse::class)]
+#[UsesClass(TransportFailure::class)]
 final class OpenAiCompatibleChatModelTest extends TestCase
 {
     private const string API_KEY = 'sk-test-SECRET-0123456789';
@@ -326,6 +335,27 @@ final class OpenAiCompatibleChatModelTest extends TestCase
     }
 
     #[Test]
+    public function it_retries_a_rate_limit_and_says_how_often_it_tried(): void
+    {
+        $sleeper = new FakeSleeper();
+
+        $exception = $this->failure($this->model($this->client(429, 'error-429.json'), retrier: new Retrier(sleeper: $sleeper)));
+
+        self::assertSame(429, $exception->statusCode);
+        self::assertSame('rate_limit_exceeded', $exception->vendorCode);
+        self::assertStringStartsWith('openai returned HTTP 429 after 3 attempts: Rate limit reached', $exception->getMessage());
+        self::assertCount(2, $sleeper->delays);
+    }
+
+    #[Test]
+    public function it_says_how_often_it_tried_to_reach_the_server(): void
+    {
+        $model = $this->model(new FakeHttpClient(static fn(RequestInterface $request): Response => throw new FakeNetworkException('Connection reset', $request)), retrier: new Retrier(sleeper: new FakeSleeper()));
+
+        self::assertStringStartsWith('Could not reach openai at https://api.openai.com/v1/chat/completions after 3 attempts: Connection reset', $this->failure($model)->getMessage());
+    }
+
+    #[Test]
     public function it_names_the_configured_model(): void
     {
         self::assertSame('openai:gpt-4o-mini', $this->model($this->client(200, 'success.json'))->modelId());
@@ -364,11 +394,14 @@ final class OpenAiCompatibleChatModelTest extends TestCase
         }
     }
 
-    private function model(FakeHttpClient $client, ?OpenAiCompatibleConfig $config = null): OpenAiCompatibleChatModel
+    /**
+     * Without retries, so every scripted response is the one the adapter reports; retries have their own tests.
+     */
+    private function model(FakeHttpClient $client, ?OpenAiCompatibleConfig $config = null, ?Retrier $retrier = null): OpenAiCompatibleChatModel
     {
         $factory = new Psr17Factory();
 
-        return new OpenAiCompatibleChatModel($client, $factory, $factory, $config ?? OpenAiCompatibleConfig::openAi(self::API_KEY, 'gpt-4o-mini'));
+        return new OpenAiCompatibleChatModel($client, $factory, $factory, $config ?? OpenAiCompatibleConfig::openAi(self::API_KEY, 'gpt-4o-mini'), $retrier ?? new Retrier(RetryPolicy::none()));
     }
 
     private function client(int $status, string $fixture): FakeHttpClient

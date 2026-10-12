@@ -6,13 +6,14 @@ namespace HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible;
 
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Exception\UntrustedText;
+use HtmlTranslator\Provider\Llm\Bridge\Retrier;
+use HtmlTranslator\Provider\Llm\Bridge\TransportFailure;
 use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatModelInterface;
 use HtmlTranslator\Provider\Llm\ChatRequest;
 use HtmlTranslator\Provider\Llm\ChatResponse;
 use HtmlTranslator\Provider\Llm\FinishReason;
 use JsonException;
-use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
@@ -41,6 +42,7 @@ final readonly class OpenAiCompatibleChatModel implements ChatModelInterface
         private RequestFactoryInterface $requestFactory,
         private StreamFactoryInterface $streamFactory,
         private OpenAiCompatibleConfig $config,
+        private Retrier $retrier = new Retrier(),
     ) {}
 
     public function modelId(): string
@@ -57,15 +59,16 @@ final readonly class OpenAiCompatibleChatModel implements ChatModelInterface
         }
 
         try {
-            $response = $this->client->sendRequest($httpRequest);
-        } catch (ClientExceptionInterface $exception) {
-            throw $this->transportError($exception);
+            $retried = $this->retrier->send($this->client, $httpRequest);
+        } catch (TransportFailure $failure) {
+            throw $this->transportError($failure);
         }
 
+        $response = $retried->response;
         $status = $response->getStatusCode();
         $body = (string) $response->getBody();
         if ($status < 200 || $status > 299) {
-            throw $this->httpError($status, $body);
+            throw $this->httpError($status, $body, $retried->attempts);
         }
 
         return $this->answer($body);
@@ -155,7 +158,7 @@ final readonly class OpenAiCompatibleChatModel implements ChatModelInterface
      * Error bodies are {"error": {"message", "type", "code"}}, or a list of such objects (Gemini), with
      * Gemini's "status" instead of a string code.
      */
-    private function httpError(int $status, #[SensitiveParameter] string $body): ProviderException
+    private function httpError(int $status, #[SensitiveParameter] string $body, int $attempts): ProviderException
     {
         // Proxy pages and other non-JSON bodies are not quoted: they may be large and say nothing useful.
         $data = json_decode($body, true);
@@ -175,7 +178,7 @@ final readonly class OpenAiCompatibleChatModel implements ChatModelInterface
 
         $vendorMessage = \is_string($error['message'] ?? null) ? UntrustedText::quote($this->config->redact($error['message']), self::VENDOR_MESSAGE_LENGTH) : '';
 
-        $message = \sprintf('%s returned HTTP %d', $this->config->name, $status);
+        $message = \sprintf('%s returned HTTP %d', $this->config->name, $status) . $this->afterAttempts($attempts);
 
         return ProviderException::fromHttpResponse($status, '' === $vendorMessage ? $message . '.' : $message . ': ' . $vendorMessage, $vendorCode);
     }
@@ -186,11 +189,11 @@ final readonly class OpenAiCompatibleChatModel implements ChatModelInterface
      * is a ProviderException naming the client's exception type and its redacted message; the parameter is sensitive,
      * so the client's exception does not reach the traces of the new exceptions either.
      */
-    private function transportError(#[SensitiveParameter] ClientExceptionInterface $exception): ProviderException
+    private function transportError(#[SensitiveParameter] TransportFailure $failure): ProviderException
     {
-        $message = UntrustedText::quote($this->config->redact($exception->getMessage()));
+        $message = UntrustedText::quote($this->config->redact($failure->getMessage()));
 
-        return new ProviderException(\sprintf('Could not reach %s at %s: %s', $this->config->name, $this->config->endpoint(), $message), 0, new ProviderException(\sprintf('%s: %s', get_debug_type($exception), $message)));
+        return new ProviderException(\sprintf('Could not reach %s at %s%s: %s', $this->config->name, $this->config->endpoint(), $this->afterAttempts($failure->attempts), $message), 0, new ProviderException(\sprintf('%s: %s', get_debug_type($failure->getPrevious()), $message)));
     }
 
     /**
@@ -210,5 +213,13 @@ final readonly class OpenAiCompatibleChatModel implements ChatModelInterface
         }
 
         return $data;
+    }
+
+    /**
+     * " after N attempts" when the Retrier tried more than once, so the message says the failure was not a one-off.
+     */
+    private function afterAttempts(int $attempts): string
+    {
+        return $attempts > 1 ? \sprintf(' after %d attempts', $attempts) : '';
     }
 }

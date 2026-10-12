@@ -72,6 +72,7 @@ final class RetrierTest extends TestCase
         yield 'date without a response date' => [['Retry-After' => 'Mon, 12 Oct 2026 10:00:05 GMT']];
         yield 'garbage' => [['Retry-After' => 'soon']];
         yield 'negative' => [['Retry-After' => '-3']];
+        yield 'date equal to the response date' => [['Date' => 'Mon, 12 Oct 2026 10:00:05 GMT', 'Retry-After' => 'Mon, 12 Oct 2026 10:00:05 GMT']];
         yield 'date in the past' => [['Date' => 'Mon, 12 Oct 2026 10:00:05 GMT', 'Retry-After' => 'Mon, 12 Oct 2026 10:00:00 GMT']];
     }
 
@@ -138,6 +139,7 @@ final class RetrierTest extends TestCase
 
         self::assertSame(200, $result->response->getStatusCode());
         self::assertSame(3, $result->attempts);
+        self::assertCount(2, $this->sleeper->delays, 'It backs off between network errors too.');
     }
 
     #[Test]
@@ -226,7 +228,8 @@ final class RetrierTest extends TestCase
     private function client(array $script): FakeHttpClient
     {
         return new FakeHttpClient(function (RequestInterface $request) use (&$script): ResponseInterface {
-            $this->bodies[] = (string) $request->getBody();
+            // getContents() reads from the current position, as a real client does: an unrewound body is empty.
+            $this->bodies[] = $request->getBody()->getContents();
             $next = array_shift($script) ?? self::fail('No answer left for this attempt.');
 
             return match ($next) {

@@ -86,6 +86,34 @@ final class RetryPolicyTest extends TestCase
     }
 
     #[Test]
+    public function it_treats_retry_zero_like_the_first_retry(): void
+    {
+        $delay = new RetryPolicy(baseDelayMilliseconds: 1000)->backoffMilliseconds(0, new Randomizer(new Mt19937(5)));
+
+        self::assertGreaterThanOrEqual(500, $delay);
+        self::assertLessThanOrEqual(1000, $delay);
+    }
+
+    #[Test]
+    public function it_never_waits_less_than_half_the_backoff(): void
+    {
+        $policy = new RetryPolicy(baseDelayMilliseconds: 2, maxDelayMilliseconds: 2);
+        $randomizer = new Randomizer(new Mt19937(11));
+
+        for ($sample = 0; $sample < 200; ++$sample) {
+            $delay = $policy->backoffMilliseconds(1, $randomizer);
+            self::assertGreaterThanOrEqual(1, $delay);
+            self::assertLessThanOrEqual(2, $delay);
+        }
+    }
+
+    #[Test]
+    public function it_accepts_the_bounds_of_the_error_statuses(): void
+    {
+        self::assertSame([300, 599], new RetryPolicy(retryableStatuses: [300, 599])->retryableStatuses);
+    }
+
+    #[Test]
     public function it_does_not_wait_with_a_zero_base_delay(): void
     {
         self::assertSame(0, new RetryPolicy(baseDelayMilliseconds: 0, maxDelayMilliseconds: 0)->backoffMilliseconds(3, new Randomizer(new Mt19937(1))));
@@ -101,6 +129,8 @@ final class RetryPolicyTest extends TestCase
         yield 'maximum below the base' => [static fn(): RetryPolicy => new RetryPolicy(baseDelayMilliseconds: 2000, maxDelayMilliseconds: 1000)];
         yield 'success status as retryable' => [static fn(): RetryPolicy => new RetryPolicy(retryableStatuses: [200])];
         yield 'status outside HTTP' => [static fn(): RetryPolicy => new RetryPolicy(retryableStatuses: [700])];
+        yield 'status just below the errors' => [static fn(): RetryPolicy => new RetryPolicy(retryableStatuses: [299])];
+        yield 'status just above the errors' => [static fn(): RetryPolicy => new RetryPolicy(retryableStatuses: [600])];
     }
 
     /**

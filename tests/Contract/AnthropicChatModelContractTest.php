@@ -9,6 +9,10 @@ use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
 use HtmlTranslator\Provider\Llm\Bridge\HttpSecrets;
+use HtmlTranslator\Provider\Llm\Bridge\RetriedResponse;
+use HtmlTranslator\Provider\Llm\Bridge\Retrier;
+use HtmlTranslator\Provider\Llm\Bridge\RetryPolicy;
+use HtmlTranslator\Provider\Llm\Bridge\TransportFailure;
 use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatModelInterface;
 use HtmlTranslator\Provider\Llm\ChatRequest;
@@ -22,6 +26,7 @@ use HtmlTranslator\Provider\Llm\Testing\RecordedChatRequest;
 use HtmlTranslator\Tests\Support\FakeClientException;
 use HtmlTranslator\Tests\Support\FakeHttpClient;
 use HtmlTranslator\Tests\Support\FakeNetworkException;
+use HtmlTranslator\Tests\Support\FakeSleeper;
 use LogicException;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Nyholm\Psr7\Response;
@@ -44,6 +49,10 @@ use Psr\Http\Message\RequestInterface;
 #[UsesClass(ProviderException::class)]
 #[UsesClass(UntrustedText::class)]
 #[UsesClass(HttpSecrets::class)]
+#[UsesClass(Retrier::class)]
+#[UsesClass(RetryPolicy::class)]
+#[UsesClass(RetriedResponse::class)]
+#[UsesClass(TransportFailure::class)]
 final class AnthropicChatModelContractTest extends ChatModelContractTestCase
 {
     private const string MODEL = 'contract-configured-model';
@@ -81,7 +90,7 @@ final class AnthropicChatModelContractTest extends ChatModelContractTestCase
         });
         $factory = new Psr17Factory();
 
-        return new AnthropicChatModel($this->client, $factory, $factory, new AnthropicConfig(self::MODEL, self::API_KEY, baseUrl: 'https://api.example.test/v1', defaultMaxOutputTokens: self::DEFAULT_MAX_OUTPUT_TOKENS));
+        return new AnthropicChatModel($this->client, $factory, $factory, new AnthropicConfig(self::MODEL, self::API_KEY, baseUrl: 'https://api.example.test/v1', defaultMaxOutputTokens: self::DEFAULT_MAX_OUTPUT_TOKENS), new Retrier(sleeper: new FakeSleeper()));
     }
 
     protected function recordedRequest(): RecordedChatRequest
