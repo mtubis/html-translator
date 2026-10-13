@@ -16,6 +16,7 @@ use HtmlTranslator\Exception\UntrustedText;
  *   unsupported language for that unit); they go straight to the fallback strategy.
  * Every reason ends up in an Issue message and in logs, so it must never contain API keys, tokens or other
  * credentials. Units in none of the maps are treated as missing; ids that are not in the batch are ignored.
+ * The usage covers every call the provider made for the batch (its own retries included); null when it reports none.
  */
 final readonly class BatchResult
 {
@@ -23,6 +24,7 @@ final readonly class BatchResult
      * @param array<string, string> $translations unit id → translated unit text (ADR-0008 format)
      * @param array<string, string> $failures unit id → why the provider could not translate it this time
      * @param array<string, string> $permanentFailures unit id → why the provider will never translate it
+     * @param TokenUsage|null $usage tokens used for the batch, null when the provider reports none
      *
      * @throws InvalidArgumentException when a unit appears in more than one map, or a failure has no reason
      */
@@ -30,6 +32,7 @@ final readonly class BatchResult
         public array $translations,
         public array $failures = [],
         public array $permanentFailures = [],
+        public ?TokenUsage $usage = null,
     ) {
         $overlap = array_keys(array_intersect_key($translations, $failures) + array_intersect_key($translations, $permanentFailures) + array_intersect_key($failures, $permanentFailures));
         foreach ($overlap as $id) {
@@ -41,5 +44,13 @@ final readonly class BatchResult
                 throw new InvalidArgumentException(\sprintf('The failure of unit "%s" needs a reason.', UntrustedText::quote((string) $id)));
             }
         }
+    }
+
+    /**
+     * A copy with the given usage, which replaces any usage already set.
+     */
+    public function withUsage(?TokenUsage $usage): self
+    {
+        return new self($this->translations, $this->failures, $this->permanentFailures, $usage);
     }
 }

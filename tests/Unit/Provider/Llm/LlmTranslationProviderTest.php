@@ -26,6 +26,7 @@ use HtmlTranslator\Provider\Llm\LlmTranslationProvider;
 use HtmlTranslator\Provider\Llm\PromptBuilder;
 use HtmlTranslator\Provider\Llm\ResponseParser;
 use HtmlTranslator\Provider\Llm\Testing\FakeChatModel;
+use HtmlTranslator\Provider\TokenUsage;
 use HtmlTranslator\Provider\TranslationBatch;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -54,6 +55,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(TranslationProfile::class)]
 #[UsesClass(BatchContext::class)]
 #[UsesClass(JsonSchema::class)]
+#[UsesClass(TokenUsage::class)]
 final class LlmTranslationProviderTest extends TestCase
 {
     private const string ANSWER = '{"units": [{"id": "u1", "text": "Jeden"}, {"id": "u2", "text": "Dwa"}]}';
@@ -220,9 +222,72 @@ final class LlmTranslationProviderTest extends TestCase
         self::assertSame(['u1', 'u2'], array_keys($result->permanentFailures));
     }
 
-    private function response(string $content, FinishReason $finishReason = FinishReason::Stop): ChatResponse
+    #[Test]
+    public function it_reports_the_token_usage_of_the_call(): void
     {
-        return new ChatResponse($content, 'fake:model', finishReason: $finishReason);
+        $model = FakeChatModel::withResponses($this->response(self::ANSWER, inputTokens: 120, outputTokens: 30));
+
+        $result = new LlmTranslationProvider($model)->translate($this->batch());
+
+        self::assertEquals(new TokenUsage(120, 30), $result->usage);
+    }
+
+    #[Test]
+    public function it_sums_the_token_usage_of_both_calls_when_it_asks_once_more(): void
+    {
+        $model = FakeChatModel::withResponses(
+            $this->response('not JSON', inputTokens: 120, outputTokens: 5),
+            $this->response(self::ANSWER, inputTokens: 120, outputTokens: 30),
+        );
+
+        $result = new LlmTranslationProvider($model)->translate($this->batch());
+
+        self::assertEquals(new TokenUsage(240, 35), $result->usage);
+    }
+
+    #[Test]
+    public function it_reports_the_token_usage_of_a_refused_batch(): void
+    {
+        $model = FakeChatModel::withResponses($this->response("I can't help with that.", FinishReason::Refusal, inputTokens: 120, outputTokens: 8));
+
+        $result = new LlmTranslationProvider($model)->translate($this->batch());
+
+        self::assertEquals(new TokenUsage(120, 8), $result->usage);
+    }
+
+    #[Test]
+    public function it_sums_the_token_usage_of_a_refusal_on_the_second_call(): void
+    {
+        $model = FakeChatModel::withResponses(
+            $this->response('not JSON', inputTokens: 120, outputTokens: 5),
+            $this->response("I can't help with that.", FinishReason::Refusal, 120, 8),
+        );
+
+        $result = new LlmTranslationProvider($model)->translate($this->batch());
+
+        self::assertSame(['u1', 'u2'], array_keys($result->permanentFailures));
+        self::assertEquals(new TokenUsage(240, 13), $result->usage);
+    }
+
+    #[Test]
+    public function it_reports_no_token_usage_when_the_model_reports_none(): void
+    {
+        $model = FakeChatModel::withResponses($this->response(self::ANSWER));
+
+        self::assertNull(new LlmTranslationProvider($model)->translate($this->batch())->usage);
+    }
+
+    #[Test]
+    public function it_keeps_the_token_counts_a_model_reports_on_only_one_of_two_calls(): void
+    {
+        $model = FakeChatModel::withResponses($this->response('not JSON'), $this->response(self::ANSWER, inputTokens: 120));
+
+        self::assertEquals(new TokenUsage(120, null), new LlmTranslationProvider($model)->translate($this->batch())->usage);
+    }
+
+    private function response(string $content, FinishReason $finishReason = FinishReason::Stop, ?int $inputTokens = null, ?int $outputTokens = null): ChatResponse
+    {
+        return new ChatResponse($content, 'fake:model', $inputTokens, $outputTokens, $finishReason);
     }
 
     /**

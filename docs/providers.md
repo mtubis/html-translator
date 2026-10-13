@@ -180,4 +180,5 @@ pass their own, and tests `Provider\Llm\Testing\FakeSleeper`, which records the 
   response and the number of attempts) and throws a `TransportFailure` when the client fails; turn that into a
   `ProviderException` at once without keeping it, since its previous exception holds the request.
 - **A non-LLM engine**: implement `Provider\TranslationProviderInterface` and pass
-  `Provider\Testing\TranslationProviderContractTestCase`.
+  `Provider\Testing\TranslationProviderContractTestCase`. Report tokens in `BatchResult::$usage` (`TokenUsage`) when the engine
+  reports them; leave it null otherwise (engines billed by characters too, since the stats count tokens).
