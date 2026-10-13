@@ -29,6 +29,7 @@ use HtmlTranslator\Provider\Llm\ResponseParser;
 use HtmlTranslator\Provider\Llm\Testing\FakeChatModel;
 use HtmlTranslator\Provider\Testing\PseudoLocalizationProvider;
 use HtmlTranslator\Provider\Testing\TranslationProviderContractTestCase;
+use HtmlTranslator\Provider\TokenUsage;
 use HtmlTranslator\Provider\TranslationBatch;
 use HtmlTranslator\Provider\TranslationProviderInterface;
 use HtmlTranslator\Tests\Support\PseudoLocalizingChatModel;
@@ -71,6 +72,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(ProfileText::class)]
 #[UsesClass(BatchContext::class)]
 #[UsesClass(JsonSchema::class)]
+#[UsesClass(TokenUsage::class)]
 final class LlmTranslationProviderContractTest extends TranslationProviderContractTestCase
 {
     protected function provider(): TranslationProviderInterface
