@@ -3,12 +3,19 @@
     "description": "Translate HTML with LLMs (OpenAI, Anthropic, Gemini, Ollama, …) while preserving markup, semantics and document validity.",
     "type": "library",
     "license": "MIT",
-    "keywords": ["html", "translation", "i18n", "l10n", "llm", "openai", "anthropic", "ollama", "ai"],
+    "keywords": ["html", "translation", "i18n", "l10n", "llm", "openai", "anthropic", "gemini", "ollama", "ai", "localization"],
     "authors": [
         {
-            "name": "Magdalena Tubis"
+            "name": "Magdalena Tubis",
+            "homepage": "https://github.com/mtubis",
+            "role": "Developer"
         }
     ],
+    "support": {
+        "issues": "https://github.com/mtubis/html-translator/issues",
+        "source": "https://github.com/mtubis/html-translator",
+        "docs": "https://github.com/mtubis/html-translator/blob/main/docs/usage.md"
+    },
     "require": {
         "php": "^8.4",
         "ext-dom": "*",
@@ -20,7 +27,7 @@
         "psr/log": "^3.0"
     },
     "suggest": {
-        "phpunit/phpunit": "To run Provider\\Llm\\Testing\\ChatModelContractTestCase against your own chat model adapter"
+        "phpunit/phpunit": "Required only when running the optional chat model adapter contract tests"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.95",
@@ -76,7 +83,5 @@
         "fixtures:update": "Regenerate expected.pseudo.html of golden fixtures (all, or the names after --). Review the result by hand.",
         "test:integration": "Run the tests against real model APIs (load .env first, see .env.dist).",
         "eval": "Translate the golden fixtures with a real model and write a report to tools/eval/out (see tools/eval/README.md)."
-    },
-    "minimum-stability": "stable",
-    "prefer-stable": true
+    }
 }
