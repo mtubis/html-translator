@@ -133,6 +133,7 @@ $translator = new HtmlTranslator(new LlmTranslationProvider($model));
 | `effort` | `null` (model default) | `AnthropicEffort::Low` … `Max` (`low`, `medium`, `high`, `xhigh`, `max`): thinking depth and token spend |
 | `refusalFallbacks` | `false` | Let the API answer a refused request with a fallback model (`fallbacks: "default"`) |
 | `extraHeaders` | `[]` | Further headers, e.g. `Authorization` for a gateway; treated as secret |
+| `betas` | `[]` | Further `anthropic-beta` values, e.g. `['some-feature-2026-01-01']`; see Betas below |
 
 - **JSON**: `LlmTranslationProvider` asks for its answer format as a JSON schema, which the adapter sends as structured
   output (`output_config.format`), so the answer is always valid JSON (ADR-0014). Current Claude models reject assistant
@@ -148,6 +149,11 @@ $translator = new HtmlTranslator(new LlmTranslationProvider($model));
   as permanent failures. With `refusalFallbacks: true` the adapter sends the `server-side-fallback-2026-07-01` beta,
   and the API may answer with a fallback model instead (`ChatResponse::$model` names it). Available on the Claude API
   only; check that your model supports it.
+- **Betas**: `betas` enables beta features without a library release. Each value must be in the form of Anthropic's beta
+  names (lowercase letters, digits, `.`, `_` and `-`); they are sent with the fallback beta in one comma-separated `anthropic-beta` header, without duplicates.
+  `anthropic-beta` cannot be set through `extraHeaders`. A beta may change request or response shapes the adapter
+  does not map (new content blocks are ignored, new fields are not sent), so test a beta before relying on it. Betas
+  are part of `modelId()` (`+betas=…`), since they may change answers.
 - **Errors** are `ProviderException`s with `statusCode` and `vendorCode` (`error.type`, e.g. `rate_limit_error`,
   `overloaded_error` for HTTP 529); the message names the request id, which Anthropic support asks for. Transient
   failures are retried, see [Retries](#retries).
@@ -203,4 +209,4 @@ pass their own, and tests `Provider\Llm\Testing\FakeSleeper`, which records the 
   provider works, but nothing is cached. A decorator that changes translations prefixes the wrapped provider's id with
   its own settings; one around a provider that is not cacheable does not implement the interface.
 - **Chat model settings and the cache**: `ChatModelInterface::modelId()` is part of the cache key, so it names every
-  setting that changes answers (`AnthropicConfig` adds `+effort=<level>` and `+fallbacks`).
+  setting that changes answers (`AnthropicConfig` adds `+effort=<level>`, `+betas=<sorted list>` and `+fallbacks`).
