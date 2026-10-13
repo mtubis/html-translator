@@ -13,6 +13,12 @@ All notable changes to this project are documented here. The format follows [Kee
   bounded and kept on one line (`Exception\UntrustedText`, #43).
 
 ### Changed
+- `OpenAiCompatibleConfig::$jsonMode` is an `OpenAiCompatible\JsonMode` instead of a `bool` (`true` →
+  `JsonMode::JsonObject`, `false` → `JsonMode::None`). `openAi()` uses `JsonSchema` and `lmStudio()` `JsonSchemaOnly`:
+  the answer schema is sent as `response_format: json_schema` (strict), so the answer shape is enforced.
+  A schema of your own sent through these presets must follow OpenAI's strict rules (every property in `required`,
+  `additionalProperties: false`), or the server answers HTTP 400. OpenAI models without structured outputs need
+  `openAi($key, $model, JsonMode::JsonObject)` (#54).
 - `IssueType` has a new case, `TermViolation` (#47). Code that matches `IssueType` exhaustively must handle it.
 - The do-not-translate section of the prompt lists only the terms that occur in the batch, like the glossary; with 500
   terms that saves about 2,300 tokens per call. `PromptBuilder::VERSION` is 2026-10.5, so unit-cache entries made with

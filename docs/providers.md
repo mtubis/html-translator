@@ -50,11 +50,11 @@ $model = new OpenAiCompatibleChatModel(
 
 | Preset | Base URL | Authentication | JSON mode | Output limit field |
 |---|---|---|---|---|
-| `openAi($apiKey, $model)` | `https://api.openai.com/v1` | `Authorization: Bearer` | yes | `max_completion_tokens` |
-| `gemini($apiKey, $model)` | `https://generativelanguage.googleapis.com/v1beta/openai` | `Authorization: Bearer` | yes | `max_tokens` |
-| `ollama($model, $baseUrl = 'http://localhost:11434/v1')` | local | none | yes | `max_tokens` |
-| `vllm($model, $baseUrl = 'http://localhost:8000/v1', $apiKey = null)` | local | optional Bearer | yes | `max_tokens` |
-| `lmStudio($model, $baseUrl = 'http://localhost:1234/v1')` | local | none | no | `max_tokens` |
+| `openAi($apiKey, $model, $jsonMode = JsonMode::JsonSchema)` | `https://api.openai.com/v1` | `Authorization: Bearer` | `JsonSchema` | `max_completion_tokens` |
+| `gemini($apiKey, $model)` | `https://generativelanguage.googleapis.com/v1beta/openai` | `Authorization: Bearer` | `JsonObject` | `max_tokens` |
+| `ollama($model, $baseUrl = 'http://localhost:11434/v1')` | local | none | `JsonObject` | `max_tokens` |
+| `vllm($model, $baseUrl = 'http://localhost:8000/v1', $apiKey = null)` | local | optional Bearer | `JsonObject` | `max_tokens` |
+| `lmStudio($model, $baseUrl = 'http://localhost:1234/v1')` | local | none | `JsonSchemaOnly` | `max_tokens` |
 
 For any other server, create the configuration directly:
 
@@ -64,12 +64,27 @@ new OpenAiCompatibleConfig(
     baseUrl: 'https://api.together.xyz/v1',
     model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
     apiKey: $_ENV['TOGETHER_API_KEY'],      // null for servers without authentication
-    jsonMode: true,                         // send response_format json_object
+    jsonMode: JsonMode::JsonObject,         // see JSON mode below
     maxTokensField: OpenAiCompatibleConfig::MAX_TOKENS,
     extraHeaders: [],                       // e.g. ['OpenAI-Organization' => 'org-…']; treated as secret
 );
 ```
 
+- **JSON mode** (`OpenAiCompatible\JsonMode`) decides how a request that asks for JSON (`ChatRequest::$jsonResponse`)
+  is sent as `response_format`:
+
+  | Mode | Request with a schema | Request without a schema |
+  |---|---|---|
+  | `None` | nothing | nothing |
+  | `JsonObject` | `{"type": "json_object"}` | `{"type": "json_object"}` |
+  | `JsonSchema` | `{"type": "json_schema", "json_schema": {"name": "answer", "strict": true, "schema": …}}` | `{"type": "json_object"}` |
+  | `JsonSchemaOnly` | as `JsonSchema` | nothing (for servers that reject `json_object`, e.g. LM Studio) |
+
+  `LlmTranslationProvider` always sends its answer schema (ADR-0014), so with `JsonSchema` the answer shape is
+  guaranteed. Strict mode requires every property to be listed in `required` and `additionalProperties: false`; the
+  provider's schema follows these rules. OpenAI models without structured outputs (e.g. `gpt-3.5-turbo`,
+  `gpt-4-turbo`) reject `json_schema` with HTTP 400: use `openAi($key, $model, JsonMode::JsonObject)`. Gemini, Ollama and vLLM stay on `JsonObject` until their schema support is
+  verified; a server without JSON support needs `None`, and the prompt still asks for JSON.
 - **Timeouts** are set on the HTTP client: PSR-18 has no per-request timeout. Translation batches can take a while,
   so allow at least 60 seconds.
 - **Retries**: see [Retries](#retries) below. `LlmTranslationProvider` also asks the model once more when an answer
