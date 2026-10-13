@@ -8,7 +8,6 @@ use HtmlTranslator\Domain\Locale;
 use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitKind;
 use HtmlTranslator\Domain\UnitText;
-use HtmlTranslator\Domain\UnitTextTokenKind;
 use HtmlTranslator\Profile\Formality;
 use HtmlTranslator\Profile\GlossaryEntry;
 use HtmlTranslator\Profile\TermMatcher;
@@ -190,21 +189,13 @@ final readonly class PromptBuilder
     }
 
     /**
-     * Unit texts as the reader sees them, for matching glossary and do-not-translate terms: unescaped, with a space
-     * where a pseudo-tag was, so "pull <g1>request</g1>" still contains "pull request" while a tag never joins two words.
+     * Unit texts as the reader sees them (UnitText::plainText()), for matching glossary and do-not-translate terms.
      *
      * @return list<string>
      */
     private function plainTexts(TranslationBatch $batch): array
     {
-        return array_map(static function (TranslationUnit $unit): string {
-            $text = '';
-            foreach (UnitText::tokenize($unit->text) as $token) {
-                $text .= UnitTextTokenKind::Text === $token->kind ? $token->text : ' ';
-            }
-
-            return $text;
-        }, $batch->units);
+        return array_map(static fn(TranslationUnit $unit): string => UnitText::plainText($unit->text), $batch->units);
     }
 
     /**
