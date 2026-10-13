@@ -15,6 +15,7 @@ use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\GlossaryEntry;
 use HtmlTranslator\Profile\ProfileText;
+use HtmlTranslator\Profile\TermMatcher;
 use HtmlTranslator\Profile\TranslationProfile;
 use HtmlTranslator\Provider\BatchContext;
 use HtmlTranslator\Provider\BatchResult;
@@ -67,6 +68,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(TagNesting::class)]
 #[UsesClass(ValidationResult::class)]
 #[UsesClass(Glossary::class)]
+#[UsesClass(TermMatcher::class)]
 #[UsesClass(TranslationProfile::class)]
 #[UsesClass(GlossaryEntry::class)]
 #[UsesClass(ProfileText::class)]

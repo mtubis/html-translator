@@ -13,6 +13,12 @@ All notable changes to this project are documented here. The format follows [Kee
   bounded and kept on one line (`Exception\UntrustedText`, #43).
 
 ### Changed
+- The do-not-translate section of the prompt lists only the terms that occur in the batch, like the glossary; with 500
+  terms that saves about 2,300 tokens per call. `PromptBuilder::VERSION` is 2026-10.5, so unit-cache entries made with
+  the previous prompt are not reused (#48).
+- `AnthropicConfig::modelId()` names the settings that change answers: `+effort=<level>` and `+fallbacks` (e.g.
+  `anthropic:claude-opus-5-5+effort=low`). The model id is part of the unit cache key and appears in exception
+  messages and eval reports (#59).
 - `tools/eval` takes token counts from `TranslationStats`; a fixture that fails with an error shows no tokens, and the
   summary line says how many fixtures it leaves out (#60).
 - Units are no longer cut into fixed chunks of `batchSize`: a batch also closes at `tokenBudget`, so documents with
@@ -24,6 +30,12 @@ All notable changes to this project are documented here. The format follows [Kee
   Contract tests of third-party adapters that match the kinds exhaustively must handle it (#52).
 
 ### Added
+- Optional unit cache: `new HtmlTranslator($provider, cache: $psr6Pool)`. Units are looked up before batching and
+  validated like provider answers; validated translations are stored after each batch, failures and fallback output
+  never. Only providers implementing `Provider\CacheableProviderInterface` (`cacheId()`) are cached;
+  `LlmTranslationProvider` and `PseudoLocalizationProvider` are. `TranslationStats::$cacheHits` counts the hits and
+  `TranslationProfile::fingerprint()` identifies a profile. No expiry is set; configure it on the pool (ADR-0016, #59).
+- `TranslationProviderContractTestCase` checks that a cacheable provider has a stable, single-line cache id (#59).
 - Token usage in the stats: `TranslationStats::$inputTokens` / `$outputTokens`, summed over every provider call of a
   document (corrective retries and the text-node fallback included) and null while no call reported a count. Providers
   report it in `BatchResult::$usage` (`Provider\TokenUsage`); `LlmTranslationProvider` fills it from the chat

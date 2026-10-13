@@ -11,6 +11,7 @@ use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextTokenKind;
 use HtmlTranslator\Profile\Formality;
 use HtmlTranslator\Profile\GlossaryEntry;
+use HtmlTranslator\Profile\TermMatcher;
 use HtmlTranslator\Profile\TermPolicy;
 use HtmlTranslator\Provider\TranslationBatch;
 
@@ -26,7 +27,7 @@ final readonly class PromptBuilder
      * change to what build() renders, or to the text ResponseParser::parse() returns, must come with a new version, or
      * cached translations made the old way are reused.
      */
-    public const string VERSION = '2026-10.4';
+    public const string VERSION = '2026-10.5';
 
     private const string INPUT = <<<'TEXT'
         The input is a JSON object {"units": [...]}. Every unit has an "id", a "kind" and a "text":
@@ -163,7 +164,8 @@ final readonly class PromptBuilder
             $sections[] = $termPolicy;
         }
 
-        $glossary = $profile->glossary->matching($this->plainTexts($batch));
+        $plainTexts = $this->plainTexts($batch);
+        $glossary = $profile->glossary->matching($plainTexts);
         if (!$glossary->isEmpty()) {
             // JSON strings, so a term with a quote ("27\" monitor") cannot make the line ambiguous.
             $lines = array_map(
@@ -173,8 +175,11 @@ final readonly class PromptBuilder
             $sections[] = self::GLOSSARY . "\n" . implode("\n", $lines);
         }
 
-        if ([] !== $profile->doNotTranslate) {
-            $sections[] = self::DO_NOT_TRANSLATE . "\n" . implode("\n", array_map(static fn(string $term): string => '- ' . $term, $profile->doNotTranslate));
+        // Filtered like the glossary: a profile can list 500 terms, and most batches contain none of them.
+        $matcher = TermMatcher::in($plainTexts);
+        $doNotTranslate = array_values(array_filter($profile->doNotTranslate, $matcher->matches(...)));
+        if ([] !== $doNotTranslate) {
+            $sections[] = self::DO_NOT_TRANSLATE . "\n" . implode("\n", array_map(static fn(string $term): string => '- ' . $term, $doNotTranslate));
         }
 
         if (null !== $profile->instructions) {
@@ -185,8 +190,8 @@ final readonly class PromptBuilder
     }
 
     /**
-     * Unit texts as the reader sees them, for glossary matching: unescaped, with a space where a pseudo-tag was,
-     * so "pull <g1>request</g1>" still contains "pull request" while a tag never joins two words.
+     * Unit texts as the reader sees them, for matching glossary and do-not-translate terms: unescaped, with a space
+     * where a pseudo-tag was, so "pull <g1>request</g1>" still contains "pull request" while a tag never joins two words.
      *
      * @return list<string>
      */

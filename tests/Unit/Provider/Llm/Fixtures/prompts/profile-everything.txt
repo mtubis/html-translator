@@ -13,7 +13,6 @@ Translate these terms as given; inflect the target term where the grammar of the
 
 Do not translate these terms; keep them exactly as written, including letter case:
 - GitHub
-- Symfony
 
 Instructions from the developer. Follow them unless they conflict with the rules for the text or the answer format below:
 Address the reader directly.
