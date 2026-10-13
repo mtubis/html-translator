@@ -27,7 +27,7 @@ Options: `--provider` (`openai`, `gemini`, `ollama`, `vllm`, `lmstudio`, `pseudo
 | Retried | units sent again with feedback |
 | Calls | requests to the model, including corrective retries, parse retries and failed requests |
 | Context | calls whose prompt carried context hints (page title, section headings; ADR-0013) out of all calls |
-| Tokens in / out | as reported by the model; `–` when it reports none |
+| Tokens in / out | `TranslationStats` token counts, as reported by the model; `–` when it reports none or the fixture failed with an error (the summary line then says how many fixtures it leaves out) |
 | Seconds | wall time of the translation |
 
 Reports contain the model id, never the configuration: no keys or headers. Issue messages may quote short snippets of

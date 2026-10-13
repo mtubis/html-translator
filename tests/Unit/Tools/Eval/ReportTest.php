@@ -29,7 +29,7 @@ final class ReportTest extends TestCase
         self::assertStringContainsString('- Prompt version: 2026-10.1', $markdown);
         self::assertStringContainsString('- Complete: 1 of 2 fixtures', $markdown);
         self::assertStringContainsString('- Issues: 0, retried units: 2, model calls: 5 (3 with context hints)', $markdown);
-        self::assertStringContainsString('- Tokens: 1200 in, 300 out', $markdown);
+        self::assertStringContainsString('- Tokens: 1200 in, 300 out (not counted: calls of 1 fixture that failed with an error)', $markdown);
         self::assertStringContainsString('| blog-article | yes | – | 10 | 1 | 2 | 3 | 3/3 | 1200 | 300 | 2.5 |', $markdown);
         self::assertStringContainsString('| table | no | error: ollama returned HTTP 500: a \| b c | 0 | 0 | 0 | 2 | 0/2 | – | – | 0.1 |', $markdown);
     }

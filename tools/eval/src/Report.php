@@ -50,7 +50,7 @@ final readonly class Report
                 $this->sum(static fn(FixtureResult $result): int => $result->calls),
                 $this->sum(static fn(FixtureResult $result): int => $result->callsWithContext),
             ),
-            \sprintf('- Tokens: %s in, %s out', $this->tokens(array_map(static fn(FixtureResult $result): ?int => $result->inputTokens, $this->results)), $this->tokens(array_map(static fn(FixtureResult $result): ?int => $result->outputTokens, $this->results))),
+            \sprintf('- Tokens: %s in, %s out%s', $this->tokens(array_map(static fn(FixtureResult $result): ?int => $result->inputTokens, $this->results)), $this->tokens(array_map(static fn(FixtureResult $result): ?int => $result->outputTokens, $this->results)), $this->uncountedTokens()),
             '',
             '| Fixture | Complete | Issues | Units | Batches | Retried | Calls | Context | Tokens in | Tokens out | Seconds |',
             '|---|---|---|---|---|---|---|---|---|---|---|',
@@ -102,6 +102,17 @@ final readonly class Report
         }
 
         return $sum;
+    }
+
+    /**
+     * Token counts come from the stats of a translated document, so calls of fixtures that failed with an error are
+     * paid for but not in the total.
+     */
+    private function uncountedTokens(): string
+    {
+        $failed = \count(array_filter($this->results, static fn(FixtureResult $result): bool => null !== $result->error && $result->calls > 0));
+
+        return 0 === $failed ? '' : \sprintf(' (not counted: calls of %d fixture%s that failed with an error)', $failed, 1 === $failed ? '' : 's');
     }
 
     /**

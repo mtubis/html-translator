@@ -11,17 +11,13 @@ use HtmlTranslator\Provider\Llm\ChatResponse;
 use HtmlTranslator\Provider\Llm\ChatRole;
 
 /**
- * Counts calls and tokens of the wrapped model; TranslationStats has no token counts before 0.4.
+ * Counts calls of the wrapped model, which TranslationStats does not report; token counts come from the stats.
  */
-final class TokenCountingChatModel implements ChatModelInterface
+final class CallCountingChatModel implements ChatModelInterface
 {
     private int $calls = 0;
 
     private int $callsWithContext = 0;
-
-    private ?int $inputTokens = null;
-
-    private ?int $outputTokens = null;
 
     public function __construct(
         private readonly ChatModelInterface $model,
@@ -42,34 +38,21 @@ final class TokenCountingChatModel implements ChatModelInterface
             ++$this->callsWithContext;
         }
 
-        $response = $this->model->complete($request);
-        if (null !== $response->inputTokens) {
-            $this->inputTokens = ($this->inputTokens ?? 0) + $response->inputTokens;
-        }
-
-        if (null !== $response->outputTokens) {
-            $this->outputTokens = ($this->outputTokens ?? 0) + $response->outputTokens;
-        }
-
-        return $response;
+        return $this->model->complete($request);
     }
 
     /**
-     * Token counts are null while the model reported none.
-     *
-     * @return array{calls: int, inputTokens: ?int, outputTokens: ?int, callsWithContext: int}
+     * @return array{calls: int, callsWithContext: int}
      */
-    public function usage(): array
+    public function counts(): array
     {
-        return ['calls' => $this->calls, 'inputTokens' => $this->inputTokens, 'outputTokens' => $this->outputTokens, 'callsWithContext' => $this->callsWithContext];
+        return ['calls' => $this->calls, 'callsWithContext' => $this->callsWithContext];
     }
 
     public function reset(): void
     {
         $this->calls = 0;
         $this->callsWithContext = 0;
-        $this->inputTokens = null;
-        $this->outputTokens = null;
     }
 
     /**
