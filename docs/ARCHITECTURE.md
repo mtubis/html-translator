@@ -44,13 +44,13 @@ Use these names in code, tests, docs, commit messages and prompts to coding agen
 ```php
 $translator = new HtmlTranslator(
     provider: $provider,                 // TranslationProviderInterface (required)
-    cache: $psr6Pool,                    // ?CacheItemPoolInterface
+    cache: $psr6Pool,                    // ?CacheItemPoolInterface, used when the provider is cacheable (ADR-0016)
     logger: $psr3Logger,                 // ?LoggerInterface
     // optional collaborators with sensible defaults:
     // loader, segmenter, validator, reassembler, skipRules, translatableAttributes, batcher, clock
 );
 // Named arguments beyond `provider`; positional order is not part of the API (ADR-0010).
-// cache and clock arrive in 0.4; the profile is a TranslationOptions argument.
+// clock arrives later; the profile is a TranslationOptions argument.
 
 $result = $translator->translate(
     html: $html,
@@ -154,7 +154,9 @@ Adapters are written on **PSR-18 / PSR-17**, not vendor SDKs ([ADR-0002](adr/000
 - Document-level updates: `<html lang>` is set to the target, `dir="rtl"` for right-to-left targets (`dir="ltr"` if a `dir` was present otherwise). Fragments have no element for these and are left as they are. Then the document is serialized.
 
 ### 6.7 Caching
-- Optional PSR-6 pool. Key = hash of (normalized unit text, locale pair, profile fingerprint, provider/model id, prompt version). Unit-level caching makes re-translating a slightly edited page cheap.
+- Optional PSR-6 pool, used only with a provider that implements `CacheableProviderInterface` (otherwise a notice is logged); see [ADR-0016](adr/0016-unit-cache-and-cacheable-providers.md). Unit-level caching makes re-translating a slightly edited page cheap.
+- `CacheKey` = hash of (unit text without surrounding whitespace, unit kind, inline tag shape, locale pair, `TranslationProfile::fingerprint()`, the provider's `cacheId()`, which for `LlmTranslationProvider` names the model and `PromptBuilder::VERSION`). Context hints are not part of it (ADR-0013).
+- `UnitCache` looks up every unit before batching; a hit must be a string that passes `StructureValidator`, otherwise the unit is translated again. Translations that passed validation are stored after each batch; failures and fallback output never are. No expiry is set (configure it on the pool). `TranslationStats::$cacheHits` counts the hits.
 
 ### 6.8 Reliability
 - Transport-level retries with exponential backoff and jitter for 408/429/5xx/529 and network errors live in the chat-model adapters, not in the core: `Provider\Llm\Bridge\Retrier` with a `RetryPolicy` and a `SleeperInterface` port, honouring `Retry-After` (docs/providers.md).
@@ -172,7 +174,7 @@ src/
   Html/                         HtmlLoader, Segmenter, InlineEncoder, Reassembler, SkipRules, TranslatableAttributes
   Validation/                   StructureValidator, ValidationResult, Violation, ViolationType
   Batching/                     Batcher, TokenEstimatorInterface, CharacterTokenEstimator
-  Provider/                     TranslationProviderInterface, TranslationBatch, BatchResult, TokenUsage
+  Provider/                     TranslationProviderInterface, CacheableProviderInterface, TranslationBatch, BatchResult, TokenUsage
   Provider/Llm/                 LlmTranslationProvider, PromptBuilder, ResponseParser, ChatModelInterface, ChatRequest, ChatResponse,
                                 ChatMessage, ChatRole, FinishReason, JsonSchema
   Provider/Llm/Testing/         FakeChatModel, FakeSleeper, ChatModelContractTestCase (+ ChatScenario, RecordedChatRequest; needs phpunit, suggested)
@@ -181,7 +183,7 @@ src/
   Provider/Llm/Bridge/OpenAiCompatible/   OpenAiCompatibleChatModel, OpenAiCompatibleConfig
   Provider/Llm/Bridge/Anthropic/          AnthropicChatModel, AnthropicConfig
   Provider/Testing/             PseudoLocalizationProvider, TranslationProviderContractTestCase (needs phpunit, suggested)
-  Cache/                        UnitCache, CacheKey
+  Cache/                        UnitCache (@internal), CacheKey
   Exception/                    TranslatorException (interface), InvalidHtmlException, ProviderException, StructureValidationException, InvalidArgumentException
 tests/
   Unit/  Integration/  Contract/  Support/
@@ -194,6 +196,7 @@ Dependency rule (checked by the `architecture-reviewer` agent and later by a PHP
 
 - `Domain`, `Profile` depend on nothing else in `src/` except `Exception`; every namespace may depend on `Exception` (exceptions and `UntrustedText`, which bounds untrusted text in messages).
 - `Html`, `Validation`, `Batching` depend on `Domain`, `Profile`.
+- `Cache` depends on `Domain` and PSR-6; the profile fingerprint and provider id reach it as strings.
 - `Provider\Llm\Bridge\*` are the only places allowed to use PSR-18/17.
 - Nothing in `src/` depends on a framework, a vendor SDK or a concrete HTTP client.
 
