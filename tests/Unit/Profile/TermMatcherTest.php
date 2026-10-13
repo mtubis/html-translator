@@ -41,4 +41,25 @@ final class TermMatcherTest extends TestCase
     {
         self::assertSame($expected, TermMatcher::in($texts)->matches($term));
     }
+
+    /**
+     * @return iterable<string, array{string, list<string>, bool}>
+     */
+    public static function caseSensitiveCases(): iterable
+    {
+        yield 'same case' => ['GitHub', ['Push to GitHub.'], true];
+        yield 'other case' => ['GitHub', ['Push to GITHUB.'], false];
+        yield 'other whitespace' => ['Symfony Flex', ["Symfony\u{00A0} Flex"], true];
+        yield 'inside a longer word' => ['Git', ['GitHub'], false];
+    }
+
+    /**
+     * @param list<string> $texts
+     */
+    #[Test]
+    #[DataProvider('caseSensitiveCases')]
+    public function it_can_match_with_the_same_letter_case_only(string $term, array $texts, bool $expected): void
+    {
+        self::assertSame($expected, TermMatcher::caseSensitiveIn($texts)->matches($term));
+    }
 }

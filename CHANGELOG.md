@@ -13,6 +13,7 @@ All notable changes to this project are documented here. The format follows [Kee
   bounded and kept on one line (`Exception\UntrustedText`, #43).
 
 ### Changed
+- `IssueType` has a new case, `TermViolation` (#47). Code that matches `IssueType` exhaustively must handle it.
 - The do-not-translate section of the prompt lists only the terms that occur in the batch, like the glossary; with 500
   terms that saves about 2,300 tokens per call. `PromptBuilder::VERSION` is 2026-10.5, so unit-cache entries made with
   the previous prompt are not reused (#48).
@@ -30,6 +31,10 @@ All notable changes to this project are documented here. The format follows [Kee
   Contract tests of third-party adapters that match the kinds exhaustively must handle it (#52).
 
 ### Added
+- Term check: a translation that changes a do-not-translate term, or a glossary term whose target equals its source,
+  gets an `IssueType::TermViolation` issue naming the terms. The translation is used anyway (no retry, no fallback,
+  no extra call); glossary entries that translate their term are not checked, since targets may be inflected
+  (`Validation\TermChecker`, ADR-0017, #47).
 - Optional unit cache: `new HtmlTranslator($provider, cache: $psr6Pool)`. Units are looked up before batching and
   validated like provider answers; validated translations are stored after each batch, failures and fallback output
   never. Only providers implementing `Provider\CacheableProviderInterface` (`cacheId()`) are cached;

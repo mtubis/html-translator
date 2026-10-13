@@ -35,6 +35,7 @@ use HtmlTranslator\Issue;
 use HtmlTranslator\Profile\Formality;
 use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\ProfileText;
+use HtmlTranslator\Profile\TermMatcher;
 use HtmlTranslator\Profile\TranslationProfile;
 use HtmlTranslator\Progress;
 use HtmlTranslator\Provider\BatchContext;
@@ -52,6 +53,7 @@ use HtmlTranslator\TranslationOptions;
 use HtmlTranslator\TranslationStats;
 use HtmlTranslator\Validation\StructureValidator;
 use HtmlTranslator\Validation\TagNesting;
+use HtmlTranslator\Validation\TermChecker;
 use HtmlTranslator\Validation\ValidationResult;
 use HtmlTranslator\Validation\Violation;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -91,6 +93,8 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(SkipRules::class)]
 #[UsesClass(TranslatableAttributes::class)]
 #[UsesClass(StructureValidator::class)]
+#[UsesClass(TermChecker::class)]
+#[UsesClass(TermMatcher::class)]
 #[UsesClass(TagNesting::class)]
 #[UsesClass(ValidationResult::class)]
 #[UsesClass(Violation::class)]

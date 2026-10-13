@@ -17,4 +17,10 @@ enum IssueType
 
     /** The TextNodesOnly fallback could not translate some text nodes; they keep their original text. */
     case PartiallyTranslated;
+
+    /**
+     * The translation changes a do-not-translate term, or a glossary term meant to stay as it is (ADR-0017). The
+     * translation is used anyway: no retry, no fallback.
+     */
+    case TermViolation;
 }
