@@ -37,6 +37,8 @@ All notable changes to this project are documented here. The format follows [Kee
   Contract tests of third-party adapters that match the kinds exhaustively must handle it (#52).
 
 ### Added
+- `AnthropicConfig::$betas`: further `anthropic-beta` values (Anthropic beta names), sent with the refusal fallback beta in
+  one header. `modelId()` names them as `+betas=<sorted list>`, so changing them starts a fresh unit cache (#55).
 - Term check: a translation that changes a do-not-translate term, or a glossary term whose target equals its source,
   gets an `IssueType::TermViolation` issue naming the terms. The translation is used anyway (no retry, no fallback,
   no extra call); glossary entries that translate their term are not checked, since targets may be inflected

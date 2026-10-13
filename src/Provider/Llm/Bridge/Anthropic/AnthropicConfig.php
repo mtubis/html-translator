@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HtmlTranslator\Provider\Llm\Bridge\Anthropic;
 
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\HttpSecrets;
 use SensitiveParameter;
 
@@ -30,6 +31,15 @@ final readonly class AnthropicConfig
     /** Headers the adapter sets itself; Authorization stays free for a gateway in front of the API. */
     private const array RESERVED_HEADERS = ['x-api-key', 'anthropic-version', 'anthropic-beta', 'content-type', 'accept'];
 
+    /**
+     * The form of Anthropic's beta names, e.g. "server-side-fallback-2026-07-01". Stricter than a header token: no "+",
+     * so a beta cannot imitate another part of modelId(), and lowercase only, so a beta has one spelling.
+     */
+    private const string BETA = '/^[a-z0-9][a-z0-9._-]*$/D';
+
+    /** @var list<string> */
+    public array $betas;
+
     private HttpSecrets $secrets;
 
     /**
@@ -40,8 +50,11 @@ final readonly class AnthropicConfig
      * @param ?AnthropicEffort $effort output_config.effort; null leaves the model's default
      * @param bool $refusalFallbacks let the API answer a refused request with a fallback model (Claude API only)
      * @param array<array-key, string> $extraHeaders treated as secret like the key (PHP turns numeric names into int keys)
+     * @param array<array-key, string> $betas further anthropic-beta values, e.g. "some-feature-2026-01-01"; they may
+     *                                        change request or response shapes the adapter does not map
      *
-     * @throws InvalidArgumentException when a setting is blank or invalid, or a header is one the adapter sets itself
+     * @throws InvalidArgumentException when a setting is blank or invalid, a header is one the adapter sets itself, or a
+     *                                  beta is not in the form of Anthropic's beta names
      */
     public function __construct(
         public string $model,
@@ -54,6 +67,7 @@ final readonly class AnthropicConfig
         public bool $refusalFallbacks = false,
         #[SensitiveParameter]
         array $extraHeaders = [],
+        array $betas = [],
     ) {
         if ('' === trim($model)) {
             throw new InvalidArgumentException('An Anthropic configuration needs a model.');
@@ -72,17 +86,30 @@ final readonly class AnthropicConfig
             throw new InvalidArgumentException(\sprintf('The default output limit must be at least 1, got %d.', $defaultMaxOutputTokens));
         }
 
+        foreach ($betas as $beta) {
+            if (1 !== preg_match(self::BETA, $beta)) {
+                throw new InvalidArgumentException(\sprintf('The Anthropic beta "%s" may contain only lowercase letters, digits, ".", "_" and "-".', UntrustedText::quote($beta)));
+            }
+        }
+
         $this->secrets = $secrets;
+        $this->betas = array_values($betas);
     }
 
     /**
-     * "anthropic:<model>", plus the settings that change answers: "+effort=<level>" and "+fallbacks" (a refused
-     * request may be answered by another model), e.g. "anthropic:claude-opus-5-5+effort=low".
+     * "anthropic:<model>", plus the settings that change answers: "+effort=<level>", "+betas=<sorted betas>" (a beta
+     * may change the model's behaviour) and "+fallbacks" (a refused request may be answered by another model), e.g.
+     * "anthropic:claude-opus-5-5+effort=low". With refusal fallbacks the fallback beta is left out of "+betas":
+     * "+fallbacks" names it.
      */
     public function modelId(): string
     {
+        $betas = array_diff(array_unique($this->betas), $this->refusalFallbacks ? [self::REFUSAL_FALLBACKS_BETA] : []);
+        sort($betas, \SORT_STRING);
+
         return 'anthropic:' . $this->model
             . ($this->effort instanceof AnthropicEffort ? '+effort=' . $this->effort->value : '')
+            . ([] !== $betas ? '+betas=' . implode(',', $betas) : '')
             . ($this->refusalFallbacks ? '+fallbacks' : '');
     }
 
@@ -109,8 +136,9 @@ final readonly class AnthropicConfig
             'anthropic-version' => $this->apiVersion,
             'x-api-key' => $this->secrets->apiKey() ?? '',
         ];
-        if ($this->refusalFallbacks) {
-            $headers['anthropic-beta'] = self::REFUSAL_FALLBACKS_BETA;
+        $betas = $this->refusalFallbacks ? [...$this->betas, self::REFUSAL_FALLBACKS_BETA] : $this->betas;
+        if ([] !== $betas) {
+            $headers['anthropic-beta'] = implode(',', array_unique($betas));
         }
 
         return $headers;
@@ -127,7 +155,7 @@ final readonly class AnthropicConfig
     }
 
     /**
-     * @return array{baseUrl: string, model: string, apiKey: string, apiVersion: string, defaultMaxOutputTokens: int, effort: ?string, refusalFallbacks: bool, extraHeaders: array<string, string>}
+     * @return array{baseUrl: string, model: string, apiKey: string, apiVersion: string, defaultMaxOutputTokens: int, effort: ?string, refusalFallbacks: bool, extraHeaders: array<string, string>, betas: list<string>}
      */
     public function __debugInfo(): array
     {
@@ -140,6 +168,7 @@ final readonly class AnthropicConfig
             'effort' => $this->effort?->value,
             'refusalFallbacks' => $this->refusalFallbacks,
             'extraHeaders' => $this->secrets->maskedExtraHeaders(),
+            'betas' => $this->betas,
         ];
     }
 }

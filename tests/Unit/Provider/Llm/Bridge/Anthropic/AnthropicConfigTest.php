@@ -46,6 +46,29 @@ final class AnthropicConfigTest extends TestCase
     }
 
     #[Test]
+    public function its_model_id_names_the_configured_betas_in_a_stable_order(): void
+    {
+        self::assertSame(
+            'anthropic:claude-opus-5-5+effort=low+betas=a-beta-2026-01-01,b-beta-2026-02-01+fallbacks',
+            new AnthropicConfig(
+                'claude-opus-5-5',
+                self::API_KEY,
+                effort: AnthropicEffort::Low,
+                refusalFallbacks: true,
+                betas: ['b-beta-2026-02-01', AnthropicConfig::REFUSAL_FALLBACKS_BETA, 'a-beta-2026-01-01', 'b-beta-2026-02-01'],
+            )->modelId(),
+        );
+        self::assertSame(
+            'anthropic:claude-opus-5-5+betas=server-side-fallback-2026-07-01',
+            new AnthropicConfig('claude-opus-5-5', self::API_KEY, betas: [AnthropicConfig::REFUSAL_FALLBACKS_BETA])->modelId(),
+        );
+        self::assertSame(
+            new AnthropicConfig('claude-opus-5-5', self::API_KEY, betas: ['10', '1e1'])->modelId(),
+            new AnthropicConfig('claude-opus-5-5', self::API_KEY, betas: ['1e1', '10'])->modelId(),
+        );
+    }
+
+    #[Test]
     public function it_has_the_documented_defaults(): void
     {
         $config = new AnthropicConfig('claude-opus-5-5', self::API_KEY);
@@ -55,6 +78,7 @@ final class AnthropicConfigTest extends TestCase
         self::assertSame(16000, $config->defaultMaxOutputTokens);
         self::assertNull($config->effort);
         self::assertFalse($config->refusalFallbacks);
+        self::assertSame([], $config->betas);
         self::assertSame([
             'Content-Type' => 'application/json',
             'Accept' => 'application/json',
@@ -77,6 +101,37 @@ final class AnthropicConfigTest extends TestCase
             'x-api-key' => self::API_KEY,
             'anthropic-beta' => 'server-side-fallback-2026-07-01',
         ], $config->headers());
+    }
+
+    #[Test]
+    public function it_merges_configured_betas_with_the_fallback_beta(): void
+    {
+        $config = new AnthropicConfig('claude-opus-5-5', self::API_KEY, refusalFallbacks: true, betas: ['b-beta-2026-02-01', 'a-beta-2026-01-01', 'b-beta-2026-02-01']);
+
+        self::assertSame(['b-beta-2026-02-01', 'a-beta-2026-01-01', 'b-beta-2026-02-01'], $config->betas);
+        self::assertSame('b-beta-2026-02-01,a-beta-2026-01-01,server-side-fallback-2026-07-01', $config->headers()['anthropic-beta'] ?? null);
+    }
+
+    #[Test]
+    public function it_sends_the_fallback_beta_once_when_it_is_also_configured(): void
+    {
+        $config = new AnthropicConfig('claude-opus-5-5', self::API_KEY, refusalFallbacks: true, betas: [AnthropicConfig::REFUSAL_FALLBACKS_BETA, 'a-beta-2026-01-01']);
+
+        self::assertSame('server-side-fallback-2026-07-01,a-beta-2026-01-01', $config->headers()['anthropic-beta'] ?? null);
+    }
+
+    #[Test]
+    public function it_sends_configured_betas_without_refusal_fallbacks(): void
+    {
+        $config = new AnthropicConfig('claude-opus-5-5', self::API_KEY, betas: ['a-beta-2026-01-01']);
+
+        self::assertSame('a-beta-2026-01-01', $config->headers()['anthropic-beta'] ?? null);
+    }
+
+    #[Test]
+    public function it_keeps_betas_as_a_list(): void
+    {
+        self::assertSame(['a-beta-2026-01-01'], new AnthropicConfig('claude-opus-5-5', self::API_KEY, betas: ['first' => 'a-beta-2026-01-01'])->betas);
     }
 
     #[Test]
@@ -123,7 +178,7 @@ final class AnthropicConfigTest extends TestCase
     #[Test]
     public function it_keeps_its_secrets_out_of_dumps(): void
     {
-        $config = new AnthropicConfig('claude-opus-5-5', self::API_KEY, extraHeaders: ['X-Gateway-Token' => 'gateway-SECRET']);
+        $config = new AnthropicConfig('claude-opus-5-5', self::API_KEY, extraHeaders: ['X-Gateway-Token' => 'gateway-SECRET'], betas: ['a-beta-2026-01-01']);
 
         self::assertStringNotContainsString(self::API_KEY, print_r($config, true));
         self::assertStringNotContainsString(self::API_KEY, var_export($config, true));
@@ -137,6 +192,7 @@ final class AnthropicConfigTest extends TestCase
             'effort' => null,
             'refusalFallbacks' => false,
             'extraHeaders' => ['X-Gateway-Token' => '[redacted]'],
+            'betas' => ['a-beta-2026-01-01'],
         ], $config->__debugInfo());
     }
 
@@ -173,6 +229,14 @@ final class AnthropicConfigTest extends TestCase
         yield 'header overriding the beta header' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, extraHeaders: ['Anthropic-Beta' => 'x'])];
         yield 'header overriding the content type' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, extraHeaders: ['content-type' => 'text/plain'])];
         yield 'header name with a space' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, extraHeaders: ['X Team' => 'x'])];
+        yield 'empty beta' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, betas: [''])];
+        yield 'two betas in one' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, betas: ['a-beta,b-beta'])];
+        yield 'beta with a space' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, betas: ['a-beta ', 'b-beta'])];
+        yield 'beta with a line break' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, betas: ['ok', "a-beta\r\nX-Injected: b"])];
+        yield 'beta with a plus' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, betas: ['x+fallbacks'])];
+        yield 'beta with capitals' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, betas: ['Server-Side-Fallback-2026-07-01'])];
+        yield 'beta starting with a hyphen' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, betas: ['-beta'])];
+        yield 'beta with non-ASCII letters' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, betas: ['beta-ł'])];
         yield 'header value with a line break' => [static fn(): AnthropicConfig => new AnthropicConfig('claude-opus-5-5', self::API_KEY, extraHeaders: ['X-Team' => "a\r\nX-Injected: b"])];
     }
 

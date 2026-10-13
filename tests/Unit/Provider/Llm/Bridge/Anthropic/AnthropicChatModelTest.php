@@ -323,6 +323,18 @@ final class AnthropicChatModelTest extends TestCase
     }
 
     #[Test]
+    public function it_sends_configured_betas_and_the_fallback_beta_in_one_header(): void
+    {
+        $client = $this->client(200, 'success.json');
+        $config = new AnthropicConfig('claude-opus-5-5', self::API_KEY, refusalFallbacks: true, betas: ['a-beta-2026-01-01']);
+
+        new AnthropicChatModel($client, new Psr17Factory(), new Psr17Factory(), $config, new Retrier(RetryPolicy::none()))->complete($this->request());
+
+        $request = $client->requests[0] ?? self::fail('No request.');
+        self::assertSame(['a-beta-2026-01-01,server-side-fallback-2026-07-01'], $request->getHeader('anthropic-beta'));
+    }
+
+    #[Test]
     public function it_keeps_empty_objects_of_the_schema_as_objects(): void
     {
         $client = $this->client(200, 'success.json');
