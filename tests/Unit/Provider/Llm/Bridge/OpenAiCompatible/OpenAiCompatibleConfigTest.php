@@ -9,6 +9,7 @@ use Exception;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\HttpSecrets;
+use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -34,22 +35,23 @@ final class OpenAiCompatibleConfigTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{OpenAiCompatibleConfig, string, string, ?string, bool, string}>
+     * @return iterable<string, array{OpenAiCompatibleConfig, string, string, ?string, JsonMode, string}>
      */
     public static function presets(): iterable
     {
-        yield 'OpenAI' => [OpenAiCompatibleConfig::openAi(self::API_KEY, 'gpt-4o-mini'), 'openai:gpt-4o-mini', 'https://api.openai.com/v1/chat/completions', 'Bearer ' . self::API_KEY, true, 'max_completion_tokens'];
-        yield 'Gemini' => [OpenAiCompatibleConfig::gemini(self::API_KEY, 'gemini-2.5-flash'), 'gemini:gemini-2.5-flash', 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', 'Bearer ' . self::API_KEY, true, 'max_tokens'];
-        yield 'Ollama' => [OpenAiCompatibleConfig::ollama('llama3.1'), 'ollama:llama3.1', 'http://localhost:11434/v1/chat/completions', null, true, 'max_tokens'];
-        yield 'Ollama on another host' => [OpenAiCompatibleConfig::ollama('llama3.1', 'http://gpu-box:11434/v1/'), 'ollama:llama3.1', 'http://gpu-box:11434/v1/chat/completions', null, true, 'max_tokens'];
-        yield 'vLLM' => [OpenAiCompatibleConfig::vllm('Qwen/Qwen2.5-7B-Instruct'), 'vllm:Qwen/Qwen2.5-7B-Instruct', 'http://localhost:8000/v1/chat/completions', null, true, 'max_tokens'];
-        yield 'vLLM with a key' => [OpenAiCompatibleConfig::vllm('qwen', 'https://vllm.example.test/v1', self::API_KEY), 'vllm:qwen', 'https://vllm.example.test/v1/chat/completions', 'Bearer ' . self::API_KEY, true, 'max_tokens'];
-        yield 'LM Studio' => [OpenAiCompatibleConfig::lmStudio('qwen2.5-7b-instruct'), 'lmstudio:qwen2.5-7b-instruct', 'http://localhost:1234/v1/chat/completions', null, false, 'max_tokens'];
+        yield 'OpenAI' => [OpenAiCompatibleConfig::openAi(self::API_KEY, 'gpt-4o-mini'), 'openai:gpt-4o-mini', 'https://api.openai.com/v1/chat/completions', 'Bearer ' . self::API_KEY, JsonMode::JsonSchema, 'max_completion_tokens'];
+        yield 'OpenAI model without structured outputs' => [OpenAiCompatibleConfig::openAi(self::API_KEY, 'gpt-4-turbo', JsonMode::JsonObject), 'openai:gpt-4-turbo', 'https://api.openai.com/v1/chat/completions', 'Bearer ' . self::API_KEY, JsonMode::JsonObject, 'max_completion_tokens'];
+        yield 'Gemini' => [OpenAiCompatibleConfig::gemini(self::API_KEY, 'gemini-2.5-flash'), 'gemini:gemini-2.5-flash', 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', 'Bearer ' . self::API_KEY, JsonMode::JsonObject, 'max_tokens'];
+        yield 'Ollama' => [OpenAiCompatibleConfig::ollama('llama3.1'), 'ollama:llama3.1', 'http://localhost:11434/v1/chat/completions', null, JsonMode::JsonObject, 'max_tokens'];
+        yield 'Ollama on another host' => [OpenAiCompatibleConfig::ollama('llama3.1', 'http://gpu-box:11434/v1/'), 'ollama:llama3.1', 'http://gpu-box:11434/v1/chat/completions', null, JsonMode::JsonObject, 'max_tokens'];
+        yield 'vLLM' => [OpenAiCompatibleConfig::vllm('Qwen/Qwen2.5-7B-Instruct'), 'vllm:Qwen/Qwen2.5-7B-Instruct', 'http://localhost:8000/v1/chat/completions', null, JsonMode::JsonObject, 'max_tokens'];
+        yield 'vLLM with a key' => [OpenAiCompatibleConfig::vllm('qwen', 'https://vllm.example.test/v1', self::API_KEY), 'vllm:qwen', 'https://vllm.example.test/v1/chat/completions', 'Bearer ' . self::API_KEY, JsonMode::JsonObject, 'max_tokens'];
+        yield 'LM Studio' => [OpenAiCompatibleConfig::lmStudio('qwen2.5-7b-instruct'), 'lmstudio:qwen2.5-7b-instruct', 'http://localhost:1234/v1/chat/completions', null, JsonMode::JsonSchemaOnly, 'max_tokens'];
     }
 
     #[Test]
     #[DataProvider('presets')]
-    public function its_presets_have_the_documented_settings(OpenAiCompatibleConfig $config, string $modelId, string $endpoint, ?string $authorization, bool $jsonMode, string $maxTokensField): void
+    public function its_presets_have_the_documented_settings(OpenAiCompatibleConfig $config, string $modelId, string $endpoint, ?string $authorization, JsonMode $jsonMode, string $maxTokensField): void
     {
         self::assertSame($modelId, $config->modelId());
         self::assertSame($endpoint, $config->endpoint());
@@ -99,7 +101,7 @@ final class OpenAiCompatibleConfigTest extends TestCase
             'baseUrl' => 'https://api.openai.com/v1',
             'model' => 'gpt-4o-mini',
             'apiKey' => '[redacted]',
-            'jsonMode' => true,
+            'jsonMode' => 'json_schema',
             'maxTokensField' => 'max_completion_tokens',
             'extraHeaders' => [],
         ], $config->__debugInfo());

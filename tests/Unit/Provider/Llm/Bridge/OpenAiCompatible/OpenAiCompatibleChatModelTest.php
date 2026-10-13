@@ -7,6 +7,7 @@ namespace HtmlTranslator\Tests\Unit\Provider\Llm\Bridge\OpenAiCompatible;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\HttpSecrets;
+use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig;
 use HtmlTranslator\Provider\Llm\Bridge\RetriedResponse;
@@ -18,6 +19,7 @@ use HtmlTranslator\Provider\Llm\ChatRequest;
 use HtmlTranslator\Provider\Llm\ChatResponse;
 use HtmlTranslator\Provider\Llm\ChatRole;
 use HtmlTranslator\Provider\Llm\FinishReason;
+use HtmlTranslator\Provider\Llm\JsonSchema;
 use HtmlTranslator\Provider\Llm\Testing\FakeSleeper;
 use HtmlTranslator\Tests\Support\FakeClientException;
 use HtmlTranslator\Tests\Support\FakeHttpClient;
@@ -46,6 +48,7 @@ use Throwable;
 #[UsesClass(ChatMessage::class)]
 #[UsesClass(ChatResponse::class)]
 #[UsesClass(ProviderException::class)]
+#[UsesClass(JsonSchema::class)]
 #[UsesClass(UntrustedText::class)]
 #[UsesClass(HttpSecrets::class)]
 #[UsesClass(Retrier::class)]
@@ -58,6 +61,9 @@ final class OpenAiCompatibleChatModelTest extends TestCase
     private const string API_KEY = 'sk-test-SECRET-0123456789';
 
     private const string FIXTURES = __DIR__ . '/Fixtures';
+
+    /** Compact, as JsonSchema keeps it; the empty object checks that {} is not sent as []. */
+    private const string SCHEMA = '{"type":"object","properties":{"units":{"type":"array","items":{"type":"object","properties":{},"required":[],"additionalProperties":false}}},"required":["units"],"additionalProperties":false}';
 
     /**
      * @return iterable<string, array{string, string, string, ?int, ?int, ?FinishReason}> fixture, content, model, tokens, finish reason
@@ -272,16 +278,78 @@ final class OpenAiCompatibleChatModelTest extends TestCase
         ], $this->body($sent));
     }
 
+    /**
+     * @return iterable<string, array{JsonMode, bool, ?array<string, mixed>}> mode, whether the request has a schema, expected response_format
+     */
+    public static function responseFormats(): iterable
+    {
+        $withSchema = ['type' => 'json_schema', 'json_schema' => ['name' => 'answer', 'strict' => true, 'schema' => json_decode(self::SCHEMA, true, 16, \JSON_THROW_ON_ERROR)]];
+
+        yield 'JSON object' => [JsonMode::JsonObject, false, ['type' => 'json_object']];
+        yield 'JSON object ignores a schema' => [JsonMode::JsonObject, true, ['type' => 'json_object']];
+        yield 'schema' => [JsonMode::JsonSchema, true, $withSchema];
+        yield 'schema mode falls back to JSON object' => [JsonMode::JsonSchema, false, ['type' => 'json_object']];
+        yield 'schema only' => [JsonMode::JsonSchemaOnly, true, $withSchema];
+        yield 'schema only sends nothing without a schema' => [JsonMode::JsonSchemaOnly, false, null];
+        yield 'none' => [JsonMode::None, true, null];
+        yield 'none without a schema' => [JsonMode::None, false, null];
+    }
+
+    /**
+     * @param array<string, mixed>|null $expected
+     */
     #[Test]
-    public function it_asks_for_json_only_where_the_server_supports_it(): void
+    #[DataProvider('responseFormats')]
+    public function it_asks_for_json_the_way_the_server_supports(JsonMode $mode, bool $withSchema, ?array $expected): void
+    {
+        $client = $this->client(200, 'success.json');
+        $config = new OpenAiCompatibleConfig('local', 'http://localhost:1234/v1', 'qwen2.5-7b-instruct', jsonMode: $mode);
+
+        $this->model($client, $config)->complete(new ChatRequest([new ChatMessage(ChatRole::User, 'Answer in JSON.')], jsonResponse: true, jsonSchema: $withSchema ? JsonSchema::fromJson(self::SCHEMA) : null));
+
+        self::assertSame($expected, $this->body($client->requests[0] ?? self::fail('Nothing was sent.'))['response_format'] ?? null);
+    }
+
+    #[Test]
+    public function it_sends_the_schema_as_given(): void
     {
         $client = $this->client(200, 'success.json');
 
-        $this->model($client, OpenAiCompatibleConfig::lmStudio('qwen2.5-7b-instruct'))->complete(new ChatRequest([new ChatMessage(ChatRole::User, 'Hi')], jsonResponse: true));
+        $this->model($client, OpenAiCompatibleConfig::openAi(self::API_KEY, 'gpt-4o-mini'))->complete(new ChatRequest([new ChatMessage(ChatRole::User, 'Answer in JSON.')], jsonResponse: true, jsonSchema: JsonSchema::fromJson(self::SCHEMA)));
 
-        $sent = $client->requests[0] ?? self::fail('Nothing was sent.');
-        self::assertArrayNotHasKey('response_format', $this->body($sent));
-        self::assertFalse($sent->hasHeader('Authorization'));
+        // An empty object must stay {} on the wire: OpenAI rejects "properties": [].
+        self::assertStringContainsString('"json_schema":{"name":"answer","strict":true,"schema":' . self::SCHEMA . '}', (string) ($client->requests[0] ?? self::fail('Nothing was sent.'))->getBody());
+    }
+
+    /**
+     * @return iterable<string, array{JsonMode}>
+     */
+    public static function jsonModes(): iterable
+    {
+        foreach (JsonMode::cases() as $mode) {
+            yield $mode->name => [$mode];
+        }
+    }
+
+    #[Test]
+    #[DataProvider('jsonModes')]
+    public function it_asks_for_no_json_when_the_request_does_not(JsonMode $mode): void
+    {
+        $client = $this->client(200, 'success.json');
+
+        $this->model($client, new OpenAiCompatibleConfig('local', 'http://localhost:1234/v1', 'qwen2.5-7b-instruct', jsonMode: $mode))->complete(new ChatRequest([new ChatMessage(ChatRole::User, 'Hi')]));
+
+        self::assertArrayNotHasKey('response_format', $this->body($client->requests[0] ?? self::fail('Nothing was sent.')));
+    }
+
+    #[Test]
+    public function it_sends_no_key_to_a_server_without_authentication(): void
+    {
+        $client = $this->client(200, 'success.json');
+
+        $this->model($client, OpenAiCompatibleConfig::lmStudio('qwen2.5-7b-instruct'))->complete(new ChatRequest([new ChatMessage(ChatRole::User, 'Hi')]));
+
+        self::assertFalse(($client->requests[0] ?? self::fail('Nothing was sent.'))->hasHeader('Authorization'));
     }
 
     #[Test]

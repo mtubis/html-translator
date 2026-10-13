@@ -25,7 +25,8 @@ Alternatives considered:
   required string `id` and `text`, `additionalProperties: false` throughout. This is part of the request, so it came
   with a new `PromptBuilder::VERSION` (`2026-10.4`); the rendered messages are unchanged.
 - Adapters with structured outputs send the schema (`AnthropicChatModel`: `output_config.format`). Adapters without
-  ignore it and keep their JSON mode (`OpenAiCompatibleChatModel`: `response_format: json_object`). A JSON request
+  ignore it and keep their JSON mode (`OpenAiCompatibleChatModel` in `JsonMode::JsonObject`: `response_format: json_object`;
+  see Consequences, #54). A JSON request
   without a schema is not enforced by `AnthropicChatModel`; the prompt asks for JSON.
 - `ChatModelContractTestCase` sends a schema; `RecordedChatRequest::$jsonSchema` reports what the adapter sent, and an
   adapter that sends one must send the requested one.
@@ -35,7 +36,8 @@ Alternatives considered:
 - `ResponseParser` stays lenient: adapters without a schema still get prose or code fences around the JSON.
 - The answer schema and the prompt's description of the answer must stay in sync; both live in `PromptBuilder`, and
   a test checks the schema's shape.
-- `OpenAiCompatibleChatModel` could later send the schema as `response_format: {"type": "json_schema", …}` where a
-  server supports it (LM Studio supports only that); a separate change.
+- `OpenAiCompatibleChatModel` sends the schema as `response_format: {"type": "json_schema", …}` where the server
+  supports it, chosen per configuration (`OpenAiCompatible\JsonMode`, #54): OpenAI and LM Studio do; LM Studio
+  rejects `json_object`, so a JSON request without a schema sends no format there.
 - Structured outputs and refusals: a refused answer (`stop_reason: "refusal"`) may not match the schema; the adapter
   reports it as `FinishReason::Refusal`, which the provider treats as a permanent failure.
