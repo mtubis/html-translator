@@ -7,6 +7,7 @@ namespace HtmlTranslator\Tests\Contract;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\HttpSecrets;
+use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig;
 use HtmlTranslator\Provider\Llm\Bridge\RetriedResponse;
@@ -32,9 +33,11 @@ use Nyholm\Psr7\Response;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use Psr\Http\Message\RequestInterface;
+use stdClass;
 
 /**
- * The fake PSR-18 client answers like the OpenAI Chat Completions API would in each scenario.
+ * The fake PSR-18 client answers like the OpenAI Chat Completions API would in each scenario. The adapter runs in
+ * JsonMode::JsonSchema, so the contract sees the schema it sends.
  */
 #[CoversClass(OpenAiCompatibleChatModel::class)]
 #[UsesClass(OpenAiCompatibleConfig::class)]
@@ -73,7 +76,7 @@ final class OpenAiCompatibleChatModelContractTest extends ChatModelContractTestC
         });
         $factory = new Psr17Factory();
 
-        return new OpenAiCompatibleChatModel($this->client, $factory, $factory, new OpenAiCompatibleConfig('contract', 'https://api.example.test/v1', self::MODEL, self::API_KEY), new Retrier(sleeper: new FakeSleeper()));
+        return new OpenAiCompatibleChatModel($this->client, $factory, $factory, new OpenAiCompatibleConfig('contract', 'https://api.example.test/v1', self::MODEL, self::API_KEY, JsonMode::JsonSchema), new Retrier(sleeper: new FakeSleeper()));
     }
 
     protected function recordedRequest(): RecordedChatRequest
@@ -92,6 +95,15 @@ final class OpenAiCompatibleChatModelContractTest extends ChatModelContractTestC
             $messages[] = [$message['role'], $message['content']];
         }
 
+        $format = $body['response_format'] ?? null;
+        self::assertTrue(null === $format || \is_array($format));
+        // Decoded again as objects: the array decoding above would record an empty {} as [].
+        $raw = json_decode((string) $request->getBody(), false, 64, \JSON_THROW_ON_ERROR);
+        self::assertInstanceOf(stdClass::class, $raw);
+        $rawFormat = $raw->response_format ?? null;
+        $rawJsonSchema = $rawFormat instanceof stdClass ? $rawFormat->json_schema ?? null : null;
+        $schema = $rawJsonSchema instanceof stdClass ? $rawJsonSchema->schema ?? null : null;
+
         $temperature = $body['temperature'] ?? null;
         $maxTokens = $body['max_tokens'] ?? null;
         $model = $body['model'] ?? null;
@@ -102,9 +114,10 @@ final class OpenAiCompatibleChatModelContractTest extends ChatModelContractTestC
         return new RecordedChatRequest(
             $messages,
             null === $temperature ? null : (float) $temperature,
-            ['type' => 'json_object'] === ($body['response_format'] ?? null),
+            \in_array($format['type'] ?? null, ['json_object', 'json_schema'], true),
             $maxTokens,
             $model,
+            null === $schema ? null : json_encode($schema, \JSON_THROW_ON_ERROR),
         );
     }
 

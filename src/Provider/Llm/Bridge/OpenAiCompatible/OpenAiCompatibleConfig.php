@@ -34,7 +34,7 @@ final readonly class OpenAiCompatibleConfig
      * @param string $name prefix of modelId(), e.g. "openai"
      * @param string $baseUrl API root without the endpoint, e.g. "https://api.openai.com/v1"
      * @param ?string $apiKey sent as a Bearer token; null for local servers without authentication
-     * @param bool $jsonMode send response_format json_object when a request asks for JSON
+     * @param JsonMode $jsonMode how a request that asks for JSON sets response_format
      * @param string $maxTokensField the request field for ChatRequest::$maxOutputTokens (MAX_TOKENS or MAX_COMPLETION_TOKENS)
      * @param array<array-key, string> $extraHeaders e.g. OpenAI-Organization; treated as secret like the key (PHP turns
      *                                               numeric names into int keys)
@@ -47,7 +47,7 @@ final readonly class OpenAiCompatibleConfig
         public string $model,
         #[SensitiveParameter]
         ?string $apiKey = null,
-        public bool $jsonMode = true,
+        public JsonMode $jsonMode = JsonMode::JsonObject,
         public string $maxTokensField = self::MAX_TOKENS,
         #[SensitiveParameter]
         array $extraHeaders = [],
@@ -78,11 +78,14 @@ final readonly class OpenAiCompatibleConfig
     }
 
     /**
+     * Sends the answer schema (structured outputs), so the answer shape is enforced. Models without structured outputs
+     * (e.g. gpt-3.5-turbo, gpt-4-turbo) reject it with HTTP 400: pass JsonMode::JsonObject for them.
+     *
      * @throws InvalidArgumentException when the key or model is invalid
      */
-    public static function openAi(#[SensitiveParameter] string $apiKey, string $model): self
+    public static function openAi(#[SensitiveParameter] string $apiKey, string $model, JsonMode $jsonMode = JsonMode::JsonSchema): self
     {
-        return new self('openai', 'https://api.openai.com/v1', $model, $apiKey, maxTokensField: self::MAX_COMPLETION_TOKENS);
+        return new self('openai', 'https://api.openai.com/v1', $model, $apiKey, $jsonMode, self::MAX_COMPLETION_TOKENS);
     }
 
     /**
@@ -112,13 +115,13 @@ final readonly class OpenAiCompatibleConfig
     }
 
     /**
-     * LM Studio only offers structured output with a JSON schema, so JSON mode is off.
+     * LM Studio only offers structured output with a JSON schema and rejects json_object.
      *
      * @throws InvalidArgumentException when the model is blank or the URL invalid
      */
     public static function lmStudio(string $model, string $baseUrl = 'http://localhost:1234/v1'): self
     {
-        return new self('lmstudio', $baseUrl, $model, jsonMode: false);
+        return new self('lmstudio', $baseUrl, $model, jsonMode: JsonMode::JsonSchemaOnly);
     }
 
     public function modelId(): string
@@ -163,7 +166,7 @@ final readonly class OpenAiCompatibleConfig
     }
 
     /**
-     * @return array{name: string, baseUrl: string, model: string, apiKey: ?string, jsonMode: bool, maxTokensField: string, extraHeaders: array<string, string>}
+     * @return array{name: string, baseUrl: string, model: string, apiKey: ?string, jsonMode: string, maxTokensField: string, extraHeaders: array<string, string>}
      */
     public function __debugInfo(): array
     {
@@ -172,7 +175,7 @@ final readonly class OpenAiCompatibleConfig
             'baseUrl' => $this->baseUrl,
             'model' => $this->model,
             'apiKey' => $this->secrets->maskedApiKey(),
-            'jsonMode' => $this->jsonMode,
+            'jsonMode' => $this->jsonMode->value,
             'maxTokensField' => $this->maxTokensField,
             'extraHeaders' => $this->secrets->maskedExtraHeaders(),
         ];

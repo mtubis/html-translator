@@ -12,6 +12,9 @@ use stdClass;
  * The JSON schema a chat model's answer must follow (ADR-0014). Adapters with structured outputs send it to the
  * vendor; adapters without ignore it and rely on JSON mode or the prompt.
  *
+ * Adapters may enforce it in strict mode (OpenAI's json_schema), so follow those rules: every property listed in
+ * "required" and "additionalProperties": false on every object.
+ *
  * Kept as JSON text, so empty objects stay objects and no untyped array crosses the port.
  */
 final readonly class JsonSchema

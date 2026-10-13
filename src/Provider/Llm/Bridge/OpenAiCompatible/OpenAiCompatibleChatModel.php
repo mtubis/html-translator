@@ -13,6 +13,7 @@ use HtmlTranslator\Provider\Llm\ChatModelInterface;
 use HtmlTranslator\Provider\Llm\ChatRequest;
 use HtmlTranslator\Provider\Llm\ChatResponse;
 use HtmlTranslator\Provider\Llm\FinishReason;
+use HtmlTranslator\Provider\Llm\JsonSchema;
 use JsonException;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
@@ -23,6 +24,8 @@ use SensitiveParameter;
  * ChatModelInterface for OpenAI-style Chat Completions APIs (POST {baseUrl}/chat/completions, API shape as of 2026-10):
  * OpenAI, Gemini's OpenAI-compatible endpoint, Ollama, vLLM, LM Studio and others, on any PSR-18 client (ADR-0002).
  *
+ * JSON requests set response_format as the configuration's JsonMode says (json_object or a strict json_schema).
+ *
  * A refusal (message.refusal, sent with finish_reason "stop") becomes FinishReason::Refusal with the refusal as content,
  * so LlmTranslationProvider reports it instead of retrying. No transport retries yet (0.4).
  */
@@ -30,6 +33,9 @@ final readonly class OpenAiCompatibleChatModel implements ChatModelInterface
 {
     /** Vendor error messages are cut to this many characters. */
     private const int VENDOR_MESSAGE_LENGTH = 200;
+
+    /** json_schema.name is required by OpenAI; JsonSchema carries none. */
+    private const string SCHEMA_NAME = 'answer';
 
     /**
      * Invalid UTF-8 in a message is replaced rather than failing the call (the validator judges the answer anyway);
@@ -92,11 +98,38 @@ final readonly class OpenAiCompatibleChatModel implements ChatModelInterface
             $body[$this->config->maxTokensField] = $request->maxOutputTokens;
         }
 
-        if ($request->jsonResponse && $this->config->jsonMode) {
-            $body['response_format'] = ['type' => 'json_object'];
+        $format = $request->jsonResponse ? $this->responseFormat($request->jsonSchema) : null;
+        if (null !== $format) {
+            $body['response_format'] = $format;
         }
 
         return $body;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function responseFormat(?JsonSchema $schema): ?array
+    {
+        return match ($this->config->jsonMode) {
+            JsonMode::None => null,
+            JsonMode::JsonObject => ['type' => 'json_object'],
+            JsonMode::JsonSchema => $schema instanceof JsonSchema ? $this->schemaFormat($schema) : ['type' => 'json_object'],
+            JsonMode::JsonSchemaOnly => $schema instanceof JsonSchema ? $this->schemaFormat($schema) : null,
+        };
+    }
+
+    /**
+     * The schema is decoded to objects, so an empty object stays {} on the wire.
+     *
+     * @return array<string, mixed>
+     */
+    private function schemaFormat(JsonSchema $schema): array
+    {
+        return [
+            'type' => 'json_schema',
+            'json_schema' => ['name' => self::SCHEMA_NAME, 'strict' => true, 'schema' => json_decode($schema->json, false, 512, \JSON_THROW_ON_ERROR)],
+        ];
     }
 
     /**
