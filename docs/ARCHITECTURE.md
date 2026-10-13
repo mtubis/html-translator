@@ -47,7 +47,7 @@ $translator = new HtmlTranslator(
     cache: $psr6Pool,                    // ?CacheItemPoolInterface, used when the provider is cacheable (ADR-0016)
     logger: $psr3Logger,                 // ?LoggerInterface
     // optional collaborators with sensible defaults:
-    // loader, segmenter, validator, reassembler, skipRules, translatableAttributes, batcher, clock
+    // loader, segmenter, validator, termChecker, reassembler, skipRules, translatableAttributes, batcher, clock
 );
 // Named arguments beyond `provider`; positional order is not part of the API (ADR-0010).
 // clock arrives later; the profile is a TranslationOptions argument.
@@ -145,6 +145,7 @@ Adapters are written on **PSR-18 / PSR-17**, not vendor SDKs ([ADR-0002](adr/000
 ### 6.5 Validation and corrective retries
 - `StructureValidator` compares, per unit: the multiset of pseudo-tags, pairing/nesting, no unknown tags, no raw HTML, non-empty result. Plain-text units: no tags at all. Model output is decoded leniently by `Domain\UnitText::tokenize()` ([ADR-0009](adr/0009-lenient-decoding-of-model-output.md)); violation messages tell the model what to fix, because they are sent back in corrective retries.
 - Failed units are re-sent (only them) together with a precise error description (`Correction`; units missing from the answer get one too, refused units do not), up to `maxCorrectiveRetries`. Then the `FallbackStrategy` applies and an `Issue` is recorded.
+- Term check: every translation that is used (provider, cache, text-node fallback) is checked against the profile's do-not-translate terms and the glossary entries that keep their term (`TermChecker`, [ADR-0017](adr/0017-term-checks-after-translation.md)); a unit that breaks one gets an `IssueType::TermViolation` issue, without retry or fallback.
 
 ### 6.6 Reassembly
 - `Reassembler::apply()` is called once per segmented document with the complete map (replaced nodes leave the document). It checks every translation against its unit first (tags exactly once, in their form, properly nested); a mismatch throws and leaves the DOM untouched. Validation with retries happens before, in the orchestration.
@@ -171,9 +172,9 @@ src/
   FallbackStrategy.php  Issue.php  IssueType.php
   Domain/                       Locale, LocalePair, TranslationUnit, InlineTag, UnitId …
   Profile/                      TranslationProfile, TermPolicy, Formality, Glossary, GlossaryEntry,
-                                TermMatcher (@internal: term matching shared by Glossary and PromptBuilder)
+                                TermMatcher (@internal: term matching shared by Glossary, PromptBuilder and TermChecker)
   Html/                         HtmlLoader, Segmenter, InlineEncoder, Reassembler, SkipRules, TranslatableAttributes
-  Validation/                   StructureValidator, ValidationResult, Violation, ViolationType
+  Validation/                   StructureValidator, ValidationResult, Violation, ViolationType, TermChecker
   Batching/                     Batcher, TokenEstimatorInterface, CharacterTokenEstimator
   Provider/                     TranslationProviderInterface, CacheableProviderInterface, TranslationBatch, BatchResult, TokenUsage
   Provider/Llm/                 LlmTranslationProvider, PromptBuilder, ResponseParser, ChatModelInterface, ChatRequest, ChatResponse,
