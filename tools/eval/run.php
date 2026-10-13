@@ -12,10 +12,10 @@ use HtmlTranslator\Provider\Llm\PromptBuilder;
 use HtmlTranslator\Tests\Support\GoldenFixtures;
 use HtmlTranslator\Tests\Support\IntegrationProviders;
 use HtmlTranslator\Tests\Support\PseudoLocalizingChatModel;
+use HtmlTranslator\Tools\Eval\CallCountingChatModel;
 use HtmlTranslator\Tools\Eval\EvalRunner;
 use HtmlTranslator\Tools\Eval\FixtureResult;
 use HtmlTranslator\Tools\Eval\Report;
-use HtmlTranslator\Tools\Eval\TokenCountingChatModel;
 
 require __DIR__ . '/../../vendor/autoload.php';
 
@@ -99,7 +99,7 @@ if (!is_dir($directory) && !mkdir($directory, 0o777, true) && !is_dir($directory
     exit(1);
 }
 
-$model = new TokenCountingChatModel($chatModel);
+$model = new CallCountingChatModel($chatModel);
 $startedAt = new DateTimeImmutable();
 $results = [];
 $base = $directory . '/' . new Report($model->modelId(), PromptBuilder::VERSION, $startedAt, [])->fileName();

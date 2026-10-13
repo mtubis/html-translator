@@ -42,6 +42,7 @@ use HtmlTranslator\Provider\BatchContext;
 use HtmlTranslator\Provider\BatchResult;
 use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\Testing\PseudoLocalizationProvider;
+use HtmlTranslator\Provider\TokenUsage;
 use HtmlTranslator\Provider\TranslationBatch;
 use HtmlTranslator\Tests\Support\CallbackProvider;
 use HtmlTranslator\Tests\Support\CollectingLogger;
@@ -70,6 +71,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(PseudoLocalizationProvider::class)]
 #[UsesClass(TranslationBatch::class)]
 #[UsesClass(BatchResult::class)]
+#[UsesClass(TokenUsage::class)]
 #[UsesClass(BatchContext::class)]
 #[UsesClass(Correction::class)]
 #[UsesClass(HtmlLoader::class)]
@@ -592,6 +594,83 @@ final class HtmlTranslatorTest extends TestCase
         new HtmlTranslator($provider, batcher: new Batcher($expensive))->translate('<p>A</p><p>B</p><p>C</p>', Locale::fromString('pl'));
 
         self::assertSame([1, 1, 1], array_map(static fn(TranslationBatch $batch): int => \count($batch->units), $provider->batches));
+    }
+
+    #[Test]
+    public function it_sums_token_usage_over_batches_corrective_retries_and_the_text_node_fallback(): void
+    {
+        $provider = new CallbackProvider(static function (TranslationBatch $batch): BatchResult {
+            if (array_any($batch->units, static fn(TranslationUnit $unit): bool => str_contains($unit->id->toString(), '-'))) {
+                return new PseudoLocalizationProvider()->translate($batch)->withUsage(new TokenUsage(1000, 100));
+            }
+
+            return PseudoLocalizationProvider::corruptingEvery(1, persistent: true)->translate($batch)->withUsage(new TokenUsage(10, 1));
+        });
+
+        $result = new HtmlTranslator($provider)->translate(
+            '<p>A <b>a</b></p><p>B <b>b</b></p>',
+            Locale::fromString('pl'),
+            new TranslationOptions(fallback: FallbackStrategy::TextNodesOnly, maxCorrectiveRetries: 1, batchSize: 1),
+        );
+
+        self::assertCount(6, $provider->batches, 'Two batches, one corrective retry and one text-node fallback each.');
+        self::assertSame(2040, $result->stats()->inputTokens);
+        self::assertSame(204, $result->stats()->outputTokens);
+    }
+
+    #[Test]
+    public function it_keeps_token_usage_of_earlier_calls_when_the_provider_fails_during_a_retry(): void
+    {
+        $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => [] === $batch->corrections
+            ? PseudoLocalizationProvider::corruptingEvery(2)->translate($batch)->withUsage(new TokenUsage(10, 1))
+            : throw new ProviderException('Service unavailable.'));
+
+        $result = new HtmlTranslator($provider)->translate('<p>A</p><p>B</p>', Locale::fromString('pl'));
+
+        self::assertSame(10, $result->stats()->inputTokens);
+        self::assertSame(1, $result->stats()->outputTokens);
+    }
+
+    #[Test]
+    public function it_keeps_token_usage_of_earlier_calls_when_the_text_node_fallback_fails(): void
+    {
+        $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => array_any($batch->units, static fn(TranslationUnit $unit): bool => str_contains($unit->id->toString(), '-'))
+            ? throw new ProviderException('Service unavailable.')
+            : new BatchResult(['u1' => 'Kliknij <g1>tutaj'], usage: new TokenUsage(10, 1)));
+
+        $result = new HtmlTranslator($provider)
+            ->translate('<p>Click <a href="/x">here</a></p>', Locale::fromString('pl'), new TranslationOptions(fallback: FallbackStrategy::TextNodesOnly, maxCorrectiveRetries: 0));
+
+        self::assertSame(10, $result->stats()->inputTokens);
+        self::assertSame(1, $result->stats()->outputTokens);
+    }
+
+    #[Test]
+    public function it_keeps_a_token_count_unknown_while_no_call_reported_it(): void
+    {
+        $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => new PseudoLocalizationProvider()->translate($batch)->withUsage(new TokenUsage(10, null)));
+
+        $result = new HtmlTranslator($provider)->translate('<p>A</p><p>B</p>', Locale::fromString('pl'), new TranslationOptions(batchSize: 1));
+
+        self::assertSame(20, $result->stats()->inputTokens);
+        self::assertNull($result->stats()->outputTokens);
+    }
+
+    #[Test]
+    public function it_leaves_token_counts_null_when_the_provider_reports_none(): void
+    {
+        $result = new HtmlTranslator(new PseudoLocalizationProvider())->translate('<p>A</p><p>B</p>', Locale::fromString('pl'));
+
+        self::assertNull($result->stats()->inputTokens);
+        self::assertNull($result->stats()->outputTokens);
+    }
+
+    #[Test]
+    public function it_leaves_token_counts_null_without_units(): void
+    {
+        $result = new HtmlTranslator(new PseudoLocalizationProvider())->translate('<p> </p>', Locale::fromString('pl'));
+
+        self::assertNull($result->stats()->inputTokens);
     }
 
     #[Test]

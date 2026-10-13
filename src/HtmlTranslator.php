@@ -27,6 +27,7 @@ use HtmlTranslator\Html\TranslatableAttributes;
 use HtmlTranslator\Profile\TranslationProfile;
 use HtmlTranslator\Provider\BatchContext;
 use HtmlTranslator\Provider\Correction;
+use HtmlTranslator\Provider\TokenUsage;
 use HtmlTranslator\Provider\TranslationBatch;
 use HtmlTranslator\Provider\TranslationProviderInterface;
 use HtmlTranslator\Validation\StructureValidator;
@@ -93,18 +94,21 @@ final readonly class HtmlTranslator
         $issues = [];
         $complete = true;
         $retries = 0;
+        $usage = null;
         $unitsDone = 0;
 
         foreach ($batches as $index => $batchUnits) {
-            [$translated, $failures, $batchRetries] = $this->translateWithRetries($locales, $options->profile, $documentContext, $batchUnits, $options->maxCorrectiveRetries);
+            [$translated, $failures, $batchRetries, $batchUsage] = $this->translateWithRetries($locales, $options->profile, $documentContext, $batchUnits, $options->maxCorrectiveRetries);
             $translations += $translated;
             $retries += $batchRetries;
+            $usage = TokenUsage::sum($usage, $batchUsage);
 
             if ([] !== $failures) {
-                [$fallbackTranslations, $fallbackIssues, $fallbackComplete] = $this->applyFallback($locales, $documentContext, $failures, $options);
+                [$fallbackTranslations, $fallbackIssues, $fallbackComplete, $fallbackUsage] = $this->applyFallback($locales, $documentContext, $failures, $options);
                 $translations += $fallbackTranslations;
                 array_push($issues, ...$fallbackIssues);
                 $complete = $complete && $fallbackComplete;
+                $usage = TokenUsage::sum($usage, $fallbackUsage);
             }
 
             $unitsDone += \count($batchUnits);
@@ -123,7 +127,7 @@ final readonly class HtmlTranslator
             $segmented->document()->serialize(),
             $complete,
             $issues,
-            new TranslationStats(\count($units), \count($batches), $retries, (hrtime(true) - $started) / 1_000_000_000),
+            new TranslationStats(\count($units), \count($batches), $retries, (hrtime(true) - $started) / 1_000_000_000, $usage?->inputTokens, $usage?->outputTokens),
         );
     }
 
@@ -135,8 +139,10 @@ final readonly class HtmlTranslator
      *
      * @param list<TranslationUnit> $units
      *
-     * @return array{array<string, string>, array<string, Failure>, int} valid translations, the last failure of
-     *                                                                   each failed unit in document order, units retried
+     * @return array{array<string, string>, array<string, Failure>, int, ?TokenUsage} valid translations, the last
+     *                                                                                failure of each failed unit in
+     *                                                                                document order, units retried,
+     *                                                                                tokens of the calls that answered
      */
     private function translateWithRetries(LocalePair $locales, TranslationProfile $profile, BatchContext $documentContext, array $units, int $maxRetries): array
     {
@@ -150,6 +156,7 @@ final readonly class HtmlTranslator
         $permanent = [];
         $corrections = [];
         $retries = 0;
+        $usage = null;
 
         for ($attempt = 0; [] !== $pending && $attempt <= $maxRetries; ++$attempt) {
             if ($attempt > 0) {
@@ -168,6 +175,7 @@ final readonly class HtmlTranslator
                 break;
             }
 
+            $usage = TokenUsage::sum($usage, $result->usage);
             $corrections = [];
             $failures = [];
 
@@ -215,7 +223,7 @@ final readonly class HtmlTranslator
             }
         }
 
-        return [$translations, $failed, $retries];
+        return [$translations, $failed, $retries, $usage];
     }
 
     /**
@@ -239,7 +247,8 @@ final readonly class HtmlTranslator
     /**
      * @param array<string, Failure> $failures
      *
-     * @return array{array<string, string>, list<Issue>, bool} translations, issues, whether every unit is translated
+     * @return array{array<string, string>, list<Issue>, bool, ?TokenUsage} translations, issues, whether every unit
+     *                                                                      is translated, tokens of the fallback call
      */
     private function applyFallback(LocalePair $locales, BatchContext $documentContext, array $failures, TranslationOptions $options): array
     {
@@ -263,12 +272,12 @@ final readonly class HtmlTranslator
         }
 
         if (FallbackStrategy::KeepOriginal === $options->fallback) {
-            return [[], $issues, false];
+            return [[], $issues, false, null];
         }
 
-        [$translations, $partialIssues] = $this->translateTextNodes($locales, $options->profile, $documentContext, $failedUnits);
+        [$translations, $partialIssues, $usage] = $this->translateTextNodes($locales, $options->profile, $documentContext, $failedUnits);
 
-        return [$translations, [...$issues, ...$partialIssues], [] === $partialIssues];
+        return [$translations, [...$issues, ...$partialIssues], [] === $partialIssues, $usage];
     }
 
     private function failureMessage(string $id, IssueType $type, string $detail, bool $permanent, int $maxRetries): string
@@ -293,7 +302,7 @@ final readonly class HtmlTranslator
      *
      * @param list<TranslationUnit> $units
      *
-     * @return array{array<string, string>, list<Issue>}
+     * @return array{array<string, string>, list<Issue>, ?TokenUsage}
      */
     private function translateTextNodes(LocalePair $locales, TranslationProfile $profile, BatchContext $documentContext, array $units): array
     {
@@ -368,7 +377,7 @@ final readonly class HtmlTranslator
             }
         }
 
-        return [$translations, $issues];
+        return [$translations, $issues, $result?->usage];
     }
 
     /**

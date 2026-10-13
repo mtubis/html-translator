@@ -7,6 +7,7 @@ namespace HtmlTranslator\Provider\Llm;
 use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Provider\BatchResult;
+use HtmlTranslator\Provider\TokenUsage;
 use HtmlTranslator\Provider\TranslationBatch;
 use HtmlTranslator\Provider\TranslationProviderInterface;
 
@@ -20,6 +21,8 @@ use HtmlTranslator\Provider\TranslationProviderInterface;
  * only the second parse error is kept, as the previous exception.
  * A batch the model refuses (content filter, refusal) fails permanently for all its units: re-sending it would be
  * refused again.
+ * The result carries the tokens of both calls when it asked twice. A batch that ends in a ProviderException reports no
+ * usage, also not the tokens of a call that answered before (an unparsable or cut-off answer).
  */
 final readonly class LlmTranslationProvider implements TranslationProviderInterface
 {
@@ -36,9 +39,10 @@ final readonly class LlmTranslationProvider implements TranslationProviderInterf
     {
         $request = $this->promptBuilder->build($batch);
         $response = $this->chatModel->complete($request);
+        $firstUsage = TokenUsage::reported($response->inputTokens, $response->outputTokens);
 
         try {
-            return $this->read($response, $batch);
+            return $this->read($response, $batch)->withUsage($firstUsage);
         } catch (ProviderException $exception) {
             if (FinishReason::Length === $response->finishReason) {
                 throw $this->withModel($exception);
@@ -49,7 +53,7 @@ final readonly class LlmTranslationProvider implements TranslationProviderInterf
         $response = $this->chatModel->complete($request);
 
         try {
-            return $this->read($response, $batch);
+            return $this->read($response, $batch)->withUsage(TokenUsage::sum($firstUsage, TokenUsage::reported($response->inputTokens, $response->outputTokens)));
         } catch (ProviderException $exception) {
             throw $this->withModel($exception);
         }

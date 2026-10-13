@@ -13,6 +13,8 @@ All notable changes to this project are documented here. The format follows [Kee
   bounded and kept on one line (`Exception\UntrustedText`, #43).
 
 ### Changed
+- `tools/eval` takes token counts from `TranslationStats`; a fixture that fails with an error shows no tokens, and the
+  summary line says how many fixtures it leaves out (#60).
 - Units are no longer cut into fixed chunks of `batchSize`: a batch also closes at `tokenBudget`, so documents with
   long units need more provider calls, which shows in `stats()->batches` and the `onProgress` totals (#58).
 - The chat model configs share their key, header and base URL rules (`Provider\Llm\Bridge\HttpSecrets`, #53).
@@ -22,6 +24,10 @@ All notable changes to this project are documented here. The format follows [Kee
   Contract tests of third-party adapters that match the kinds exhaustively must handle it (#52).
 
 ### Added
+- Token usage in the stats: `TranslationStats::$inputTokens` / `$outputTokens`, summed over every provider call of a
+  document (corrective retries and the text-node fallback included) and null while no call reported a count. Providers
+  report it in `BatchResult::$usage` (`Provider\TokenUsage`); `LlmTranslationProvider` fills it from the chat
+  responses. A provider call that ends in a `ProviderException` adds no tokens (#60).
 - Batches are sized by an approximate token budget: `TranslationOptions::$tokenBudget` (default 2,000), `Batcher`
   and the `TokenEstimatorInterface` port with `CharacterTokenEstimator`; `batchSize` stays as the upper bound of units
   per batch, and `HtmlTranslator` takes an optional `batcher` (ADR-0015, #58).

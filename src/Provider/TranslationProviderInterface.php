@@ -32,6 +32,9 @@ use HtmlTranslator\Exception\ProviderException;
  * (429/5xx, Retry-After, backoff) belong in the provider. A ProviderException on the first call of a batch reaches the
  * caller as it is; on a corrective retry it becomes issues, and with FallbackStrategy::Throw it is the previous
  * exception of the one thrown.
+ *
+ * Usage: report the tokens of every call made for the batch (own retries included) in BatchResult::$usage; leave it
+ * null when the vendor reports none.
  */
 interface TranslationProviderInterface
 {

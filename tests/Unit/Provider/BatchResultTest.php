@@ -7,6 +7,7 @@ namespace HtmlTranslator\Tests\Unit\Provider;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\BatchResult;
+use HtmlTranslator\Provider\TokenUsage;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -16,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(BatchResult::class)]
 #[UsesClass(InvalidArgumentException::class)]
 #[UsesClass(UntrustedText::class)]
+#[UsesClass(TokenUsage::class)]
 final class BatchResultTest extends TestCase
 {
     #[Test]
@@ -54,6 +56,23 @@ final class BatchResultTest extends TestCase
     public function it_has_no_permanent_failures_by_default(): void
     {
         self::assertSame([], new BatchResult(['u1' => 'Jeden'], ['u2' => 'timeout'])->permanentFailures);
+    }
+
+    #[Test]
+    public function it_has_no_token_usage_by_default(): void
+    {
+        self::assertNull(new BatchResult(['u1' => 'Jeden'])->usage);
+    }
+
+    #[Test]
+    public function it_returns_a_copy_with_token_usage(): void
+    {
+        $result = new BatchResult(['u1' => 'Jeden'], ['u2' => 'timeout'], ['u3' => 'content policy']);
+
+        $withUsage = $result->withUsage(new TokenUsage(10, 2));
+
+        self::assertEquals(new BatchResult(['u1' => 'Jeden'], ['u2' => 'timeout'], ['u3' => 'content policy'], new TokenUsage(10, 2)), $withUsage);
+        self::assertNull($result->usage);
     }
 
     /**
