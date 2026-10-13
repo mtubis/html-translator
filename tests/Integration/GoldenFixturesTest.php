@@ -6,8 +6,11 @@ namespace HtmlTranslator\Tests\Integration;
 
 use HtmlTranslator\Issue;
 use HtmlTranslator\Provider\Llm\LlmTranslationProvider;
+use HtmlTranslator\Provider\Testing\PseudoLocalizationProvider;
+use HtmlTranslator\Tests\Support\CacheableCallbackProvider;
 use HtmlTranslator\Tests\Support\DomAssertions;
 use HtmlTranslator\Tests\Support\GoldenFixtures;
+use HtmlTranslator\Tests\Support\InMemoryCachePool;
 use HtmlTranslator\Tests\Support\PseudoLocalizingChatModel;
 use HtmlTranslator\TranslatedDocument;
 use PHPUnit\Framework\Attributes\CoversNothing;
@@ -50,6 +53,21 @@ final class GoldenFixturesTest extends TestCase
     public function it_matches_the_expected_pseudo_translation_through_the_llm_provider(string $directory): void
     {
         $this->assertMatchesTheFixture($directory, GoldenFixtures::translate($directory, new LlmTranslationProvider(PseudoLocalizingChatModel::create())));
+    }
+
+    /**
+     * A second translation served from the unit cache must give the same document (ADR-0016).
+     */
+    #[Test]
+    #[DataProvider('fixtures')]
+    public function it_matches_the_expected_pseudo_translation_from_a_warm_cache(string $directory): void
+    {
+        $cache = new InMemoryCachePool();
+        $first = GoldenFixtures::translate($directory, cache: $cache);
+        $second = GoldenFixtures::translate($directory, new CacheableCallbackProvider(static fn(): never => self::fail('Every unit should come from the cache.'), new PseudoLocalizationProvider()->cacheId()), $cache);
+
+        $this->assertMatchesTheFixture($directory, $second);
+        self::assertSame($first->stats()->units, $second->stats()->cacheHits);
     }
 
     private function assertMatchesTheFixture(string $directory, TranslatedDocument $result): void

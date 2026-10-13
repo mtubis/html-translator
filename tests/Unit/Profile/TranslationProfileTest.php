@@ -300,6 +300,58 @@ final class TranslationProfileTest extends TestCase
         TranslationProfile::default()->withDoNotTranslate(...$terms);
     }
 
+    #[Test]
+    public function its_fingerprint_is_stable_across_processes(): void
+    {
+        // Pinned: a different value for the same profile would turn every cached translation into a miss.
+        self::assertSame('ea48a49d710469cc6ce90c705ea8fa6c819ad698ac53c7b14806d82a4458a8ff', TranslationProfile::default()->fingerprint());
+        self::assertSame('df5093b1276c7ec0f5076a7a40713aa11cfa6e4557dfaf7b85239ca1137f690c', TranslationProfile::technical()->withGlossary(Glossary::fromArray(['pull request' => 'żądanie scalenia']))->withDoNotTranslate('GitHub')->fingerprint());
+    }
+
+    #[Test]
+    public function equal_profiles_have_equal_fingerprints_however_they_were_built(): void
+    {
+        $built = TranslationProfile::default()
+            ->withDomain('software and technical documentation')
+            ->withTermPolicy(TermPolicy::PreferOriginalTechnicalTerms)
+            ->withInstructions('Temporary')
+            ->withInstructions(null);
+
+        self::assertSame(TranslationProfile::technical()->fingerprint(), $built->fingerprint());
+        self::assertSame(
+            TranslationProfile::default()->withDomain('  medical devices ')->fingerprint(),
+            TranslationProfile::default()->withDomain('medical devices')->fingerprint(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{Closure(TranslationProfile): TranslationProfile}>
+     */
+    public static function settingChanges(): iterable
+    {
+        yield 'domain' => [static fn(TranslationProfile $profile): TranslationProfile => $profile->withDomain('legal texts')];
+        yield 'formality' => [static fn(TranslationProfile $profile): TranslationProfile => $profile->withFormality(Formality::Informal)];
+        yield 'term policy' => [static fn(TranslationProfile $profile): TranslationProfile => $profile->withTermPolicy(TermPolicy::KeepOriginal)];
+        yield 'glossary target' => [static fn(TranslationProfile $profile): TranslationProfile => $profile->withGlossary(Glossary::fromArray(['pull request' => 'żądanie scalenia', 'commit' => 'commit']))];
+        yield 'glossary order' => [static fn(TranslationProfile $profile): TranslationProfile => $profile->withGlossary(Glossary::fromArray(['commit' => 'commit', 'pull request' => 'pull request']))];
+        yield 'do-not-translate term' => [static fn(TranslationProfile $profile): TranslationProfile => $profile->withDoNotTranslate('GitHub', 'GitLab')];
+        yield 'instructions' => [static fn(TranslationProfile $profile): TranslationProfile => $profile->withInstructions('Use British spelling.')];
+    }
+
+    /**
+     * @param Closure(TranslationProfile): TranslationProfile $change
+     */
+    #[Test]
+    #[DataProvider('settingChanges')]
+    public function its_fingerprint_changes_with_every_setting(Closure $change): void
+    {
+        $profile = TranslationProfile::technical()
+            ->withGlossary(Glossary::fromArray(['pull request' => 'pull request', 'commit' => 'commit']))
+            ->withDoNotTranslate('GitHub');
+
+        self::assertNotSame($profile->fingerprint(), $change($profile)->fingerprint());
+    }
+
     /**
      * @return list<string>
      */

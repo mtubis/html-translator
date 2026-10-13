@@ -22,8 +22,9 @@ use HtmlTranslator\Provider\TranslationBatch;
 final readonly class PromptBuilder
 {
     /**
-     * Version of the prompt wording and format, part of the translation cache key (ARCHITECTURE §6.7): any change to
-     * what build() renders must come with a new version, or cached translations made with the old prompt are reused.
+     * Version of the prompt wording and format, part of the translation cache key (ARCHITECTURE §6.7, ADR-0016): any
+     * change to what build() renders, or to the text ResponseParser::parse() returns, must come with a new version, or
+     * cached translations made the old way are reused.
      */
     public const string VERSION = '2026-10.4';
 

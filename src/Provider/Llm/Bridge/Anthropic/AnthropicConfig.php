@@ -75,9 +75,15 @@ final readonly class AnthropicConfig
         $this->secrets = $secrets;
     }
 
+    /**
+     * "anthropic:<model>", plus the settings that change answers: "+effort=<level>" and "+fallbacks" (a refused
+     * request may be answered by another model), e.g. "anthropic:claude-opus-5-5+effort=low".
+     */
     public function modelId(): string
     {
-        return 'anthropic:' . $this->model;
+        return 'anthropic:' . $this->model
+            . ($this->effort instanceof AnthropicEffort ? '+effort=' . $this->effort->value : '')
+            . ($this->refusalFallbacks ? '+fallbacks' : '');
     }
 
     /**

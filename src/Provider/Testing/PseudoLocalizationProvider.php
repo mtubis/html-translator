@@ -10,8 +10,8 @@ use HtmlTranslator\Domain\UnitTextToken;
 use HtmlTranslator\Domain\UnitTextTokenKind;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Provider\BatchResult;
+use HtmlTranslator\Provider\CacheableProviderInterface;
 use HtmlTranslator\Provider\TranslationBatch;
-use HtmlTranslator\Provider\TranslationProviderInterface;
 
 /**
  * Deterministic fake translation for tests and demos, no network: "Hello <g1>world</g1>" →
@@ -26,7 +26,7 @@ use HtmlTranslator\Provider\TranslationProviderInterface;
  * and fallbacks: a unit with tags loses its last tag, a unit without tags comes back empty. Derived ids such as
  * "u3-1" (text-node fallback pieces) are never corrupted, so the TextNodesOnly fallback can succeed.
  */
-final readonly class PseudoLocalizationProvider implements TranslationProviderInterface
+final readonly class PseudoLocalizationProvider implements CacheableProviderInterface
 {
     private const array ACCENTS = [
         'a' => 'á', 'b' => 'ƀ', 'c' => 'ç', 'd' => 'ð', 'e' => 'é', 'f' => 'ƒ', 'g' => 'ĝ', 'h' => 'ĥ', 'i' => 'í',
@@ -68,6 +68,14 @@ final readonly class PseudoLocalizationProvider implements TranslationProviderIn
         }
 
         return new self($every, $persistent);
+    }
+
+    /**
+     * The same for every instance: corrupted translations are invalid, so they never reach a cache.
+     */
+    public function cacheId(): string
+    {
+        return 'pseudo-localization';
     }
 
     public function translate(TranslationBatch $batch): BatchResult

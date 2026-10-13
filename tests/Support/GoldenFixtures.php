@@ -11,6 +11,7 @@ use HtmlTranslator\Provider\TranslationProviderInterface;
 use HtmlTranslator\TranslatedDocument;
 use HtmlTranslator\TranslationOptions;
 use JsonException;
+use Psr\Cache\CacheItemPoolInterface;
 use UnexpectedValueException;
 
 /**
@@ -68,11 +69,11 @@ final class GoldenFixtures
         return is_file($file) ? self::read($file) : null;
     }
 
-    public static function translate(string $directory, ?TranslationProviderInterface $provider = null): TranslatedDocument
+    public static function translate(string $directory, ?TranslationProviderInterface $provider = null, ?CacheItemPoolInterface $cache = null): TranslatedDocument
     {
         [$target, $source] = self::options($directory);
 
-        return new HtmlTranslator($provider ?? new PseudoLocalizationProvider())
+        return new HtmlTranslator($provider ?? new PseudoLocalizationProvider(), cache: $cache)
             ->translate(self::input($directory), Locale::fromString($target), new TranslationOptions(source: null === $source ? null : Locale::fromString($source)));
     }
 

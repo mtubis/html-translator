@@ -147,6 +147,23 @@ final readonly class TranslationProfile
     }
 
     /**
+     * A hash of every setting, stable across processes and PHP versions: equal profiles have equal fingerprints,
+     * however they were built. Part of the unit cache key (ADR-0016). The order of glossary entries and
+     * do-not-translate terms counts, because it is the order the model sees them in.
+     */
+    public function fingerprint(): string
+    {
+        return hash('sha256', serialize([
+            $this->domain,
+            $this->formality->value,
+            $this->termPolicy->value,
+            array_map(static fn(GlossaryEntry $entry): array => [$entry->source, $entry->target], $this->glossary->entries()),
+            $this->doNotTranslate,
+            $this->instructions,
+        ]));
+    }
+
+    /**
      * @param list<string> $terms
      *
      * @return list<string>

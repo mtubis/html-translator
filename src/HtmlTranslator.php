@@ -6,6 +6,7 @@ namespace HtmlTranslator;
 
 use Closure;
 use HtmlTranslator\Batching\Batcher;
+use HtmlTranslator\Cache\UnitCache;
 use HtmlTranslator\Domain\Locale;
 use HtmlTranslator\Domain\LocalePair;
 use HtmlTranslator\Domain\TranslationUnit;
@@ -26,18 +27,23 @@ use HtmlTranslator\Html\SkipRules;
 use HtmlTranslator\Html\TranslatableAttributes;
 use HtmlTranslator\Profile\TranslationProfile;
 use HtmlTranslator\Provider\BatchContext;
+use HtmlTranslator\Provider\CacheableProviderInterface;
 use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\TokenUsage;
 use HtmlTranslator\Provider\TranslationBatch;
 use HtmlTranslator\Provider\TranslationProviderInterface;
 use HtmlTranslator\Validation\StructureValidator;
+use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
 /**
  * Entry point: translates an HTML document or fragment and keeps its structure (ARCHITECTURE §4–§6).
  *
- * Pipeline: load → segment → batches → provider → validation with corrective retries → fallback → reassembly.
- * Partial failures do not throw (ADR-0004): they become issues on the result, resolved by the FallbackStrategy.
+ * Pipeline: load → segment → unit cache → batches → provider → validation with corrective retries → fallback →
+ * reassembly. Partial failures do not throw (ADR-0004): they become issues on the result, resolved by the FallbackStrategy.
+ *
+ * With a cache and a CacheableProviderInterface provider, units are looked up before batching and validated
+ * translations are stored after each batch; fallback output and failures are never stored (ADR-0016).
  *
  * @phpstan-type Failure array{unit: TranslationUnit, type: IssueType, detail: string, permanent: bool, cause: ?ProviderException}
  */
@@ -53,8 +59,15 @@ final readonly class HtmlTranslator
 
     private TranslatableAttributes $translatableAttributes;
 
+    private ?UnitCache $cache;
+
+    /**
+     * @param CacheItemPoolInterface|null $cache unit translations; used only when the provider implements
+     *                                           CacheableProviderInterface. No expiry is set, configure it on the pool.
+     */
     public function __construct(
         private TranslationProviderInterface $provider,
+        ?CacheItemPoolInterface $cache = null,
         private ?LoggerInterface $logger = null,
         private HtmlLoader $loader = new HtmlLoader(),
         private Segmenter $segmenter = new Segmenter(),
@@ -66,6 +79,7 @@ final readonly class HtmlTranslator
     ) {
         $this->skipRules = $skipRules ?? SkipRules::defaults();
         $this->translatableAttributes = $translatableAttributes ?? TranslatableAttributes::defaults();
+        $this->cache = $cache instanceof CacheItemPoolInterface ? new UnitCache($cache) : null;
     }
 
     /**
@@ -88,17 +102,29 @@ final readonly class HtmlTranslator
         }
 
         $documentContext = BatchContext::forUnits($segmented->title(), $headingByUnit);
-        $batches = $this->batcher->batches($units, $options->tokenBudget, $options->batchSize);
+        [$unitCache, $profileFingerprint, $providerId] = $this->cacheScope($options->profile) ?? [null, '', ''];
+        $translations = $unitCache instanceof UnitCache ? $this->cachedTranslations($units, $locales, $unitCache, $profileFingerprint, $providerId) : [];
+        $cacheHits = \count($translations);
+        $uncached = [];
+        foreach ($units as $unit) {
+            if (!isset($translations[$unit->id->toString()])) {
+                $uncached[] = $unit;
+            }
+        }
 
-        $translations = [];
+        $batches = $this->batcher->batches($uncached, $options->tokenBudget, $options->batchSize);
+
         $issues = [];
         $complete = true;
         $retries = 0;
         $usage = null;
-        $unitsDone = 0;
+        $unitsDone = $cacheHits;
 
         foreach ($batches as $index => $batchUnits) {
             [$translated, $failures, $batchRetries, $batchUsage] = $this->translateWithRetries($locales, $options->profile, $documentContext, $batchUnits, $options->maxCorrectiveRetries);
+            // Stored per batch, so a later batch that throws does not lose them; fallback output is never stored.
+            $unitCache?->store($batchUnits, $translated, $locales, $profileFingerprint, $providerId);
+
             $translations += $translated;
             $retries += $batchRetries;
             $usage = TokenUsage::sum($usage, $batchUsage);
@@ -117,6 +143,11 @@ final readonly class HtmlTranslator
             }
         }
 
+        // Everything came from the cache: report completion once, so a progress bar still reaches the end.
+        if ([] === $batches && $cacheHits > 0 && $options->onProgress instanceof Closure) {
+            ($options->onProgress)(new Progress(0, 0, $cacheHits, \count($units)));
+        }
+
         $this->reassembler->apply($segmented, $translations, $target);
 
         foreach ($issues as $issue) {
@@ -127,8 +158,51 @@ final readonly class HtmlTranslator
             $segmented->document()->serialize(),
             $complete,
             $issues,
-            new TranslationStats(\count($units), \count($batches), $retries, (hrtime(true) - $started) / 1_000_000_000, $usage?->inputTokens, $usage?->outputTokens),
+            new TranslationStats(\count($units), \count($batches), $retries, (hrtime(true) - $started) / 1_000_000_000, $usage?->inputTokens, $usage?->outputTokens, $cacheHits),
         );
+    }
+
+    /**
+     * The cache with the profile fingerprint and provider id of this translation, or null when nothing is cached.
+     *
+     * @return array{UnitCache, string, string}|null
+     */
+    private function cacheScope(TranslationProfile $profile): ?array
+    {
+        if (!$this->cache instanceof UnitCache) {
+            return null;
+        }
+
+        if (!$this->provider instanceof CacheableProviderInterface) {
+            $this->logger?->notice(\sprintf('A cache is configured, but %s does not implement CacheableProviderInterface; nothing is cached.', $this->provider::class));
+
+            return null;
+        }
+
+        return [$this->cache, $profile->fingerprint(), $this->provider->cacheId()];
+    }
+
+    /**
+     * Cached translations whose structure is valid for their unit; anything else in the pool is untrusted and
+     * treated as a miss, so the unit is translated again and its entry overwritten.
+     *
+     * @param list<TranslationUnit> $units
+     *
+     * @return array<string, string> unit id → translation
+     */
+    private function cachedTranslations(array $units, LocalePair $locales, UnitCache $cache, string $profileFingerprint, string $providerId): array
+    {
+        $cached = $cache->fetch($units, $locales, $profileFingerprint, $providerId);
+
+        $translations = [];
+        foreach ($units as $unit) {
+            $id = $unit->id->toString();
+            if (isset($cached[$id]) && $this->validator->validate($unit, $cached[$id])->isValid()) {
+                $translations[$id] = $cached[$id];
+            }
+        }
+
+        return $translations;
     }
 
     /**
