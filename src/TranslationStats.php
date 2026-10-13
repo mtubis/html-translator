@@ -14,6 +14,7 @@ final readonly class TranslationStats
      *                              report it, and a provider call that ends in a ProviderException adds nothing, also
      *                              not for calls that answered before it
      * @param int|null $outputTokens answer tokens of the same calls, with the same rules
+     * @param int $cacheHits units taken from the unit cache instead of the provider; they are part of $units
      */
     public function __construct(
         public int $units,
@@ -22,5 +23,6 @@ final readonly class TranslationStats
         public float $durationSeconds,
         public ?int $inputTokens = null,
         public ?int $outputTokens = null,
+        public int $cacheHits = 0,
     ) {}
 }
