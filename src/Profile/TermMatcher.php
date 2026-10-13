@@ -12,7 +12,7 @@ namespace HtmlTranslator\Profile;
  * match "party". Scripts written without spaces between words (Chinese, Japanese, Thai, …) have no word boundaries
  * to check, so their terms match anywhere. A term never matches across two texts.
  *
- * @internal used by Glossary and PromptBuilder
+ * @internal used by Glossary, PromptBuilder and TermChecker
  */
 final readonly class TermMatcher
 {
@@ -22,6 +22,7 @@ final readonly class TermMatcher
 
     private function __construct(
         private string $haystack,
+        private bool $caseSensitive,
     ) {}
 
     /**
@@ -29,22 +30,34 @@ final readonly class TermMatcher
      */
     public static function in(array $texts): self
     {
-        return new self(implode("\n", array_map(self::fold(...), $texts)));
+        return new self(implode("\n", array_map(static fn(string $text): string => self::fold($text, false), $texts)), false);
+    }
+
+    /**
+     * Like in(), but a term matches only with the same letter case ("GitHub" not in "GITHUB").
+     *
+     * @param list<string> $texts plain text, without markup
+     */
+    public static function caseSensitiveIn(array $texts): self
+    {
+        return new self(implode("\n", array_map(static fn(string $text): string => self::fold($text, true), $texts)), true);
     }
 
     public function matches(string $term): bool
     {
-        return 1 === preg_match($this->pattern(self::fold($term)), $this->haystack);
+        return 1 === preg_match($this->pattern(self::fold($term, $this->caseSensitive)), $this->haystack);
     }
 
     /**
-     * Case-folded (so "STRASSE" equals "straße") with every run of whitespace as one space; texts and terms are
-     * compared in this form. Unicode normalization (NFC/NFD) is not applied.
+     * Every run of whitespace as one space and, unless case-sensitive, case-folded (so "STRASSE" equals "straße");
+     * texts and terms are compared in this form. Unicode normalization (NFC/NFD) is not applied.
      */
-    private static function fold(string $text): string
+    private static function fold(string $text, bool $caseSensitive): string
     {
         // preg_replace() fails only on invalid UTF-8; such a text keeps its whitespace and can still be compared.
-        return mb_convert_case(preg_replace('/[\s\p{Z}]+/u', ' ', $text) ?? $text, \MB_CASE_FOLD);
+        $text = preg_replace('/[\s\p{Z}]+/u', ' ', $text) ?? $text;
+
+        return $caseSensitive ? $text : mb_convert_case($text, \MB_CASE_FOLD);
     }
 
     /**

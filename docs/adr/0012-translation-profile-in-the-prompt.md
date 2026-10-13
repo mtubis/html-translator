@@ -44,4 +44,4 @@ Alternatives considered:
 - No Unicode normalization: a term in NFC does not match the same word in NFD. HTML is almost always NFC; adding
   normalization would need `ext-intl`.
 - Wording changes of any section need a new `PromptBuilder::VERSION` and show up in the golden prompt files.
-- Whether the model respected glossary and do-not-translate terms is not checked; a possible later `Issue` type.
+- Whether the model respected do-not-translate terms and kept glossary terms is checked afterwards (ADR-0017).

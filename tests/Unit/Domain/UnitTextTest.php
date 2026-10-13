@@ -158,6 +158,26 @@ final class UnitTextTest extends TestCase
     }
 
     /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function plainTexts(): iterable
+    {
+        yield 'text only' => ['Hello', 'Hello'];
+        yield 'escapes decoded' => ['Tom &amp; Jerry &lt;3', 'Tom & Jerry <3'];
+        yield 'paired tag becomes spaces' => ['pull <g1>request</g1>', 'pull  request '];
+        yield 'tag never joins words' => ['Git<g1>Hub</g1>', 'Git Hub '];
+        yield 'void tag' => ['Press<x1/>Enter', 'Press Enter'];
+        yield 'raw markup' => ['a <b>c', 'a  c'];
+    }
+
+    #[Test]
+    #[DataProvider('plainTexts')]
+    public function it_gives_the_plain_text_a_reader_sees(string $text, string $expected): void
+    {
+        self::assertSame($expected, UnitText::plainText($text));
+    }
+
+    /**
      * @return iterable<string, array{UnitTextTokenKind}>
      */
     public static function tagKinds(): iterable

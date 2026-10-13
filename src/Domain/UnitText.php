@@ -40,6 +40,20 @@ final class UnitText
     }
 
     /**
+     * The text as a reader sees it, for matching terms: escapes decoded, a space for every pseudo-tag and raw markup,
+     * so "pull <g1>request</g1>" still contains "pull request" while a tag never joins two words.
+     */
+    public static function plainText(string $text): string
+    {
+        $plain = '';
+        foreach (self::tokenize($text) as $token) {
+            $plain .= UnitTextTokenKind::Text === $token->kind ? $token->text : ' ';
+        }
+
+        return $plain;
+    }
+
+    /**
      * Splits unit text (typically model output) into text and pseudo-tags, decoding character references (ADR-0009).
      * Never throws: anything that is neither text nor a valid pseudo-tag becomes a RawMarkup token.
      *

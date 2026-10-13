@@ -17,6 +17,7 @@ use HtmlTranslator\Domain\UnitTextToken;
 use HtmlTranslator\Domain\UnitTextTokenKind;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\InvalidHtmlException;
+use HtmlTranslator\Exception\LogicException;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Exception\StructureValidationException;
 use HtmlTranslator\Exception\UntrustedText;
@@ -33,6 +34,7 @@ use HtmlTranslator\Provider\TokenUsage;
 use HtmlTranslator\Provider\TranslationBatch;
 use HtmlTranslator\Provider\TranslationProviderInterface;
 use HtmlTranslator\Validation\StructureValidator;
+use HtmlTranslator\Validation\TermChecker;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
@@ -76,6 +78,7 @@ final readonly class HtmlTranslator
         ?SkipRules $skipRules = null,
         ?TranslatableAttributes $translatableAttributes = null,
         private Batcher $batcher = new Batcher(),
+        private TermChecker $termChecker = new TermChecker(),
     ) {
         $this->skipRules = $skipRules ?? SkipRules::defaults();
         $this->translatableAttributes = $translatableAttributes ?? TranslatableAttributes::defaults();
@@ -148,6 +151,7 @@ final readonly class HtmlTranslator
             ($options->onProgress)(new Progress(0, 0, $cacheHits, \count($units)));
         }
 
+        array_push($issues, ...$this->termViolations($units, $translations, $options->profile));
         $this->reassembler->apply($segmented, $translations, $target);
 
         foreach ($issues as $issue) {
@@ -160,6 +164,36 @@ final readonly class HtmlTranslator
             $issues,
             new TranslationStats(\count($units), \count($batches), $retries, (hrtime(true) - $started) / 1_000_000_000, $usage?->inputTokens, $usage?->outputTokens, $cacheHits),
         );
+    }
+
+    /**
+     * Checks every translation that will be used (from the provider, the cache or the TextNodesOnly fallback) against
+     * the profile's terms; one issue per unit that breaks any (ADR-0017). No retry and no fallback follow.
+     *
+     * @param list<TranslationUnit> $units
+     * @param array<string, string> $translations unit id → translation
+     *
+     * @return list<Issue>
+     */
+    private function termViolations(array $units, array $translations, TranslationProfile $profile): array
+    {
+        $issues = [];
+        foreach ($units as $unit) {
+            $translation = $translations[$unit->id->toString()] ?? null;
+            $problems = null === $translation ? [] : $this->termChecker->check($unit, $translation, $profile);
+            if ([] !== $problems) {
+                // Bounded like reasons(): one unit can break hundreds of terms of a large profile.
+                $more = \count($problems) - self::MAX_REASONS;
+                $issues[] = new Issue($unit->id, IssueType::TermViolation, \sprintf(
+                    'The translation of unit "%s" does not follow the translation profile: %s%s.',
+                    $unit->id,
+                    implode('; ', \array_slice($problems, 0, self::MAX_REASONS)),
+                    $more > 0 ? \sprintf('; and %d more', $more) : '',
+                ));
+            }
+        }
+
+        return $issues;
     }
 
     /**
@@ -366,6 +400,8 @@ final readonly class HtmlTranslator
                 1 === $maxRetries ? 'retry' : 'retries',
                 $detail,
             ),
+            // Term violations are found after translation (termViolations()), never as a failure.
+            IssueType::TermViolation => throw new LogicException('A term violation is not a translation failure.'),
         };
     }
 

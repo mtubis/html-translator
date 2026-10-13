@@ -97,6 +97,15 @@ Token cost per call, roughly: 20–40 tokens for each of domain, formality and t
 glossary entry or do-not-translate term, plus the instructions. The rendered prompts are in
 `tests/Unit/Provider/Llm/Fixtures/prompts/profile-*.txt`.
 
+## Checking the result
+
+After translation, every translated unit is checked against the profile ([ADR-0017](adr/0017-term-checks-after-translation.md)):
+a do-not-translate term in the source must appear in the translation (with the profile's letter case when the source
+has it), and so must a glossary entry whose target equals its source (`'pull request' => 'pull request'`). A unit that
+breaks one gets an `IssueType::TermViolation` issue in `$result->issues()`; the translation is used anyway, without
+retries or extra calls. Glossary entries that translate their term are not checked, because the model may inflect the
+target ("gałąź" → "gałęzi").
+
 ## Presets
 
 | Preset | Domain | Formality | Term policy | Instructions |
