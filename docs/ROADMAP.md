@@ -1,7 +1,7 @@
 # Roadmap
 
 Each milestone is a GitHub milestone; each bullet is one issue = one Claude Code session = one PR.
-Issue bodies are drafted in [`docs/issues/core-0.1/`](issues/core-0.1/), [`docs/issues/core-0.2/`](issues/core-0.2/), [`docs/issues/core-0.3/`](issues/core-0.3/) and [`docs/issues/core-0.4/`](issues/core-0.4/) and can be created with `scripts/create-issues.sh`.
+Issue bodies are drafted in [`docs/issues/core-0.1/`](issues/core-0.1/), [`docs/issues/core-0.2/`](issues/core-0.2/), [`docs/issues/core-0.3/`](issues/core-0.3/), [`docs/issues/core-0.4/`](issues/core-0.4/) and [`docs/issues/core-1.0/`](issues/core-1.0/) and can be created with `scripts/create-issues.sh`.
 
 ## Core 0.1 — pipeline without any LLM
 Goal: any HTML fixture round-trips through segmentation → pseudo-localization → validation → reassembly with valid structure.
@@ -35,8 +35,14 @@ Goal: any HTML fixture round-trips through segmentation → pseudo-localization 
 - Transport retries with backoff in adapters
 - README with real examples, [usage guide](usage.md), 0.4.0 release on Packagist ([RELEASING](RELEASING.md))
 
-## 1.0 — API freeze
-- Public API review (deprecations removed), Infection MSI ≥ 85 %, docs complete.
+## Core 1.0 — API freeze
+- Public API review and the backward compatibility promise (ADR, `@internal`, API snapshot test)
+- API changes due before the freeze: token usage and bounded vendor codes on `ProviderException`; configs built from arrays fail with `InvalidArgumentException`
+- Refused batches are split to find the refused unit
+- JSON modes of the OpenAI-compatible presets verified against live servers
+- Tooling: `tools/eval` exit code and cache hits, token assertions in integration tests, nightly integration CI
+- Infection: mutation score locked in (covered MSI was 97 % at 0.4; ROADMAP asked for ≥ 85 %)
+- Docs complete (extension guide, `UPGRADE-1.0.md`, every snippet tested), 1.0.0 release
 
 ## Then
 - `html-translator-bundle` (Symfony): config tree (providers, profiles), DI, console command, Messenger handler, optional `symfony/ai` chat-model bridge.
