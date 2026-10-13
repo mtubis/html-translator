@@ -141,8 +141,11 @@ exceptions implement `HtmlTranslator\Exception\TranslatorException`. See the [us
 
 ## Framework integrations
 
-- Symfony bundle — planned
-- Laravel package — planned
+- **Laravel**: [`mtubis/html-translator-laravel`](https://github.com/mtubis/html-translator-laravel)
+  ([Packagist](https://packagist.org/packages/mtubis/html-translator-laravel)) — providers and profiles in
+  `config/html-translator.php`, the `HtmlTranslation` facade, Artisan commands, Laravel's HTTP client, cache stores
+  and log channels, and `HtmlTranslation::fake()` for tests.
+- Symfony bundle — planned.
 
 ## Contributing
 

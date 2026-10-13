@@ -46,5 +46,5 @@ Goal: any HTML fixture round-trips through segmentation → pseudo-localization 
 
 ## Then
 - `html-translator-bundle` (Symfony): config tree (providers, profiles), DI, console command, Messenger handler, optional `symfony/ai` chat-model bridge.
-- `html-translator-laravel`: service provider, config, facade, Artisan command, queued job, optional Prism bridge.
+- [`html-translator-laravel`](https://github.com/mtubis/html-translator-laravel) (released, 0.1.0): service provider, config, facade, Artisan commands, test fake. Still open: queued job, optional Prism bridge.
 - Drupal module (optional): formatted-text fields translated field by field via the core; evaluate the Drupal AI module's translation submodule first.
