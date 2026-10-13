@@ -88,10 +88,10 @@ glossary, do-not-translate terms, instructions. `Formality::Default`, `TermPolic
 add nothing, so the default profile leaves the prompt as it is. Instructions are introduced as "Instructions from the
 developer" and cannot override the rules for pseudo-tags or the answer format, which come after them.
 
-The glossary section lists only the entries that occur in the units of the batch. A term matches regardless of
-case, whitespace and inline markup (`pull <b>request</b>` matches "pull request"), as a whole word ("art" does not
-match "party", ".NET" matches in "ASP.NET"); in Chinese, Japanese, Thai and other scripts without spaces it matches
-anywhere. Do-not-translate terms are always sent in full.
+The glossary and do-not-translate sections list only the terms that occur in the units of the batch. A term matches
+regardless of case, whitespace and inline markup (`pull <b>request</b>` matches "pull request"), as a whole word ("art"
+does not match "party", ".NET" matches in "ASP.NET"); in Chinese, Japanese, Thai and other scripts without spaces it
+matches anywhere.
 
 Token cost per call, roughly: 20–40 tokens for each of domain, formality and term policy, 10 tokens per matched
 glossary entry or do-not-translate term, plus the instructions. The rendered prompts are in

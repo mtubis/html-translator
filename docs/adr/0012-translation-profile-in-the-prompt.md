@@ -29,15 +29,17 @@ Alternatives considered:
   Khmer, Myanmar); an edge that is punctuation needs no boundary, so ".NET" matches in "ASP.NET". Previous
   translations and problems are not searched. Terms are written as JSON strings (`- "source" → "target"`), and the
   model may inflect a target term where grammar requires it.
-- Do-not-translate terms are rendered in full on every call (at most 500 short terms); filtering them like the
-  glossary is left to token budgeting (0.4).
+- The do-not-translate section lists only the terms that occur in a unit text of the batch, in profile order, with
+  the same plain-text view and matching rules as the glossary (`Profile\TermMatcher`, shared by both; #48). A batch
+  without any of them gets no section.
 - Developer instructions are introduced as "Instructions from the developer", to be followed unless they conflict
   with the rules for the text or the answer format below them.
 - The user message does not change; the profile never reaches it.
 
 ## Consequences
-- A batch's prompt depends on its units (glossary filtering), so first calls no longer share one system message per
-  locale pair when a glossary is set; prompt caching by vendors works per batch content then.
+- A batch's prompt depends on its units (glossary and do-not-translate filtering), so first calls no longer share one
+  system message per locale pair when a glossary or do-not-translate terms are set; prompt caching by vendors works per
+  batch content then.
 - Term edges in scripts without spaces may match inside longer words (no reliable word boundaries there); accepted.
 - No Unicode normalization: a term in NFC does not match the same word in NFD. HTML is almost always NFC; adding
   normalization would need `ext-intl`.

@@ -13,6 +13,7 @@ use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Profile\Glossary;
+use HtmlTranslator\Profile\TermMatcher;
 use HtmlTranslator\Profile\TranslationProfile;
 use HtmlTranslator\Provider\BatchContext;
 use HtmlTranslator\Provider\BatchResult;
@@ -52,6 +53,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(UnitText::class)]
 #[UsesClass(UnitTextToken::class)]
 #[UsesClass(Glossary::class)]
+#[UsesClass(TermMatcher::class)]
 #[UsesClass(TranslationProfile::class)]
 #[UsesClass(BatchContext::class)]
 #[UsesClass(JsonSchema::class)]

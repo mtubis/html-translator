@@ -8,6 +8,7 @@ use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\GlossaryEntry;
 use HtmlTranslator\Profile\ProfileText;
+use HtmlTranslator\Profile\TermMatcher;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -15,6 +16,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(Glossary::class)]
+#[CoversClass(TermMatcher::class)]
 #[UsesClass(GlossaryEntry::class)]
 #[UsesClass(ProfileText::class)]
 final class GlossaryTest extends TestCase

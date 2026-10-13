@@ -137,7 +137,7 @@ Adapters are written on **PSR-18 / PSR-17**, not vendor SDKs ([ADR-0002](adr/000
 - Each batch carries document context hints (`BatchContext`): the page title and the section heading of each unit (helps the model with ambiguous short strings such as button labels). Corrective retries and the text-node fallback get the same hints; see [ADR-0013](adr/0013-context-hints-in-the-prompt.md).
 
 ### 6.4 Provider call (LLM)
-- `PromptBuilder::build(TranslationBatch): ChatRequest` renders a system prompt with the pseudo-tag rules (plus sections for what the `TranslationProfile` sets, with the glossary filtered to the batch; [ADR-0012](adr/0012-translation-profile-in-the-prompt.md)) and a user message containing units as a JSON object (`{"units": [{"id": "u12", "kind": "block", "text": "…"}]}`, preceded by a `"context"` member when the batch has context hints, ADR-0013), with the previous answer and the problems for units that are retried.
+- `PromptBuilder::build(TranslationBatch): ChatRequest` renders a system prompt with the pseudo-tag rules (plus sections for what the `TranslationProfile` sets, with the glossary and do-not-translate terms filtered to those that occur in the batch; [ADR-0012](adr/0012-translation-profile-in-the-prompt.md)) and a user message containing units as a JSON object (`{"units": [{"id": "u12", "kind": "block", "text": "…"}]}`, preceded by a `"context"` member when the batch has context hints, ADR-0013), with the previous answer and the problems for units that are retried.
 - The model must answer with a JSON object `{"units": [{"id": "u12", "text": "…"}]}`. `ResponseParser::parse(ChatResponse, TranslationBatch): BatchResult` takes the first JSON value with that shape, skipping code fences and prose around it, drops trailing commas and surrounding whitespace of texts; anything else is a `ProviderException` for that batch. See [ADR-0011](adr/0011-prompt-and-response-format-of-the-llm-provider.md).
 - The prompt has a **version string** (`PromptBuilder::VERSION`); it is part of the cache key.
 - Token usage: `BatchResult::$usage` (`TokenUsage`, input and output tokens as the vendor reports them; null when it reports none) covers every call made for a batch, the parse retry included. `HtmlTranslator` sums it over first calls, corrective retries and the text-node fallback into `TranslationStats::$inputTokens` / `$outputTokens`, which stay null while no call reported a count (and are lower bounds when only some calls reported it). A batch call that ends in a `ProviderException` adds nothing, also not the tokens of calls that answered before it.
@@ -170,7 +170,8 @@ src/
   TranslationOptions.php  TranslatedDocument.php  TranslationStats.php  Progress.php
   FallbackStrategy.php  Issue.php  IssueType.php
   Domain/                       Locale, LocalePair, TranslationUnit, InlineTag, UnitId …
-  Profile/                      TranslationProfile, TermPolicy, Formality, Glossary, GlossaryEntry
+  Profile/                      TranslationProfile, TermPolicy, Formality, Glossary, GlossaryEntry,
+                                TermMatcher (@internal: term matching shared by Glossary and PromptBuilder)
   Html/                         HtmlLoader, Segmenter, InlineEncoder, Reassembler, SkipRules, TranslatableAttributes
   Validation/                   StructureValidator, ValidationResult, Violation, ViolationType
   Batching/                     Batcher, TokenEstimatorInterface, CharacterTokenEstimator

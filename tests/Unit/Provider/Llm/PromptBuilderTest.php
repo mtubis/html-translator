@@ -17,6 +17,7 @@ use HtmlTranslator\Profile\Formality;
 use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\GlossaryEntry;
 use HtmlTranslator\Profile\ProfileText;
+use HtmlTranslator\Profile\TermMatcher;
 use HtmlTranslator\Profile\TermPolicy;
 use HtmlTranslator\Profile\TranslationProfile;
 use HtmlTranslator\Provider\BatchContext;
@@ -50,6 +51,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(UnitId::class)]
 #[UsesClass(TranslationProfile::class)]
 #[UsesClass(Glossary::class)]
+#[UsesClass(TermMatcher::class)]
 #[UsesClass(GlossaryEntry::class)]
 #[UsesClass(ProfileText::class)]
 #[UsesClass(UnitText::class)]
@@ -290,6 +292,52 @@ final class PromptBuilderTest extends TestCase
         $batch = self::batch([self::unit('u1', 'Contact us')], ['u1' => new Correction('merge', '- merge')], $profile);
 
         self::assertStringNotContainsString('scalenie', $this->content(new PromptBuilder()->build($batch), 0));
+    }
+
+    #[Test]
+    public function it_leaves_out_the_do_not_translate_terms_when_none_occurs_in_the_batch(): void
+    {
+        $units = [self::unit('u1', 'Contact us'), self::unit('a1', 'Team photo', kind: UnitKind::Attribute)];
+        $profile = TranslationProfile::default()->withDoNotTranslate('GitHub', 'Symfony');
+
+        self::assertSame(
+            $this->content(new PromptBuilder()->build(self::batch($units)), 0),
+            $this->content(new PromptBuilder()->build(self::batch($units, profile: $profile)), 0),
+        );
+    }
+
+    #[Test]
+    public function it_sends_only_the_do_not_translate_terms_of_the_batch_in_profile_order(): void
+    {
+        $profile = TranslationProfile::default()->withDoNotTranslate('Symfony Flex', 'Laravel', 'AT&T', 'GitHub', 'Git');
+
+        $system = $this->content(new PromptBuilder()->build(self::batch([
+            self::unit('u1', 'Push it to GITHUB with <g1>symfony</g1> <g2>flex</g2>.', [InlineTag::of(1, InlineTagKind::Paired), InlineTag::of(2, InlineTagKind::Paired)]),
+            self::unit('a1', 'Call AT&amp;T', kind: UnitKind::Attribute),
+        ], profile: $profile)), 0);
+
+        self::assertStringContainsString("including letter case:\n- Symfony Flex\n- AT&T\n- GitHub\n\n", $system);
+    }
+
+    #[Test]
+    public function it_does_not_join_words_split_by_a_pseudo_tag_for_do_not_translate_terms(): void
+    {
+        $profile = TranslationProfile::default()->withDoNotTranslate('GitHub');
+
+        $system = $this->content(new PromptBuilder()->build(self::batch([
+            self::unit('u1', 'Git<g1>Hub</g1>', [InlineTag::of(1, InlineTagKind::Paired)]),
+        ], profile: $profile)), 0);
+
+        self::assertStringNotContainsString('Do not translate these terms', $system);
+    }
+
+    #[Test]
+    public function it_does_not_match_do_not_translate_terms_in_previous_translations_or_problems(): void
+    {
+        $profile = TranslationProfile::default()->withDoNotTranslate('GitHub');
+        $batch = self::batch([self::unit('u1', 'Contact us')], ['u1' => new Correction('GitHub', '- GitHub')], $profile);
+
+        self::assertStringNotContainsString('Do not translate these terms', $this->content(new PromptBuilder()->build($batch), 0));
     }
 
     #[Test]

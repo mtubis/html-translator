@@ -13,6 +13,9 @@ All notable changes to this project are documented here. The format follows [Kee
   bounded and kept on one line (`Exception\UntrustedText`, #43).
 
 ### Changed
+- The do-not-translate section of the prompt lists only the terms that occur in the batch, like the glossary; with 500
+  terms that saves about 2,300 tokens per call. `PromptBuilder::VERSION` is 2026-10.5, so unit-cache entries made with
+  the previous prompt are not reused (#48).
 - `tools/eval` takes token counts from `TranslationStats`; a fixture that fails with an error shows no tokens, and the
   summary line says how many fixtures it leaves out (#60).
 - Units are no longer cut into fixed chunks of `batchSize`: a batch also closes at `tokenBudget`, so documents with
