@@ -24,7 +24,10 @@ interface ChatModelInterface
 {
     /**
      * The configured model, stable across calls and known before any call (e.g. "openai:gpt-4o-mini"); part of the
-     * translation cache key. ChatResponse::$model may differ (vendors often report a dated snapshot).
+     * translation cache key (ADR-0016), so it must also name every adapter setting that changes answers, such as a
+     * reasoning effort or server-side fallback models (e.g. "anthropic:claude-opus-5-5+effort=low"). Settings that only
+     * cut answers off (output limits) or change transport and parsing do not belong in it. Single line, no credentials.
+     * ChatResponse::$model may differ (vendors often report a dated snapshot).
      */
     public function modelId(): string;
 

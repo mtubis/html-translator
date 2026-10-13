@@ -35,6 +35,17 @@ final class AnthropicConfigTest extends TestCase
     }
 
     #[Test]
+    public function its_model_id_names_the_settings_that_change_answers(): void
+    {
+        self::assertSame('anthropic:claude-opus-5-5+effort=low', new AnthropicConfig('claude-opus-5-5', self::API_KEY, effort: AnthropicEffort::Low)->modelId());
+        self::assertSame('anthropic:claude-opus-5-5+fallbacks', new AnthropicConfig('claude-opus-5-5', self::API_KEY, refusalFallbacks: true)->modelId());
+        self::assertSame(
+            'anthropic:claude-opus-5-5+effort=max+fallbacks',
+            new AnthropicConfig('claude-opus-5-5', self::API_KEY, effort: AnthropicEffort::Max, refusalFallbacks: true)->modelId(),
+        );
+    }
+
+    #[Test]
     public function it_has_the_documented_defaults(): void
     {
         $config = new AnthropicConfig('claude-opus-5-5', self::API_KEY);

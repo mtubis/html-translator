@@ -48,6 +48,13 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(BatchContext::class)]
 final class PseudoLocalizationProviderTest extends TestCase
 {
+    #[Test]
+    public function its_cache_id_does_not_depend_on_corruption(): void
+    {
+        self::assertSame('pseudo-localization', new PseudoLocalizationProvider()->cacheId());
+        self::assertSame('pseudo-localization', PseudoLocalizationProvider::corruptingEvery(2)->cacheId());
+    }
+
     /**
      * @return iterable<string, array{string, string}>
      */

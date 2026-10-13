@@ -61,6 +61,14 @@ final class LlmTranslationProviderTest extends TestCase
     private const string ANSWER = '{"units": [{"id": "u1", "text": "Jeden"}, {"id": "u2", "text": "Dwa"}]}';
 
     #[Test]
+    public function its_cache_id_names_the_model_and_the_prompt_version(): void
+    {
+        $provider = new LlmTranslationProvider(FakeChatModel::withResponses()->withModelId('openai:gpt-4o-mini'));
+
+        self::assertSame('llm:openai:gpt-4o-mini:' . PromptBuilder::VERSION, $provider->cacheId());
+    }
+
+    #[Test]
     public function it_sends_the_prompt_of_the_batch_and_returns_the_parsed_answer(): void
     {
         $model = FakeChatModel::withResponses($this->response(self::ANSWER));

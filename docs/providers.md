@@ -182,3 +182,10 @@ pass their own, and tests `Provider\Llm\Testing\FakeSleeper`, which records the 
 - **A non-LLM engine**: implement `Provider\TranslationProviderInterface` and pass
   `Provider\Testing\TranslationProviderContractTestCase`. Report tokens in `BatchResult::$usage` (`TokenUsage`) when the engine
   reports them; leave it null otherwise (engines billed by characters too, since the stats count tokens).
+  To let `HtmlTranslator` reuse its translations from a unit cache, implement
+  `Provider\CacheableProviderInterface` instead: `cacheId()` names everything that changes the output (engine, model,
+  settings), e.g. `deepl:formal`, never a credential and never per-batch data such as locales (ADR-0016). Without it the
+  provider works, but nothing is cached. A decorator that changes translations prefixes the wrapped provider's id with
+  its own settings; one around a provider that is not cacheable does not implement the interface.
+- **Chat model settings and the cache**: `ChatModelInterface::modelId()` is part of the cache key, so it names every
+  setting that changes answers (`AnthropicConfig` adds `+effort=<level>` and `+fallbacks`).

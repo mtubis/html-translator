@@ -7,9 +7,9 @@ namespace HtmlTranslator\Provider\Llm;
 use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Provider\BatchResult;
+use HtmlTranslator\Provider\CacheableProviderInterface;
 use HtmlTranslator\Provider\TokenUsage;
 use HtmlTranslator\Provider\TranslationBatch;
-use HtmlTranslator\Provider\TranslationProviderInterface;
 
 /**
  * Translates with any chat model (ADR-0005): PromptBuilder renders the batch, including the corrections the core
@@ -23,14 +23,24 @@ use HtmlTranslator\Provider\TranslationProviderInterface;
  * refused again.
  * The result carries the tokens of both calls when it asked twice. A batch that ends in a ProviderException reports no
  * usage, also not the tokens of a call that answered before (an unparsable or cut-off answer).
+ * Cacheable (ADR-0016): the cache id names the chat model and the prompt version.
  */
-final readonly class LlmTranslationProvider implements TranslationProviderInterface
+final readonly class LlmTranslationProvider implements CacheableProviderInterface
 {
     public function __construct(
         private ChatModelInterface $chatModel,
         private PromptBuilder $promptBuilder = new PromptBuilder(),
         private ResponseParser $responseParser = new ResponseParser(),
     ) {}
+
+    /**
+     * "llm:<model id>:<prompt version>", e.g. "llm:openai:gpt-4o-mini:2026-10.4".
+     */
+    public function cacheId(): string
+    {
+        // PromptBuilder and ResponseParser are final and have no options; if they gain any, they belong in the id.
+        return \sprintf('llm:%s:%s', $this->chatModel->modelId(), PromptBuilder::VERSION);
+    }
 
     /**
      * @throws ProviderException when the chat model fails, or its answer cannot be parsed twice in a row

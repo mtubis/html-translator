@@ -17,6 +17,7 @@ use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\TermPolicy;
 use HtmlTranslator\Profile\TranslationProfile;
 use HtmlTranslator\Provider\BatchResult;
+use HtmlTranslator\Provider\CacheableProviderInterface;
 use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\TranslationBatch;
 use HtmlTranslator\Provider\TranslationProviderInterface;
@@ -207,6 +208,31 @@ abstract class TranslationProviderContractTestCase extends TestCase
         $this->assertFailsWithProviderException(
             $this->providerWithUndecodableAnswers() ?? self::markTestSkipped('This provider cannot receive undecodable answers.'),
         );
+    }
+
+    /**
+     * A cacheable provider (ADR-0016) gives the same non-empty, single-line, credential-free id on every call and for
+     * every instance configured the same way, translating or not; otherwise cached translations would never be found
+     * again. It translates one short unit, so with a real engine it costs one call.
+     */
+    #[Test]
+    public function it_has_a_stable_cache_id_when_it_is_cacheable(): void
+    {
+        $provider = $this->provider();
+        if (!$provider instanceof CacheableProviderInterface) {
+            self::markTestSkipped('This provider is not cacheable.');
+        }
+
+        $cacheId = $provider->cacheId();
+        $provider->translate($this->batch([$this->unit('u1', 'Hello')]));
+        $other = $this->provider();
+
+        self::assertNotSame('', trim($cacheId));
+        self::assertDoesNotMatchRegularExpression('/\p{Cc}/u', $cacheId);
+        self::assertStringNotContainsString(self::API_KEY, $cacheId);
+        self::assertSame($cacheId, $provider->cacheId());
+        self::assertInstanceOf(CacheableProviderInterface::class, $other);
+        self::assertSame($cacheId, $other->cacheId());
     }
 
     /**
