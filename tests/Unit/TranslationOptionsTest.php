@@ -34,6 +34,7 @@ final class TranslationOptionsTest extends TestCase
         self::assertSame(FallbackStrategy::KeepOriginal, $options->fallback);
         self::assertSame(2, $options->maxCorrectiveRetries);
         self::assertSame(20, $options->batchSize);
+        self::assertSame(2000, $options->tokenBudget);
         self::assertNull($options->onProgress);
     }
 
@@ -73,5 +74,20 @@ final class TranslationOptionsTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         new TranslationOptions(batchSize: 0);
+    }
+
+    #[Test]
+    public function it_holds_a_token_budget(): void
+    {
+        self::assertSame(1, new TranslationOptions(tokenBudget: 1)->tokenBudget);
+    }
+
+    #[Test]
+    public function it_rejects_an_empty_token_budget(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Token budget must be at least 1, got 0.');
+
+        new TranslationOptions(tokenBudget: 0);
     }
 }

@@ -14,8 +14,11 @@ final readonly class TranslationOptions
     /** @var non-negative-int how often a unit failing validation is sent again with feedback */
     public int $maxCorrectiveRetries;
 
-    /** @var positive-int units per provider call (a token-based batcher replaces this in 0.4) */
+    /** @var positive-int upper bound of units per provider call */
     public int $batchSize;
+
+    /** @var positive-int approximate tokens of unit texts per provider call, not counting the instructions (ADR-0015) */
+    public int $tokenBudget;
 
     /** How text is translated: domain, formality, term policy, glossary, … */
     public TranslationProfile $profile;
@@ -25,7 +28,7 @@ final readonly class TranslationOptions
      * @param (Closure(Progress): void)|null $onProgress called after each batch
      * @param TranslationProfile|null $profile null means TranslationProfile::default()
      *
-     * @throws InvalidArgumentException when retries are negative or the batch size is below 1
+     * @throws InvalidArgumentException when retries are negative or the batch size or token budget is below 1
      */
     public function __construct(
         public ?Locale $source = null,
@@ -34,6 +37,7 @@ final readonly class TranslationOptions
         int $batchSize = 20,
         public ?Closure $onProgress = null,
         ?TranslationProfile $profile = null,
+        int $tokenBudget = 2000,
     ) {
         if ($maxCorrectiveRetries < 0) {
             throw new InvalidArgumentException(\sprintf('Corrective retries cannot be negative, got %d.', $maxCorrectiveRetries));
@@ -43,8 +47,13 @@ final readonly class TranslationOptions
             throw new InvalidArgumentException(\sprintf('Batch size must be at least 1, got %d.', $batchSize));
         }
 
+        if ($tokenBudget < 1) {
+            throw new InvalidArgumentException(\sprintf('Token budget must be at least 1, got %d.', $tokenBudget));
+        }
+
         $this->maxCorrectiveRetries = $maxCorrectiveRetries;
         $this->batchSize = $batchSize;
+        $this->tokenBudget = $tokenBudget;
         $this->profile = $profile ?? TranslationProfile::default();
     }
 }
