@@ -18,3 +18,8 @@ composer test:integration
 ```
 
 `tools/eval` compares models over all golden fixtures; see [tools/eval/README.md](tools/eval/README.md).
+
+The examples in the README and in [docs/usage.md](docs/usage.md) are run by the `documentation` test suite: the
+`php` code blocks of a file run as one script in document order, and a `text` code block right after one is
+the output it must print.
+Releases follow [docs/RELEASING.md](docs/RELEASING.md).

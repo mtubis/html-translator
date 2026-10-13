@@ -11,84 +11,46 @@ Translate HTML documents with large language models — **without breaking the m
 
 ## Requirements
 
-PHP 8.4+ (uses the native HTML5 parser `Dom\HTMLDocument`).
+PHP 8.4+ (uses the native HTML5 parser `Dom\HTMLDocument`). For real models: any PSR-18 HTTP client with PSR-17
+factories, e.g. `symfony/http-client` with `nyholm/psr7`.
 
 ## Installation
 
 ```bash
-composer require mtubis/html-translator
+composer require mtubis/html-translator:^0.4
+composer require symfony/http-client nyholm/psr7   # or any other PSR-18 client
 ```
 
-## Quick start
+## Quick start (offline)
+
+`PseudoLocalizationProvider` needs no model and no network, so you can see what the library does to your HTML:
 
 ```php
 use HtmlTranslator\Domain\Locale;
-use HtmlTranslator\FallbackStrategy;
 use HtmlTranslator\HtmlTranslator;
 use HtmlTranslator\Provider\Testing\PseudoLocalizationProvider;
-use HtmlTranslator\TranslationOptions;
 
-// Any TranslationProviderInterface (see Providers below).
-// PseudoLocalizationProvider needs no network: "Hello" becomes "[!! Ĥéļļö !!]".
 $translator = new HtmlTranslator(new PseudoLocalizationProvider());
 
 $result = $translator->translate(
     '<p>Click <a href="/docs">here</a> to <strong>continue</strong>.</p>',
     Locale::fromString('pl'),
-    new TranslationOptions(
-        source: Locale::fromString('en'),        // null = let the model detect it
-        fallback: FallbackStrategy::KeepOriginal, // or TextNodesOnly, Throw
-        maxCorrectiveRetries: 2,
-    ),
 );
 
 echo $result->html();
-// <p>[!! Çļíçķ <a href="/docs">ĥéŕé</a> ţö <strong>çöñţíñüé</strong>. !!]</p>
+```
+
+```text
+<p>[!! Çļíçķ <a href="/docs">ĥéŕé</a> ţö <strong>çöñţíñüé</strong>. !!]</p>
 ```
 
 Markup, non-translatable attributes (`href`, classes, …) and non-translatable content (`<code>`, `translate="no"`,
 scripts) are never sent to the provider and come back untouched; translatable attributes (`alt`, `title`,
 `placeholder`, …) are translated, and `<html lang>` is set to the target for full documents.
 
-**Partial failures do not throw.** A unit whose translation keeps breaking the markup after corrective retries, or
-that the provider refuses or leaves out, is handled by the fallback strategy and reported, so always check the result:
+## Translating with a real model
 
-```php
-if (!$result->isComplete()) {
-    foreach ($result->issues() as $issue) {
-        $logger->warning($issue->message, ['unit' => $issue->unitId->toString(), 'type' => $issue->type->name]);
-    }
-}
-
-$result->stats(); // units, batches, retries, durationSeconds
-```
-
-`translate()` throws only for unusable input (`InvalidHtmlException`, or `InvalidArgumentException` when source and
-target are the same), a provider that fails completely (`ProviderException`) or `FallbackStrategy::Throw`
-(`StructureValidationException` or `ProviderException`); all implement `HtmlTranslator\Exception\TranslatorException`.
-Pass options and collaborators as named arguments. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
-
-## Translation profiles
-
-A `TranslationProfile` steers how language models translate: domain, formality, technical terms, a glossary,
-terms to keep as they are and your own instructions.
-
-```php
-use HtmlTranslator\Profile\Glossary;
-use HtmlTranslator\Profile\TranslationProfile;
-
-$result = $translator->translate($html, Locale::fromString('pl'), new TranslationOptions(
-    profile: TranslationProfile::technical()
-        ->withGlossary(Glossary::fromArray(['branch' => 'gałąź']))
-        ->withDoNotTranslate('GitHub'),
-));
-```
-
-Presets: `technical()`, `marketing()`, `legal()`. See [docs/profiles.md](docs/profiles.md).
-
-## Providers
-
-Language models are used through `LlmTranslationProvider` and a chat model adapter on any PSR-18 HTTP client:
+Language models are used through `LlmTranslationProvider` and a chat model adapter. With OpenAI:
 
 ```php
 use HtmlTranslator\HtmlTranslator;
@@ -98,10 +60,65 @@ use HtmlTranslator\Provider\Llm\LlmTranslationProvider;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\HttpClient\Psr18Client;
 
-$http = new Psr18Client(HttpClient::create(['timeout' => 60]));
-$model = new OpenAiCompatibleChatModel($http, $http, $http, OpenAiCompatibleConfig::openAi($apiKey, 'gpt-4o-mini'));
+$http = new Psr18Client(HttpClient::create(['timeout' => 120]));
+$model = new OpenAiCompatibleChatModel($http, $http, $http, OpenAiCompatibleConfig::openAi($_ENV['OPENAI_API_KEY'], 'gpt-4o-mini'));
 $translator = new HtmlTranslator(new LlmTranslationProvider($model));
 ```
+
+With Anthropic's Claude:
+
+```php
+use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicChatModel;
+use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
+
+$model = new AnthropicChatModel($http, $http, $http, new AnthropicConfig('claude-opus-5-5', $_ENV['ANTHROPIC_API_KEY']));
+$translator = new HtmlTranslator(new LlmTranslationProvider($model));
+```
+
+Then translate, here with a profile for technical documentation and a PSR-6 cache, so units that were already
+translated are not paid for again:
+
+```php
+use HtmlTranslator\Domain\Locale;
+use HtmlTranslator\Profile\Glossary;
+use HtmlTranslator\Profile\TranslationProfile;
+use HtmlTranslator\TranslationOptions;
+
+$translator = new HtmlTranslator(new LlmTranslationProvider($model), cache: $cache, logger: $logger);
+
+$result = $translator->translate($html, Locale::fromString('pl'), new TranslationOptions(
+    source: Locale::fromString('en'), // null = let the model detect it
+    profile: TranslationProfile::technical()
+        ->withGlossary(Glossary::fromArray(['branch' => 'gałąź']))
+        ->withDoNotTranslate('GitHub'),
+));
+```
+
+**Partial failures do not throw.** A unit whose translation keeps breaking the markup after corrective retries, or
+that the model refuses or leaves out, is handled by the fallback strategy (by default it keeps its original text) and
+reported, so always check the result:
+
+```php
+$translated = $result->html(); // always valid HTML
+
+if (!$result->isComplete()) {
+    foreach ($result->issues() as $issue) {
+        $logger->warning($issue->message, ['unit' => $issue->unitId->toString(), 'type' => $issue->type->name]);
+    }
+}
+
+$stats = $result->stats();
+printf("units: %d, batches: %d, from the cache: %d\n", $stats->units, $stats->batches, $stats->cacheHits);
+```
+
+```text
+units: 3, batches: 1, from the cache: 0
+```
+
+`translate()` throws only for unusable input, a provider that fails completely or `FallbackStrategy::Throw`; all
+exceptions implement `HtmlTranslator\Exception\TranslatorException`. See the [usage guide](docs/usage.md).
+
+## Providers
 
 | Provider | Configuration |
 |---|---|
@@ -113,7 +130,14 @@ $translator = new HtmlTranslator(new LlmTranslationProvider($model));
 | Other OpenAI-compatible APIs | `new OpenAiCompatibleConfig(...)` |
 | Anthropic | `new AnthropicChatModel($http, $http, $http, new AnthropicConfig($model, $apiKey))` |
 
-See [docs/providers.md](docs/providers.md) for configuration, timeouts and error handling.
+## Documentation
+
+- [Usage guide](docs/usage.md): documents and fragments, what is translated, fallbacks, profiles, caching and
+  costs, errors.
+- [Providers](docs/providers.md): configuration, JSON modes, timeouts, retries and errors of each adapter.
+- [Translation profiles](docs/profiles.md): domain, formality, glossary and term policy.
+- [Architecture](docs/ARCHITECTURE.md) and [decisions](docs/adr/).
+- [Changelog](CHANGELOG.md).
 
 ## Framework integrations
 

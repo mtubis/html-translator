@@ -33,7 +33,7 @@ Goal: any HTML fixture round-trips through segmentation → pseudo-localization 
 - `Batcher` with token budget, `TokenEstimator`
 - PSR-6 unit cache, `TranslationStats`, `onProgress`
 - Transport retries with backoff in adapters
-- README with real examples, `docs/` usage guide, 0.4.0 release on Packagist
+- README with real examples, [usage guide](usage.md), 0.4.0 release on Packagist ([RELEASING](RELEASING.md))
 
 ## 1.0 — API freeze
 - Public API review (deprecations removed), Infection MSI ≥ 85 %, docs complete.
