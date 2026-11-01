@@ -45,6 +45,20 @@ final class JsonSchemaTest extends TestCase
     }
 
     /**
+     * Objects 63 deep (as JSON counts depth, with the values inside) are the limit, so a hostile schema stays cheap.
+     */
+    #[Test]
+    public function it_rejects_schemas_nested_64_deep(): void
+    {
+        $nested = static fn(int $levels): string => str_repeat('{"type": "object", "a": ', $levels - 1) . '{"type": "object"}' . str_repeat('}', $levels - 1);
+
+        self::assertStringStartsWith('{"type":"object"', JsonSchema::fromJson($nested(63))->json);
+
+        $this->expectException(InvalidArgumentException::class);
+        JsonSchema::fromJson($nested(64));
+    }
+
+    /**
      * The parser's wording differs between PHP versions, so the message is compared with the cause, not a literal.
      */
     #[Test]

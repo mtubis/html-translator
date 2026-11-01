@@ -60,14 +60,12 @@ final readonly class InlineEncoder
      */
     private function encodeNode(Node $node, SkipRules $rules, string &$text, string &$plain, array &$inlineTags, array &$tagNodes, array &$attributeCandidates): void
     {
-        if ($node instanceof Text) {
-            $text .= UnitText::escape($node->data);
-            $plain .= $node->data;
-
-            return;
-        }
-
         if (!$node instanceof Element && !$node instanceof Comment) {
+            if ($node instanceof Text) {
+                $text .= UnitText::escape($node->data);
+                $plain .= $node->data;
+            }
+
             return;
         }
 

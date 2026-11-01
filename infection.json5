@@ -21,9 +21,191 @@
         "summary": "var/infection/summary.log",
         "github": true
     },
+    // Equivalent mutants (#84): mutations that cannot change behaviour, per mutator, each with the reason.
+    // "ignore" names a method that has no other mutant of that kind; where it has, "ignoreSourceCodeByRegex"
+    // matches the mutated line's code (anchored to the whole line), so the entry follows the code when lines move.
     "mutators": {
-        "@default": true
+        "@default": true,
+        "ArrayItemRemoval": {
+            // Fragment parsing depends only on the innermost context element; <colgroup> needs no <table> around it.
+            "ignoreSourceCodeByRegex": [
+                "return \\$this->holdsOnlyColumns\\(\\$inTable->root\\(\\)\\) \\? \\$this->loadFragment\\(\\$html, \\['table', 'colgroup'\\]\\) : \\$inTable;",
+            ],
+        },
+        "Assignment": {
+            // $permanent is still empty here: with this call budget no half is parsed after a part was marked
+            // permanent, and ResponseParser reports no permanent failures, so `=` and `+=` give the same.
+            "ignoreSourceCodeByRegex": [
+                "\\$permanent \\+= \\$result->permanentFailures;",
+            ],
+        },
+        "Break_": {
+            "ignore": [
+                // No bracket is left: every further candidate finds none either, so continue ends the same way.
+                "HtmlTranslator\\Provider\\Llm\\ResponseParser::entries",
+            ],
+        },
+        "CastInt": {
+            "ignore": [
+                // The key is always found, so array_search() returns an int; the cast is for PHPStan.
+                "HtmlTranslator\\Exception\\ArrayArgument::wrongElement",
+                // A numeric string works with % as its int does.
+                "HtmlTranslator\\Provider\\Testing\\PseudoLocalizationProvider::isCorrupted",
+            ],
+            // ceil() returns a float, and the budget is only compared with and reduced by integers.
+            "ignoreSourceCodeByRegex": [
+                "\\$budget = 2 \\* \\(int\\) ceil\\(log\\(\\\\count\\(\\$batch->units\\), 2\\)\\);",
+            ],
+        },
+        "Coalesce": {
+            "ignore": [
+                // Reached only when one side is null, so either order gives the other side.
+                "HtmlTranslator\\Provider\\TokenUsage::sum",
+                "HtmlTranslator\\Provider\\TokenUsage::add",
+            ],
+            // A unit that failed permanently is never sent again, so it is never in $failures as well.
+            "ignoreSourceCodeByRegex": [
+                "\\$failure = \\$permanent\\[\\$id\\] \\?\\? \\$failures\\[\\$id\\] \\?\\? null;",
+            ],
+        },
+        "DecrementInteger": {
+            "ignore": [
+                // A schema is limited to a depth of 64 (JsonSchema), far below json_decode()'s 512.
+                "HtmlTranslator\\Provider\\Llm\\Bridge\\OpenAiCompatible\\OpenAiCompatibleChatModel::schemaFormat",
+                // usleep(): the length of a real sleep is not tested.
+                "HtmlTranslator\\Provider\\Llm\\Bridge\\UsleepSleeper::sleep",
+            ],
+            "ignoreSourceCodeByRegex": [
+                // $otherTokens is never negative; max() is for PHPStan, which does not infer the range of intdiv().
+                "\\$otherTokens = max\\(0, \\$otherTokens\\);",
+                // Searching from "!" or from the first "-" finds the same "-->" or ">".
+                "\\$end = strpos\\(\\$html, \\$closing, \\$offset \\+ 2\\);",
+                // The duration's last digits are below what a test can measure.
+                "new TranslationStats\\(.*/ 1_000_000_000, .*",
+                // As for schemaFormat above.
+                "\\$outputConfig\\['format'\\] = .*json_decode\\(\\$request->jsonSchema->json, false, 512, .*",
+                // The first attempt already reaches 0 and 1 alike.
+                "\\$maxAttempts = \\$body->isSeekable\\(\\) \\? \\$this->policy->maxAttempts : 1;",
+                // A part being split has at least two units, so its first half has at least one without max().
+                "\\$halves = array_chunk\\(\\$part, max\\(1, \\$size\\)\\);",
+            ],
+        },
+        "GreaterThan": {
+            "ignore": [
+                // usleep(0) does not sleep either.
+                "HtmlTranslator\\Provider\\Llm\\Bridge\\UsleepSleeper::sleep",
+            ],
+        },
+        "GreaterThanOrEqualTo": {
+            "ignore": [
+                // At the end of the text there is no bracket, so the further candidates find none either.
+                "HtmlTranslator\\Provider\\Llm\\ResponseParser::entries",
+            ],
+        },
+        "IncrementInteger": {
+            "ignore": [
+                // As for DecrementInteger: json_decode() depth, real sleep lengths.
+                "HtmlTranslator\\Provider\\Llm\\Bridge\\OpenAiCompatible\\OpenAiCompatibleChatModel::schemaFormat",
+                "HtmlTranslator\\Provider\\Llm\\Bridge\\UsleepSleeper::sleep",
+            ],
+            "ignoreSourceCodeByRegex": [
+                // As for DecrementInteger: duration digits and json_decode() depth.
+                "new TranslationStats\\(.*/ 1_000_000_000, .*",
+                "\\$outputConfig\\['format'\\] = .*json_decode\\(\\$request->jsonSchema->json, false, 512, .*",
+                // The cap only prevents an overflow; the delay is capped by maxDelayMilliseconds far below it.
+                "\\$seconds = min\\(\\(int\\) \\$value, intdiv\\(\\\\PHP_INT_MAX, 1000\\)\\);",
+            ],
+        },
+        "LessThan": {
+            // The loop body returns null as soon as $i reaches the end.
+            "ignoreSourceCodeByRegex": [
+                "for \\(\\$i = \\$start; \\$i < \\$length; \\+\\+\\$i\\) \\{",
+            ],
+        },
+        "LogicalAnd": {
+            "ignore": [
+                // The clone of an element is always an element.
+                "HtmlTranslator\\Html\\Reassembler::deepClone",
+            ],
+        },
+        "LogicalOr": {
+            "ignore": [
+                // A RunAnchor always has nodes, so $first is never null here.
+                "HtmlTranslator\\Html\\Reassembler::replaceRun",
+                // null + int is the int, and null + null is not reached.
+                "HtmlTranslator\\Provider\\TokenUsage::add",
+            ],
+            // A failure is never PartiallyTranslated or TermViolation, so the condition is false either way.
+            "ignoreSourceCodeByRegex": [
+                "if \\(IssueType::PartiallyTranslated === \\$type \\|\\| IssueType::TermViolation === \\$type\\) \\{",
+            ],
+        },
+        "NullSafeMethodCall": {
+            "ignore": [
+                // A run node always has a parent element (the fragment container or <body>).
+                "HtmlTranslator\\Html\\Reassembler::keepOptionValue",
+            ],
+        },
+        "NullSafePropertyCall": {
+            "ignore": [
+                // childElementCount is 1, so there is a first element child.
+                "HtmlTranslator\\Html\\HtmlLoader::holdsOnlyColumns",
+                // A RunAnchor always has nodes.
+                "HtmlTranslator\\Html\\Reassembler::replaceRun",
+                // A <title> is never the document element.
+                "HtmlTranslator\\Html\\Segmenter::isDocumentTitle",
+                // ChatRequest rejects an empty conversation.
+                "HtmlTranslator\\Provider\\Llm\\Bridge\\Anthropic\\AnthropicChatModel::body",
+            ],
+        },
+        "SpreadOneItem": {
+            "ignore": [
+                // The parser gives a <title> one text node (its content is text only).
+                "HtmlTranslator\\Html\\Segmenter::addTitleUnit",
+            ],
+        },
+        "Throw_": {
+            // Unreachable, see LogicalOr.
+            "ignoreSourceCodeByRegex": [
+                "throw new LogicException\\(\\\\sprintf\\('%s is not a translation failure\\.', \\$type->name\\)\\);",
+            ],
+        },
+        "TrueValue": {
+            "ignore": [
+                // Sets read with isset(), which is true for false values too.
+                "HtmlTranslator\\Html\\Reassembler::assertReplaceable",
+                "HtmlTranslator\\Html\\Reassembler::assertMatchesSource",
+                "HtmlTranslator\\Validation\\StructureValidator::reportOnce",
+                "HtmlTranslator\\Validation\\StructureValidator::rawMarkupOnce",
+            ],
+            // The same in Glossary and TranslationProfile (whose method has another `true`).
+            "ignoreSourceCodeByRegex": [
+                "\\$seen\\[\\$key\\] = true;",
+            ],
+        },
+        "UnwrapArrayMap": {
+            "ignore": [
+                // json_encode() of a ChatMessage gives the same object: public role (a backed enum) and content.
+                "HtmlTranslator\\Provider\\Llm\\Bridge\\Anthropic\\AnthropicChatModel::body",
+                "HtmlTranslator\\Provider\\Llm\\Bridge\\OpenAiCompatible\\OpenAiCompatibleChatModel::body",
+            ],
+        },
+        "UnwrapArrayValues": {
+            "ignore": [
+                // Checked to be a list, and the result keeps its keys.
+                "HtmlTranslator\\Exception\\ArrayArgument::stringList",
+                "HtmlTranslator\\Exception\\ArrayArgument::listOf",
+                // Variadics, which take string keys from a spread array; the keys are dropped later anyway
+                // (array_shift() of the queue, the constructor's rebuilt list of terms).
+                "HtmlTranslator\\Provider\\Llm\\Testing\\FakeChatModel::withResponses",
+                "HtmlTranslator\\Profile\\TranslationProfile::withDoNotTranslate",
+                // Private lists only searched with in_array() and rebuilt with a spread, so their keys never show.
+                "HtmlTranslator\\Html\\SkipRules::remove",
+                "HtmlTranslator\\Html\\TranslatableAttributes::remove",
+            ],
+        },
     },
-    "minMsi": 80,
-    "minCoveredMsi": 85
+    // Every escaped mutant is either killed or listed above as equivalent (#84), so any new one fails the run.
+    "minMsi": 100,
+    "minCoveredMsi": 100
 }

@@ -81,6 +81,9 @@ final class HtmlLoaderTest extends TestCase
         yield 'comment only before a paragraph' => ['<!-- c --><p>x</p>'];
         yield 'many comments before a paragraph' => [str_repeat('<!-- c -->', 50) . '<p>x</p>'];
         yield 'unclosed comment' => ['<!-- x <html>'];
+        // Unclosed items that do not start the input: the scan must stop there instead of starting over.
+        yield 'unclosed processing instruction after a space' => [' <?x'];
+        yield 'unclosed comment after whitespace' => ['   <!-- x'];
         yield 'processing instruction before a paragraph' => ['<?pi x?><p>x</p>'];
     }
 

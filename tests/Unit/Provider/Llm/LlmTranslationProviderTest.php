@@ -494,6 +494,49 @@ final class LlmTranslationProviderTest extends TestCase
         self::assertLessThanOrEqual(1 + 2 * (int) ceil(log($units, 2)), \count($model->requests));
     }
 
+    /**
+     * The budget is 2 × ⌈log2 5⌉ = 6, not 2 × round(log2 5) = 4: u1–u3, then u1–u2 still need a split.
+     */
+    #[Test]
+    public function it_rounds_the_call_budget_up(): void
+    {
+        $model = PseudoLocalizingChatModel::refusing(static fn(array $ids): bool => \in_array('u1', $ids, true));
+
+        $result = new LlmTranslationProvider($model)->translate($this->batchOf(5));
+
+        self::assertSame(['u1'], array_keys($result->permanentFailures));
+        self::assertSame(['u2', 'u3', 'u4', 'u5'], $this->sortedIds($result->translations));
+    }
+
+    /**
+     * Halves are rounded up: 3 units become u1–u2 and u3, so finding u3 takes the batch and two halves.
+     */
+    #[Test]
+    public function it_splits_an_odd_part_in_two_halves(): void
+    {
+        $model = PseudoLocalizingChatModel::refusing(static fn(array $ids): bool => \in_array('u3', $ids, true));
+
+        new LlmTranslationProvider($model)->translate($this->batchOf(3));
+
+        self::assertCount(3, $model->requests);
+    }
+
+    #[Test]
+    public function it_keeps_the_failures_of_every_half_it_could_not_read(): void
+    {
+        $model = FakeChatModel::withResponses(
+            $this->response('No.', FinishReason::Refusal),
+            $this->response('not JSON'),
+            $this->response('not JSON either'),
+        );
+
+        $result = new LlmTranslationProvider($model)->translate($this->batch());
+
+        self::assertSame([], $result->translations);
+        self::assertSame(['u1', 'u2'], $this->sortedIds($result->failures));
+        self::assertSame([], $result->permanentFailures);
+    }
+
     #[Test]
     public function it_sends_each_part_with_the_corrections_and_the_context_of_its_units(): void
     {
@@ -548,7 +591,7 @@ final class LlmTranslationProviderTest extends TestCase
 
         self::assertSame([], $result->translations);
         self::assertSame(['u1', 'u2', 'u3', 'u4', 'u5', 'u6', 'u7', 'u8'], $this->sortedIds($result->permanentFailures));
-        self::assertStringContainsString('stopped: Rate limited.', $result->permanentFailures['u3'] ?? '');
+        self::assertSame('The model refused to translate a part of the batch with this unit. Finding the refused unit stopped: Rate limited.', $result->permanentFailures['u3'] ?? null);
         self::assertStringContainsString('content filter', $result->permanentFailures['u5'] ?? '');
         self::assertStringContainsString('refused to translate', $result->permanentFailures['u1'] ?? '');
         self::assertEquals(new TokenUsage(8 + 4 + 4 + 2 + 3, 4), $result->usage);

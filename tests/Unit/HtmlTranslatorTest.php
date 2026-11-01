@@ -272,6 +272,36 @@ final class HtmlTranslatorTest extends TestCase
         self::assertSame('Unit "u1": 3 of 3 text nodes kept their original text (refused).', ($result->issues()[1] ?? null)?->message);
     }
 
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function distinctReasons(): iterable
+    {
+        // Text nodes: "A ", "B", " C" (and " D" after <i>); each is refused with its own reason.
+        yield 'as many as are listed' => ['<p>A <b>B</b> C</p>', '3 of 3 text nodes kept their original text (u1-1 line\\nbreak; u1-2; u1-3).'];
+        yield 'more than are listed' => ['<p>A <b>B</b> C <i>D</i></p>', '4 of 4 text nodes kept their original text (u1-1 line\\nbreak; u1-2; u1-3; and 1 more).'];
+    }
+
+    #[Test]
+    #[DataProvider('distinctReasons')]
+    public function it_lists_the_first_three_distinct_reasons_quoted(string $html, string $message): void
+    {
+        $provider = new CallbackProvider(static function (TranslationBatch $batch): BatchResult {
+            $failures = [];
+            foreach ($batch->units as $unit) {
+                $id = $unit->id->toString();
+                $failures[$id] = 'u1-1' === $id ? "u1-1 line\nbreak" : $id;
+            }
+
+            return new BatchResult([], $failures);
+        });
+
+        $result = new HtmlTranslator($provider)
+            ->translate($html, Locale::fromString('pl'), new TranslationOptions(fallback: FallbackStrategy::TextNodesOnly, maxCorrectiveRetries: 0));
+
+        self::assertSame('Unit "u1": ' . $message, ($result->issues()[1] ?? null)?->message);
+    }
+
     #[Test]
     public function it_keeps_good_units_of_a_batch_in_which_others_fail(): void
     {
@@ -311,6 +341,7 @@ final class HtmlTranslatorTest extends TestCase
     {
         $this->expectException(ProviderException::class);
         $this->expectExceptionMessage($message);
+        $this->expectExceptionCode(0);
 
         new HtmlTranslator(new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => $answer))
             ->translate('<p>Hello</p>', Locale::fromString('pl'), new TranslationOptions(fallback: FallbackStrategy::Throw));

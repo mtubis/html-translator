@@ -30,6 +30,7 @@ use HtmlTranslator\Html\SkipRules;
 use HtmlTranslator\Html\TranslatableAttributes;
 use HtmlTranslator\Profile\TranslationProfile;
 use HtmlTranslator\Provider\BatchContext;
+use HtmlTranslator\Provider\BatchResult;
 use HtmlTranslator\Provider\CacheableProviderInterface;
 use HtmlTranslator\Provider\Correction;
 use HtmlTranslator\Provider\TokenUsage;
@@ -421,18 +422,22 @@ final readonly class HtmlTranslator
 
     private function failureMessage(string $id, IssueType $type, string $detail, bool $permanent, int $maxRetries): string
     {
+        // Never a failure: partial translations come from the text-node fallback, term violations from
+        // termViolations() after translation. Checked before the match, which then needs no arm for them.
+        if (IssueType::PartiallyTranslated === $type || IssueType::TermViolation === $type) {
+            throw new LogicException(\sprintf('%s is not a translation failure.', $type->name));
+        }
+
         return match ($type) {
             IssueType::ProviderFailure => \sprintf('The provider could not translate unit "%s"%s: %s', $id, $permanent ? ' (permanent failure)' : '', UntrustedText::quote($detail, self::MAX_DETAIL_LENGTH)),
             IssueType::MissingTranslation => \sprintf('The provider returned no translation for unit "%s".', $id),
-            IssueType::InvalidStructure, IssueType::PartiallyTranslated => \sprintf(
+            IssueType::InvalidStructure => \sprintf(
                 "The translation of unit \"%s\" is still invalid after %d corrective %s:\n%s",
                 $id,
                 $maxRetries,
                 1 === $maxRetries ? 'retry' : 'retries',
                 $detail,
             ),
-            // Term violations are found after translation (termViolations()), never as a failure.
-            IssueType::TermViolation => throw new LogicException('A term violation is not a translation failure.'),
         };
     }
 
@@ -478,6 +483,8 @@ final readonly class HtmlTranslator
             $failedUsage = $exception->usage;
         }
 
+        // BatchResult keeps failures and permanent failures apart, so the union loses nothing.
+        $failed = $result instanceof BatchResult ? $result->failures + $result->permanentFailures : [];
         $translations = [];
         $issues = [];
         foreach ($plans as [$unit, $plan]) {
@@ -494,9 +501,10 @@ final readonly class HtmlTranslator
 
                 ++$total;
                 $pieceId = $piece->id->toString();
-                $translated = $result?->translations[$pieceId] ?? null;
+                // ?? also covers a null $result (the provider failed), as isset() would.
+                $translated = $result->translations[$pieceId] ?? null;
                 $reason = null === $translated
-                    ? ($result?->failures[$pieceId] ?? $result?->permanentFailures[$pieceId] ?? $providerError)
+                    ? ($failed[$pieceId] ?? $providerError)
                     : ($this->validator->validate($piece, $translated)->isValid() ? null : 'invalid translation');
 
                 if (null === $reason) {
@@ -539,7 +547,7 @@ final readonly class HtmlTranslator
      */
     private function reasons(array $reasons): string
     {
-        $distinct = array_values(array_unique($reasons));
+        $distinct = array_unique($reasons);
         $listed = implode('; ', array_map(static fn(string $reason): string => UntrustedText::quote($reason), \array_slice($distinct, 0, self::MAX_REASONS)));
         $more = \count($distinct) - self::MAX_REASONS;
 

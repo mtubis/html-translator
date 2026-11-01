@@ -69,6 +69,7 @@ final class ProviderExceptionTest extends TestCase
         self::assertSame(0, $exception->getCode());
         self::assertNull($exception->statusCode);
         self::assertNull($exception->vendorCode);
+        self::assertSame(0, new ProviderException('Cannot reach the service.')->getCode(), 'The code is reserved for HTTP statuses.');
     }
 
     /**

@@ -79,7 +79,10 @@ final readonly class Retrier
         // PSR-7 implementations trim header values.
         $value = $response->getHeaderLine('Retry-After');
         if (ctype_digit($value)) {
-            return min((int) $value, intdiv(\PHP_INT_MAX, 1000)) * 1000;
+            // Capped first, so the conversion to milliseconds cannot overflow.
+            $seconds = min((int) $value, intdiv(\PHP_INT_MAX, 1000));
+
+            return $seconds * 1000;
         }
 
         $retryAt = $this->httpDate($value);

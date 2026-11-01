@@ -40,8 +40,9 @@ final readonly class CharacterTokenEstimator implements TokenEstimatorInterface
         $cjk = $this->count(self::CJK, $rest);
         $emoji = $this->count(self::EMOJI, $rest);
         $others = mb_strlen($rest, 'UTF-8') - $cjk - $emoji;
+        $otherTokens = intdiv($others + self::CHARACTERS_PER_TOKEN - 1, self::CHARACTERS_PER_TOKEN);
         // max() keeps the type non-negative; PHPStan does not infer the range of intdiv().
-        $otherTokens = max(0, intdiv($others + self::CHARACTERS_PER_TOKEN - 1, self::CHARACTERS_PER_TOKEN));
+        $otherTokens = max(0, $otherTokens);
 
         return $pseudoTags * self::TOKENS_PER_PSEUDO_TAG
             + $references * self::TOKENS_PER_CHARACTER_REFERENCE

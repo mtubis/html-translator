@@ -214,6 +214,7 @@ final class RetrierTest extends TestCase
         } catch (TransportFailure $failure) {
             self::assertSame(3, $failure->attempts);
             self::assertInstanceOf(FakeNetworkException::class, $failure->getPrevious());
+            self::assertSame(0, $failure->getCode());
         }
     }
 
