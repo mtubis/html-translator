@@ -15,20 +15,23 @@ final readonly class Report
 {
     /**
      * @param list<FixtureResult> $results
+     * @param ?string $jsonMode the JSON mode of an OpenAI-compatible model, so runs of one model in two modes differ
      */
     public function __construct(
         public string $modelId,
         public string $promptVersion,
         public DateTimeImmutable $startedAt,
         public array $results,
+        public ?string $jsonMode = null,
     ) {}
 
     /**
-     * e.g. "20261011-140501-openai-gpt-4o-mini", without the extension.
+     * e.g. "20261011-140501-openai-gpt-4o-mini-json-schema", without the extension.
      */
     public function fileName(): string
     {
-        $slug = trim((string) preg_replace('/[^a-z0-9.]+/', '-', strtolower($this->modelId)), '-');
+        $name = null === $this->jsonMode ? $this->modelId : $this->modelId . '-' . $this->jsonMode;
+        $slug = trim((string) preg_replace('/[^a-z0-9.]+/', '-', strtolower($name)), '-');
 
         return $this->startedAt->format('Ymd-His') . '-' . $slug;
     }
@@ -40,6 +43,7 @@ final readonly class Report
             \sprintf('# Eval: %s', $this->modelId),
             '',
             \sprintf('- Prompt version: %s', $this->promptVersion),
+            ...(null === $this->jsonMode ? [] : [\sprintf('- JSON mode: %s', $this->jsonMode)]),
             \sprintf('- Started: %s', $this->startedAt->format(DATE_ATOM)),
             \sprintf('- PHP: %s', PHP_VERSION),
             \sprintf('- Complete: %d of %d fixtures', $complete, \count($this->results)),
@@ -85,6 +89,7 @@ final readonly class Report
         return json_encode([
             'modelId' => $this->modelId,
             'promptVersion' => $this->promptVersion,
+            'jsonMode' => $this->jsonMode,
             'startedAt' => $this->startedAt->format(DATE_ATOM),
             'php' => PHP_VERSION,
             'results' => array_map(get_object_vars(...), $this->results),

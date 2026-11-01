@@ -11,13 +11,15 @@ php tools/eval/run.php --provider=pseudo       # no network: checks the tool its
 ```
 
 Options: `--provider` (`openai`, `gemini`, `ollama`, `vllm`, `lmstudio`, `pseudo`), `--model` and `--base-url`
-(override the `.env` values), `--fixtures` (comma-separated names, default all), `--out` (default `tools/eval/out/`).
+(override the `.env` values), `--json-mode` (`none`, `json_object`, `json_schema` or `json_schema_only` instead of
+the preset's mode, to compare modes; not for `anthropic`), `--fixtures` (comma-separated names, default all), `--out` (default `tools/eval/out/`).
 `composer eval -- --provider=…` works too.
 
 ## Report
 
-`tools/eval/out/<date>-<time>-<model id>.md` and `.json` (the directory is git-ignored), with the prompt version
-(`PromptBuilder::VERSION`), the model id, and per fixture:
+`tools/eval/out/<date>-<time>-<model id>-<JSON mode>.md` and `.json` (the directory is git-ignored; Anthropic and
+`pseudo` have no JSON mode), with the prompt version (`PromptBuilder::VERSION`), the model id, the JSON mode, and per
+fixture:
 
 | Column | Meaning |
 |---|---|

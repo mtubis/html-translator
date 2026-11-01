@@ -6,11 +6,11 @@ model, and the adapter only maps one HTTP call.
 
 | Provider | Class | Notes |
 |---|---|---|
-| OpenAI | `OpenAiCompatibleChatModel` + `OpenAiCompatibleConfig::openAi()` | JSON mode, `max_completion_tokens` |
-| Gemini | `OpenAiCompatibleChatModel` + `OpenAiCompatibleConfig::gemini()` | Gemini's OpenAI-compatible endpoint |
-| Ollama | `OpenAiCompatibleChatModel` + `OpenAiCompatibleConfig::ollama()` | local, no key |
-| vLLM | `OpenAiCompatibleChatModel` + `OpenAiCompatibleConfig::vllm()` | local, optional key |
-| LM Studio | `OpenAiCompatibleChatModel` + `OpenAiCompatibleConfig::lmStudio()` | local, no JSON mode (LM Studio only supports JSON schemas) |
+| OpenAI | `OpenAiCompatibleChatModel` + `OpenAiCompatibleConfig::openAi()` | structured output (JSON schema), `max_completion_tokens` |
+| Gemini | `OpenAiCompatibleChatModel` + `OpenAiCompatibleConfig::gemini()` | Gemini's OpenAI-compatible endpoint, structured output (JSON schema) |
+| Ollama | `OpenAiCompatibleChatModel` + `OpenAiCompatibleConfig::ollama()` | local, no key, structured output (JSON schema) |
+| vLLM | `OpenAiCompatibleChatModel` + `OpenAiCompatibleConfig::vllm()` | local, optional key, structured output (JSON schema) |
+| LM Studio | `OpenAiCompatibleChatModel` + `OpenAiCompatibleConfig::lmStudio()` | local, JSON schema only (LM Studio rejects `json_object`) |
 | Other OpenAI-compatible servers | `OpenAiCompatibleChatModel` + `new OpenAiCompatibleConfig(...)` | |
 | Anthropic | `AnthropicChatModel` + `AnthropicConfig` | Claude Messages API, structured output (JSON schema) |
 | No network (tests, demos) | `PseudoLocalizationProvider` | deterministic fake translation |
@@ -51,10 +51,22 @@ $model = new OpenAiCompatibleChatModel(
 | Preset | Base URL | Authentication | JSON mode | Output limit field |
 |---|---|---|---|---|
 | `openAi($apiKey, $model, $jsonMode = JsonMode::JsonSchema)` | `https://api.openai.com/v1` | `Authorization: Bearer` | `JsonSchema` | `max_completion_tokens` |
-| `gemini($apiKey, $model)` | `https://generativelanguage.googleapis.com/v1beta/openai` | `Authorization: Bearer` | `JsonObject` | `max_tokens` |
-| `ollama($model, $baseUrl = 'http://localhost:11434/v1')` | local | none | `JsonObject` | `max_tokens` |
-| `vllm($model, $baseUrl = 'http://localhost:8000/v1', $apiKey = null)` | local | optional Bearer | `JsonObject` | `max_tokens` |
-| `lmStudio($model, $baseUrl = 'http://localhost:1234/v1')` | local | none | `JsonSchemaOnly` | `max_tokens` |
+| `gemini($apiKey, $model, $jsonMode = JsonMode::JsonSchema)` | `https://generativelanguage.googleapis.com/v1beta/openai` | `Authorization: Bearer` | `JsonSchema` | `max_tokens` |
+| `ollama($model, $baseUrl = 'http://localhost:11434/v1', $jsonMode = JsonMode::JsonSchema)` | local | none | `JsonSchema` | `max_tokens` |
+| `vllm($model, $baseUrl = 'http://localhost:8000/v1', $apiKey = null, $jsonMode = JsonMode::JsonSchema)` | local | optional Bearer | `JsonSchema` | `max_tokens` |
+| `lmStudio($model, $baseUrl = 'http://localhost:1234/v1', $jsonMode = JsonMode::JsonSchemaOnly)` | local | none | `JsonSchemaOnly` | `max_tokens` |
+
+Every preset takes another JSON mode as its last parameter, for a server version or model that does not support the
+default. The defaults were checked on 2026-11-01 against live servers, with `composer test:integration` and several
+`tools/eval` runs over the golden fixtures in both modes (#80):
+
+| Preset | Checked with | Result |
+|---|---|---|
+| `openAi()` | OpenAI API, `gpt-4o-mini` | `json_schema` and `json_object` both 20/20 in every run |
+| `gemini()` | Gemini API, `gemini-3.8-flash` | both modes accepted (no HTTP 400); the runs were cut short by the free tier's quota (HTTP 429), so the answer quality per mode is not compared |
+| `ollama()` | Ollama 0.40.3, `llama3.1` | `json_schema` 17, 16, 18 of 20; `json_object` 19, 16, 15 of 20 |
+| `vllm()` | vLLM 0.32.0, `Qwen/Qwen3-0.6B` | `json_schema` 15, 13, 15 of 20; `json_object` 14, 13, 14 of 20 (the small model cuts long answers off in both modes) |
+| `lmStudio()` | LM Studio 0.4.28, `qwen/qwen3-4b-2507` | `json_schema_only` 20/20 in every run; `json_object` rejected with HTTP 400 |
 
 For any other server, create the configuration directly:
 
@@ -80,11 +92,17 @@ new OpenAiCompatibleConfig(
   | `JsonSchema` | `{"type": "json_schema", "json_schema": {"name": "answer", "strict": true, "schema": …}}` | `{"type": "json_object"}` |
   | `JsonSchemaOnly` | as `JsonSchema` | nothing (for servers that reject `json_object`, e.g. LM Studio) |
 
-  `LlmTranslationProvider` always sends its answer schema (ADR-0014), so with `JsonSchema` the answer shape is
-  guaranteed. Strict mode requires every property to be listed in `required` and `additionalProperties: false`; the
+  `LlmTranslationProvider` always sends its answer schema (ADR-0014). With `JsonSchema`, OpenAI enforces the answer
+  shape; other servers constrain decoding to the schema as far as they support it, and a server that ignores the
+  schema still gets the format from the prompt. Every answer is parsed and validated either way, and an unreadable
+  one is asked for again. ADR-0014 names only OpenAI and LM Studio as schema users; since #80 the table above is the
+  current list. Strict mode requires every property to be listed in `required` and `additionalProperties: false`; the
   provider's schema follows these rules. OpenAI models without structured outputs (e.g. `gpt-3.5-turbo`,
-  `gpt-4-turbo`) reject `json_schema` with HTTP 400: use `openAi($key, $model, JsonMode::JsonObject)`. Gemini, Ollama and vLLM stay on `JsonObject` until their schema support is
-  verified; a server without JSON support needs `None`, and the prompt still asks for JSON.
+  `gpt-4-turbo`) reject `json_schema` with HTTP 400: use `openAi($key, $model, JsonMode::JsonObject)`. Only the
+  server versions in the table above were checked; for an older Ollama, vLLM or Gemini model without structured
+  outputs, pass the mode by name: `ollama($model, jsonMode: JsonMode::JsonObject)`,
+  `vllm($model, jsonMode: JsonMode::JsonObject)` or `gemini($key, $model, JsonMode::JsonObject)`. A server without
+  JSON support needs `None`, and the prompt still asks for JSON.
 - **Timeouts** are set on the HTTP client: PSR-18 has no per-request timeout. Translation batches can take a while,
   so allow at least 60 seconds.
 - **Retries**: see [Retries](#retries) below. `LlmTranslationProvider` also asks the model once more when an answer

@@ -21,12 +21,25 @@ final class ReportTest extends TestCase
     }
 
     #[Test]
+    public function it_tells_runs_of_one_model_in_two_json_modes_apart(): void
+    {
+        $report = new Report('ollama:llama3.1', '2026-10.1', new DateTimeImmutable('2026-11-01T18:00:00+00:00'), [], 'json_schema');
+        $json = json_decode($report->toJson(), true, 8, \JSON_THROW_ON_ERROR);
+
+        self::assertSame('20261101-180000-ollama-llama3.1-json-schema', $report->fileName());
+        self::assertStringContainsString("- JSON mode: json_schema\n", $report->toMarkdown());
+        self::assertIsArray($json);
+        self::assertSame('json_schema', $json['jsonMode'] ?? null);
+    }
+
+    #[Test]
     public function it_summarises_the_run_in_markdown(): void
     {
         $markdown = $this->report()->toMarkdown();
 
         self::assertStringContainsString("# Eval: ollama:Qwen2.5-7B-Instruct:Q4\n", $markdown);
         self::assertStringContainsString('- Prompt version: 2026-10.1', $markdown);
+        self::assertStringNotContainsString('JSON mode', $markdown, 'A model without JSON modes has none to report.');
         self::assertStringContainsString('- Complete: 1 of 2 fixtures', $markdown);
         self::assertStringContainsString('- Issues: 0, retried units: 2, model calls: 5 (3 with context hints)', $markdown);
         self::assertStringContainsString('- Tokens: 1200 in, 300 out (not counted: calls of 1 fixture that failed with an error)', $markdown);
