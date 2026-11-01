@@ -35,12 +35,12 @@ Goal: any HTML fixture round-trips through segmentation → pseudo-localization 
 - Transport retries with backoff in adapters
 - README with real examples, [usage guide](usage.md), 0.4.0 release on Packagist ([RELEASING](RELEASING.md))
 
-## Core 1.0 — API freeze
+## Core 1.0 — API freeze (1.0.0, 2026-11-02)
 - Public API review and the backward compatibility promise (ADR, `@internal`, API snapshot test)
 - API changes due before the freeze: token usage and bounded vendor codes on `ProviderException`; configs built from arrays fail with `InvalidArgumentException`
 - Refused batches are split to find the refused unit
 - JSON modes of the OpenAI-compatible presets verified against live servers
-- Tooling: `tools/eval` exit code and cache hits, token assertions in integration tests, nightly integration CI
+- Tooling: `tools/eval` exit code and cache hits, token assertions in integration tests
 - Infection: mutation score locked in at 100 % (covered MSI was 97 % at 0.4; ROADMAP asked for ≥ 85 %); equivalent mutants are listed in `infection.json5`
 - Docs complete (extension guide, `UPGRADE-1.0.md`, every snippet tested), 1.0.0 release
 

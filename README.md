@@ -7,7 +7,9 @@ Translate HTML documents with large language models — **without breaking the m
 - **Any model**: OpenAI, Anthropic, Gemini, or self-hosted (Ollama, vLLM, LM Studio) behind one interface, built on PSR-18 — bring your own HTTP client.
 - **Honest results**: partial failures are reported as issues on the result object instead of silently producing broken HTML.
 
-> **Status:** early development (0.x). The public API may change until 1.0. See [ROADMAP](docs/ROADMAP.md).
+> **Status:** stable. The public API follows Semantic Versioning under the
+> [backward compatibility promise](docs/adr/0018-public-api-and-backward-compatibility-promise.md); upgrading from 0.4:
+> [UPGRADE-1.0.md](UPGRADE-1.0.md). See [ROADMAP](docs/ROADMAP.md).
 
 ## Requirements
 
@@ -17,7 +19,7 @@ factories, e.g. `symfony/http-client` with `nyholm/psr7`.
 ## Installation
 
 ```bash
-composer require mtubis/html-translator:^0.4
+composer require mtubis/html-translator:^1.0
 composer require symfony/http-client nyholm/psr7   # or any other PSR-18 client
 ```
 

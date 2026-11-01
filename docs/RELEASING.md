@@ -1,7 +1,10 @@
 # Releasing
 
-Versions follow [Semantic Versioning](https://semver.org/); while the version is 0.x, a minor version may break the
-public API (ARCHITECTURE §4), and the CHANGELOG says how. Releases are cut from `main`.
+Versions follow [Semantic Versioning](https://semver.org/) under the backward compatibility promise
+([ADR-0018](adr/0018-public-api-and-backward-compatibility-promise.md)): a patch fixes, a minor version adds, and only a
+major version breaks the public API or the extension points; it then comes with an `UPGRADE-X.0.md`. A change to a
+public signature shows in `tests/Unit/Architecture/public-api.txt`, so check its diff since the last tag before
+choosing the version. Releases are cut from `main`.
 
 ## Checklist
 
