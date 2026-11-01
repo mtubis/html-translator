@@ -48,13 +48,13 @@ $model = new OpenAiCompatibleChatModel(
 
 ### Configuration
 
-| Preset | Base URL | Authentication | JSON mode | Output limit field |
-|---|---|---|---|---|
-| `openAi($apiKey, $model, $jsonMode = JsonMode::JsonSchema)` | `https://api.openai.com/v1` | `Authorization: Bearer` | `JsonSchema` | `max_completion_tokens` |
-| `gemini($apiKey, $model, $jsonMode = JsonMode::JsonSchema)` | `https://generativelanguage.googleapis.com/v1beta/openai` | `Authorization: Bearer` | `JsonSchema` | `max_tokens` |
-| `ollama($model, $baseUrl = 'http://localhost:11434/v1', $jsonMode = JsonMode::JsonSchema)` | local | none | `JsonSchema` | `max_tokens` |
-| `vllm($model, $baseUrl = 'http://localhost:8000/v1', $apiKey = null, $jsonMode = JsonMode::JsonSchema)` | local | optional Bearer | `JsonSchema` | `max_tokens` |
-| `lmStudio($model, $baseUrl = 'http://localhost:1234/v1', $jsonMode = JsonMode::JsonSchemaOnly)` | local | none | `JsonSchemaOnly` | `max_tokens` |
+| Preset | Base URL | Authentication | JSON mode | Output limit field | Token usage |
+|---|---|---|---|---|---|
+| `openAi($apiKey, $model, $jsonMode = JsonMode::JsonSchema)` | `https://api.openai.com/v1` | `Authorization: Bearer` | `JsonSchema` | `max_completion_tokens` | reported |
+| `gemini($apiKey, $model, $jsonMode = JsonMode::JsonSchema)` | `https://generativelanguage.googleapis.com/v1beta/openai` | `Authorization: Bearer` | `JsonSchema` | `max_tokens` | reported |
+| `ollama($model, $baseUrl = 'http://localhost:11434/v1', $jsonMode = JsonMode::JsonSchema)` | local | none | `JsonSchema` | `max_tokens` | reported |
+| `vllm($model, $baseUrl = 'http://localhost:8000/v1', $apiKey = null, $jsonMode = JsonMode::JsonSchema)` | local | optional Bearer | `JsonSchema` | `max_tokens` | reported |
+| `lmStudio($model, $baseUrl = 'http://localhost:1234/v1', $jsonMode = JsonMode::JsonSchemaOnly)` | local | none | `JsonSchemaOnly` | `max_tokens` | reported |
 
 Every preset takes another JSON mode as its last parameter, for a server version or model that does not support the
 default. The defaults were checked on 2026-11-01 against live servers, with `composer test:integration` and several
@@ -103,6 +103,10 @@ new OpenAiCompatibleConfig(
   outputs, pass the mode by name: `ollama($model, jsonMode: JsonMode::JsonObject)`,
   `vllm($model, jsonMode: JsonMode::JsonObject)` or `gemini($key, $model, JsonMode::JsonObject)`. A server without
   JSON support needs `None`, and the prompt still asks for JSON.
+- **Token usage** is read from the response's `usage.prompt_tokens` and `usage.completion_tokens` and summed in
+  `TranslationStats::$inputTokens` / `$outputTokens`. Every preset reported it in the eval runs of 2026-11-01 (#80);
+  the integration tests fail when a preset stops reporting it. A server that sends no `usage` leaves the counts
+  `null` rather than 0.
 - **Timeouts** are set on the HTTP client: PSR-18 has no per-request timeout. Translation batches can take a while,
   so allow at least 60 seconds.
 - **Retries**: see [Retries](#retries) below. `LlmTranslationProvider` also asks the model once more when an answer
@@ -163,6 +167,8 @@ $translator = new HtmlTranslator(new LlmTranslationProvider($model));
 - **Thinking**: current models think before answering (Claude Opus 5.5 always does); the adapter returns only the text
   blocks. Lower `effort` (e.g. `low`) for cheaper and faster translations, raise it for hard texts. Requests can take a
   while at higher effort: allow a generous client timeout (120 seconds or more).
+- **Token usage** is read from `usage.input_tokens` and `usage.output_tokens`; the Messages API always reports it,
+  and the integration tests fail when it is missing.
 - **Temperature**: current Claude models reject sampling parameters with HTTP 400; the adapter's 0–1 range only
   matters for older models. `LlmTranslationProvider` sends none.
 - **Prefill**: a conversation that ends with an assistant message is rejected before the call
