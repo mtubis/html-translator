@@ -31,6 +31,9 @@ abstract class ChatModelContractTestCase extends TestCase
     /** An answer schema the contract sends; adapters with structured outputs must pass it on unchanged. */
     private const string ANSWER_SCHEMA = '{"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":false}';
 
+    /** The setting before setUp(), restored by tearDown(): the contract runs next to other tests of the package. */
+    private string|false $previousIgnoreArgs = false;
+
     /**
      * A model configured with API_KEY whose far side behaves as described by the scenario. It must answer every call
      * the same way (a test may call it more than once).
@@ -48,7 +51,16 @@ abstract class ChatModelContractTestCase extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        ini_set('zend.exception_ignore_args', '0');
+        $this->previousIgnoreArgs = ini_set('zend.exception_ignore_args', '0');
+    }
+
+    protected function tearDown(): void
+    {
+        if (false !== $this->previousIgnoreArgs) {
+            ini_set('zend.exception_ignore_args', $this->previousIgnoreArgs);
+        }
+
+        parent::tearDown();
     }
 
     #[Test]

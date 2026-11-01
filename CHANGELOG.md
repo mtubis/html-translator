@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Fixed
+- `ChatModelContractTestCase` and `TranslationProviderContractTestCase` restore `zend.exception_ignore_args` after each
+  test. They turned it off for the rest of the process, so later tests of the package recorded the arguments of every
+  frame in every exception trace (#88).
+
 ## [0.4.0] - 2026-10-13
 
 Production readiness: token-budget batching, a unit cache, token usage, transport retries and the usage guide.
