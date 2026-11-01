@@ -10,8 +10,20 @@ All notable changes to this project are documented here. The format follows [Kee
   ([ADR-0018](docs/adr/0018-public-api-and-backward-compatibility-promise.md), #76).
 - `Exception\UntrustedText::quote()` is public API for integrations that quote configuration or input values in their
   own messages; its guarantees are documented in the usage guide (#87).
+- `ProviderException::$usage` (`?TokenUsage`, also a `usage:` parameter of the constructor and `fromHttpResponse()`)
+  and `withUsage()`: a call that fails can still be billed. The adapters set it when the failing response reports
+  tokens, `LlmTranslationProvider` for answers it could not read, and `TranslationStats` now counts these tokens on
+  corrective retries and in the text-node fallback. When `translate()` throws a `ProviderException` (also with
+  `FallbackStrategy::Throw`), its `usage` holds the tokens of the document so far (#77).
+- `ChatModelContractTestCase::it_reports_one_sided_token_counts()`: an adapter must keep a count the server does not
+  send unknown (`null`), not 0 (#77).
 
 ### Changed
+- `ProviderException::fromHttpResponse()` no longer throws `InvalidArgumentException` for a status outside 100–599
+  (sent by non-compliant PSR-7 implementations): the exception then has no `statusCode` and code 0 (#77).
+- `ProviderException::$vendorCode` is `null` when the vendor's code is not a single line of at most 100 characters
+  without control or bidi characters, and is stored without surrounding whitespace; it is untrusted text that ends up
+  in logs (#77).
 - `HtmlTranslator` takes a custom token estimator as `tokenEstimator: TokenEstimatorInterface` instead of
   `batcher: new Batcher($estimator)` (#76).
 - Marked `@internal`, no longer covered by Semantic Versioning: the HTML pipeline (`Html\HtmlLoader`, `Segmenter`,

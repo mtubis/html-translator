@@ -82,7 +82,10 @@ final class HtmlTranslator\Exception\LogicException extends LogicException imple
 final class HtmlTranslator\Exception\ProviderException extends RuntimeException implements HtmlTranslator\Exception\TranslatorException
     public private(set) ?int $statusCode
     public private(set) ?string $vendorCode
-    public static function fromHttpResponse(int $statusCode, string $message, ?string $vendorCode = NULL, ?Throwable $previous = NULL): HtmlTranslator\Exception\ProviderException
+    public private(set) ?HtmlTranslator\Provider\TokenUsage $usage
+    public function __construct(string $message = '', int $code = 0, ?Throwable $previous = NULL, ?HtmlTranslator\Provider\TokenUsage $usage = NULL)
+    public static function fromHttpResponse(int $statusCode, string $message, ?string $vendorCode = NULL, ?Throwable $previous = NULL, ?HtmlTranslator\Provider\TokenUsage $usage = NULL): HtmlTranslator\Exception\ProviderException
+    public function withUsage(?HtmlTranslator\Provider\TokenUsage $usage): HtmlTranslator\Exception\ProviderException
 
 final class HtmlTranslator\Exception\StructureValidationException extends RuntimeException implements HtmlTranslator\Exception\TranslatorException
 
@@ -356,6 +359,7 @@ abstract class HtmlTranslator\Provider\Llm\Testing\ChatModelContractTestCase ext
     public function it_reports_a_body_of_unexpected_shape(): void
     public function it_reports_a_malformed_body(): void
     public function it_reports_http_errors_with_status_and_vendor_code(int $statusCode, ?string $vendorCode, bool $jsonErrorBody): void
+    public function it_reports_one_sided_token_counts(): void
     public function it_returns_content_model_and_token_counts(): void
     public function it_sends_messages_roles_options_and_its_model(): void
     public function it_wraps_transport_errors_without_leaking_credentials(): void

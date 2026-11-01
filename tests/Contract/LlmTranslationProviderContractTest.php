@@ -75,6 +75,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(BatchContext::class)]
 #[UsesClass(JsonSchema::class)]
 #[UsesClass(TokenUsage::class)]
+#[UsesClass(ProviderException::class)]
 final class LlmTranslationProviderContractTest extends TranslationProviderContractTestCase
 {
     protected function provider(): TranslationProviderInterface

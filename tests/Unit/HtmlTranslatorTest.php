@@ -636,6 +636,85 @@ final class HtmlTranslatorTest extends TestCase
     }
 
     #[Test]
+    public function it_counts_the_tokens_of_a_corrective_retry_that_fails(): void
+    {
+        $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => [] === $batch->corrections
+            ? PseudoLocalizationProvider::corruptingEvery(2)->translate($batch)->withUsage(new TokenUsage(10, 1))
+            : throw new ProviderException('The answer was cut off.', usage: new TokenUsage(5, 2)));
+
+        $result = new HtmlTranslator($provider)->translate('<p>A</p><p>B</p>', Locale::fromString('pl'));
+
+        self::assertSame(15, $result->stats()->inputTokens);
+        self::assertSame(3, $result->stats()->outputTokens);
+    }
+
+    #[Test]
+    public function it_counts_the_tokens_of_a_text_node_fallback_call_that_fails(): void
+    {
+        $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => array_any($batch->units, static fn(TranslationUnit $unit): bool => str_contains($unit->id->toString(), '-'))
+            ? throw new ProviderException('The answer was cut off.', usage: new TokenUsage(7, 3))
+            : new BatchResult(['u1' => 'Kliknij <g1>tutaj'], usage: new TokenUsage(10, 1)));
+
+        $result = new HtmlTranslator($provider)
+            ->translate('<p>Click <a href="/x">here</a></p>', Locale::fromString('pl'), new TranslationOptions(fallback: FallbackStrategy::TextNodesOnly, maxCorrectiveRetries: 0));
+
+        self::assertSame(17, $result->stats()->inputTokens);
+        self::assertSame(4, $result->stats()->outputTokens);
+    }
+
+    /**
+     * A failing first call aborts translate(), so there are no stats: the exception carries the tokens of the whole
+     * document so far instead (#77).
+     */
+    #[Test]
+    public function it_rethrows_a_failing_first_call_with_the_tokens_of_the_document_so_far(): void
+    {
+        $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => 'u1' === ($batch->units[0] ?? null)?->id->toString()
+            ? new PseudoLocalizationProvider()->translate($batch)->withUsage(new TokenUsage(10, 1))
+            : throw ProviderException::fromHttpResponse(503, 'Service unavailable.', 'overloaded', usage: new TokenUsage(4, null)));
+
+        try {
+            new HtmlTranslator($provider)->translate('<p>A</p><p>B</p>', Locale::fromString('pl'), new TranslationOptions(batchSize: 1));
+            self::fail('Expected a ProviderException.');
+        } catch (ProviderException $exception) {
+            self::assertEquals(new TokenUsage(14, 1), $exception->usage);
+            self::assertSame('Service unavailable.', $exception->getMessage());
+            self::assertSame(503, $exception->statusCode);
+            self::assertSame('overloaded', $exception->vendorCode);
+        }
+    }
+
+    #[Test]
+    public function it_throws_for_a_refused_unit_with_the_tokens_of_the_document_so_far(): void
+    {
+        $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => 'u1' === ($batch->units[0] ?? null)?->id->toString()
+            ? new PseudoLocalizationProvider()->translate($batch)->withUsage(new TokenUsage(10, 1))
+            : new BatchResult([], permanentFailures: ['u2' => 'The model refused the batch.'], usage: new TokenUsage(20, 2)));
+
+        try {
+            new HtmlTranslator($provider)->translate('<p>A</p><p>B</p>', Locale::fromString('pl'), new TranslationOptions(fallback: FallbackStrategy::Throw, batchSize: 1));
+            self::fail('Expected a ProviderException.');
+        } catch (ProviderException $exception) {
+            self::assertEquals(new TokenUsage(30, 3), $exception->usage);
+            self::assertStringContainsString('refused', $exception->getMessage());
+        }
+    }
+
+    #[Test]
+    public function it_rethrows_a_failing_first_call_unchanged_when_no_call_reported_tokens(): void
+    {
+        $error = new ProviderException('Service unavailable.');
+        $provider = new CallbackProvider(static fn(TranslationBatch $batch): never => throw $error);
+
+        try {
+            new HtmlTranslator($provider)->translate('<p>A</p>', Locale::fromString('pl'));
+            self::fail('Expected a ProviderException.');
+        } catch (ProviderException $exception) {
+            self::assertSame($error, $exception);
+        }
+    }
+
+    #[Test]
     public function it_keeps_token_usage_of_earlier_calls_when_the_text_node_fallback_fails(): void
     {
         $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => array_any($batch->units, static fn(TranslationUnit $unit): bool => str_contains($unit->id->toString(), '-'))

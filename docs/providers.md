@@ -100,8 +100,10 @@ new OpenAiCompatibleConfig(
   throwing other exceptions is not covered.
 - **The base URL** must not contain credentials, a query or a fragment.
 - **Errors** are `ProviderException`s. HTTP errors carry `statusCode` and `vendorCode` (the vendor's `error.code`,
-  `error.type` or Gemini's `status`). A refused or content-filtered batch is not an exception: its units are reported
-  as issues and handled by the fallback strategy.
+  `error.type` or Gemini's `status`; a code that is not a single plain line of at most 100 characters is dropped).
+  `usage` holds the tokens a failing response reported. A status outside 100–599 from a non-compliant PSR-7
+  implementation gives an exception without `statusCode`. A refused or content-filtered batch is not an exception:
+  its units are reported as issues and handled by the fallback strategy.
 
 ## Anthropic
 
@@ -154,9 +156,9 @@ $translator = new HtmlTranslator(new LlmTranslationProvider($model));
   `anthropic-beta` cannot be set through `extraHeaders`. A beta may change request or response shapes the adapter
   does not map (new content blocks are ignored, new fields are not sent), so test a beta before relying on it. Betas
   are part of `modelId()` (`+betas=…`), since they may change answers.
-- **Errors** are `ProviderException`s with `statusCode` and `vendorCode` (`error.type`, e.g. `rate_limit_error`,
-  `overloaded_error` for HTTP 529); the message names the request id, which Anthropic support asks for. Transient
-  failures are retried, see [Retries](#retries).
+- **Errors** are `ProviderException`s with `statusCode`, `vendorCode` (`error.type`, e.g. `rate_limit_error`,
+  `overloaded_error` for HTTP 529) and `usage`, as for OpenAI-compatible servers; the message names the request id,
+  which Anthropic support asks for. Transient failures are retried, see [Retries](#retries).
 
 ## Retries
 
@@ -200,6 +202,10 @@ pass their own, and tests `Provider\Llm\Testing\FakeSleeper`, which records the 
   Send through `Provider\Llm\Bridge\Retrier` for transport retries: `send()` returns a `RetriedResponse` (the last
   response and the number of attempts) and throws a `TransportFailure` when the client fails; turn that into a
   `ProviderException` at once without keeping it, since its previous exception holds the request.
+  When a response the adapter rejects reports tokens (an error body or a body it cannot read), pass them as
+  `usage:` to the `ProviderException`, so the stats count what the call cost; drop negative and non-integer counts
+  first (`TokenUsage` rejects them). A wrapper that rethrows a `ProviderException` with more tokens uses
+  `withUsage()`.
 - **A non-LLM engine**: implement `Provider\TranslationProviderInterface` and pass
   `Provider\Testing\TranslationProviderContractTestCase`. Report tokens in `BatchResult::$usage` (`TokenUsage`) when the engine
   reports them; leave it null otherwise (engines billed by characters too, since the stats count tokens).

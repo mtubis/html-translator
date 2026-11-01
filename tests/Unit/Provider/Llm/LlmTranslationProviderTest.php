@@ -12,6 +12,7 @@ use HtmlTranslator\Domain\UnitKind;
 use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
 use HtmlTranslator\Exception\ProviderException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\TermMatcher;
 use HtmlTranslator\Profile\TranslationProfile;
@@ -58,6 +59,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(BatchContext::class)]
 #[UsesClass(JsonSchema::class)]
 #[UsesClass(TokenUsage::class)]
+#[UsesClass(UntrustedText::class)]
 final class LlmTranslationProviderTest extends TestCase
 {
     private const string ANSWER = '{"units": [{"id": "u1", "text": "Jeden"}, {"id": "u2", "text": "Dwa"}]}';
@@ -293,6 +295,56 @@ final class LlmTranslationProviderTest extends TestCase
         $model = FakeChatModel::withResponses($this->response('not JSON'), $this->response(self::ANSWER, inputTokens: 120));
 
         self::assertEquals(new TokenUsage(120, null), new LlmTranslationProvider($model)->translate($this->batch())->usage);
+    }
+
+    #[Test]
+    public function it_reports_the_tokens_of_a_cut_off_answer_it_cannot_parse(): void
+    {
+        $model = FakeChatModel::withResponses($this->response('{"units": [{"id": "u1", "text": "Jed', FinishReason::Length, 1200, 16000));
+
+        self::assertEquals(new TokenUsage(1200, 16000), $this->failure($model)->usage);
+    }
+
+    #[Test]
+    public function it_reports_the_tokens_of_both_answers_it_cannot_parse(): void
+    {
+        $model = FakeChatModel::withResponses($this->response('not JSON', inputTokens: 100, outputTokens: 5), $this->response('still not JSON', inputTokens: 100, outputTokens: 6));
+
+        self::assertEquals(new TokenUsage(200, 11), $this->failure($model)->usage);
+    }
+
+    #[Test]
+    public function it_adds_the_tokens_of_the_first_answer_to_an_error_of_the_second_call(): void
+    {
+        $error = ProviderException::fromHttpResponse(429, 'Rate limited.', 'rate_limit_exceeded', usage: new TokenUsage(50, null));
+        $model = FakeChatModel::withResponses($this->response('not JSON', inputTokens: 100, outputTokens: 5), $error);
+
+        $exception = $this->failure($model);
+
+        self::assertEquals(new TokenUsage(150, 5), $exception->usage);
+        self::assertSame('Rate limited.', $exception->getMessage());
+        self::assertSame(429, $exception->statusCode);
+        self::assertSame('rate_limit_exceeded', $exception->vendorCode);
+    }
+
+    #[Test]
+    public function it_passes_an_error_of_the_second_call_through_unchanged_when_the_first_answer_reported_no_tokens(): void
+    {
+        $error = ProviderException::fromHttpResponse(429, 'Rate limited.', usage: new TokenUsage(50, null));
+        $model = FakeChatModel::withResponses($this->response('not JSON'), $error);
+
+        self::assertSame($error, $this->failure($model));
+    }
+
+    private function failure(FakeChatModel $model): ProviderException
+    {
+        try {
+            new LlmTranslationProvider($model)->translate($this->batch());
+        } catch (ProviderException $exception) {
+            return $exception;
+        }
+
+        self::fail('Expected a ProviderException.');
     }
 
     private function response(string $content, FinishReason $finishReason = FinishReason::Stop, ?int $inputTokens = null, ?int $outputTokens = null): ChatResponse

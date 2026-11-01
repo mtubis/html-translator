@@ -25,6 +25,7 @@ use HtmlTranslator\Provider\Llm\Testing\ChatScenario;
 use HtmlTranslator\Provider\Llm\Testing\ChatScenarioKind;
 use HtmlTranslator\Provider\Llm\Testing\FakeSleeper;
 use HtmlTranslator\Provider\Llm\Testing\RecordedChatRequest;
+use HtmlTranslator\Provider\TokenUsage;
 use HtmlTranslator\Tests\Support\FakeClientException;
 use HtmlTranslator\Tests\Support\FakeHttpClient;
 use HtmlTranslator\Tests\Support\FakeNetworkException;
@@ -56,6 +57,7 @@ use stdClass;
 #[UsesClass(RetriedResponse::class)]
 #[UsesClass(TransportFailure::class)]
 #[UsesClass(FakeSleeper::class)]
+#[UsesClass(TokenUsage::class)]
 final class OpenAiCompatibleChatModelContractTest extends ChatModelContractTestCase
 {
     private const string MODEL = 'contract-configured-model';

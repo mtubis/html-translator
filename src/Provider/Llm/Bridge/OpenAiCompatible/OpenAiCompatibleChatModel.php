@@ -14,6 +14,7 @@ use HtmlTranslator\Provider\Llm\ChatRequest;
 use HtmlTranslator\Provider\Llm\ChatResponse;
 use HtmlTranslator\Provider\Llm\FinishReason;
 use HtmlTranslator\Provider\Llm\JsonSchema;
+use HtmlTranslator\Provider\TokenUsage;
 use JsonException;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
@@ -138,15 +139,17 @@ final readonly class OpenAiCompatibleChatModel implements ChatModelInterface
     private function answer(string $body): ChatResponse
     {
         $data = $this->decode($body);
+        // A body the adapter cannot read may still have been billed: its usage goes on the exception.
+        $usage = $this->usage($data);
         $choice = \is_array($data['choices'] ?? null) ? ($data['choices'][0] ?? null) : null;
         if (!\is_array($choice)) {
-            throw new ProviderException(\sprintf('%s answered without a choice.', $this->config->name));
+            throw new ProviderException(\sprintf('%s answered without a choice.', $this->config->name), usage: $usage);
         }
 
         // Some servers drop the message of a blocked answer and only send the finish reason.
         $message = $choice['message'] ?? null;
         if (!\is_array($message)) {
-            $message = \is_string($choice['finish_reason'] ?? null) ? [] : throw new ProviderException(\sprintf('%s answered without a message.', $this->config->name));
+            $message = \is_string($choice['finish_reason'] ?? null) ? [] : throw new ProviderException(\sprintf('%s answered without a message.', $this->config->name), usage: $usage);
         }
 
         $refusal = $message['refusal'] ?? null;
@@ -156,19 +159,28 @@ final readonly class OpenAiCompatibleChatModel implements ChatModelInterface
         } elseif (null === $content || \is_string($content)) {
             $finishReason = $this->finishReason($choice['finish_reason'] ?? null);
         } else {
-            throw new ProviderException(\sprintf('%s answered with content that is not text.', $this->config->name));
+            throw new ProviderException(\sprintf('%s answered with content that is not text.', $this->config->name), usage: $usage);
         }
 
         $model = $data['model'] ?? null;
-        $usage = \is_array($data['usage'] ?? null) ? $data['usage'] : [];
 
         return new ChatResponse(
             $content ?? '',
             \is_string($model) && '' !== trim($model) ? $model : $this->config->model,
-            $this->tokens($usage['prompt_tokens'] ?? null),
-            $this->tokens($usage['completion_tokens'] ?? null),
+            $usage?->inputTokens,
+            $usage?->outputTokens,
             $finishReason,
         );
+    }
+
+    /**
+     * @param array<mixed> $data
+     */
+    private function usage(array $data): ?TokenUsage
+    {
+        $usage = \is_array($data['usage'] ?? null) ? $data['usage'] : [];
+
+        return TokenUsage::reported($this->tokens($usage['prompt_tokens'] ?? null), $this->tokens($usage['completion_tokens'] ?? null));
     }
 
     private function finishReason(mixed $reason): ?FinishReason
@@ -213,7 +225,7 @@ final readonly class OpenAiCompatibleChatModel implements ChatModelInterface
 
         $message = \sprintf('%s returned HTTP %d', $this->config->name, $status) . $this->afterAttempts($attempts);
 
-        return ProviderException::fromHttpResponse($status, '' === $vendorMessage ? $message . '.' : $message . ': ' . $vendorMessage, $vendorCode);
+        return ProviderException::fromHttpResponse($status, '' === $vendorMessage ? $message . '.' : $message . ': ' . $vendorMessage, $vendorCode, usage: $this->usage($data));
     }
 
     /**
