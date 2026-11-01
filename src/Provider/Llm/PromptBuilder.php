@@ -18,6 +18,8 @@ use HtmlTranslator\Provider\TranslationBatch;
  * Renders a translation batch as a chat request (ADR-0011); ResponseParser reads the answer.
  *
  * The system message is built from sections; the translation profile adds its own, only for what it sets (ADR-0012).
+ *
+ * @internal used by LlmTranslationProvider (ADR-0018)
  */
 final readonly class PromptBuilder
 {

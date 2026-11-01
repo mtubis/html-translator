@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Validation;
 
+/** @internal part of the pipeline behind HtmlTranslator (ADR-0018) */
 final readonly class ValidationResult
 {
     /** Problems named in describe(); a hostile answer can have thousands, and the description goes back to the model. */

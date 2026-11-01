@@ -11,6 +11,8 @@ use HtmlTranslator\Exception\InvalidHtmlException;
 
 /**
  * A parsed full document or fragment. The tree is live: changes made through root() show up in serialize().
+ *
+ * @internal part of the pipeline behind HtmlTranslator (ADR-0018)
  */
 final readonly class LoadedDocument
 {

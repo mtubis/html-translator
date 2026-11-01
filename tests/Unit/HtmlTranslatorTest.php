@@ -585,7 +585,7 @@ final class HtmlTranslatorTest extends TestCase
     }
 
     #[Test]
-    public function it_batches_with_the_injected_batcher(): void
+    public function it_batches_with_the_injected_token_estimator(): void
     {
         $provider = new CallbackProvider(static fn(TranslationBatch $batch): BatchResult => new PseudoLocalizationProvider()->translate($batch));
         $expensive = new class implements TokenEstimatorInterface {
@@ -595,7 +595,7 @@ final class HtmlTranslatorTest extends TestCase
             }
         };
 
-        new HtmlTranslator($provider, batcher: new Batcher($expensive))->translate('<p>A</p><p>B</p><p>C</p>', Locale::fromString('pl'));
+        new HtmlTranslator($provider, tokenEstimator: $expensive)->translate('<p>A</p><p>B</p><p>C</p>', Locale::fromString('pl'));
 
         self::assertSame([1, 1, 1], array_map(static fn(TranslationBatch $batch): int => \count($batch->units), $provider->batches));
     }

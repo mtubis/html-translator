@@ -6,6 +6,8 @@ namespace HtmlTranslator;
 
 use Closure;
 use HtmlTranslator\Batching\Batcher;
+use HtmlTranslator\Batching\CharacterTokenEstimator;
+use HtmlTranslator\Batching\TokenEstimatorInterface;
 use HtmlTranslator\Cache\UnitCache;
 use HtmlTranslator\Domain\Locale;
 use HtmlTranslator\Domain\LocalePair;
@@ -63,26 +65,43 @@ final readonly class HtmlTranslator
 
     private ?UnitCache $cache;
 
+    private HtmlLoader $loader;
+
+    private Segmenter $segmenter;
+
+    private StructureValidator $validator;
+
+    private TermChecker $termChecker;
+
+    private Reassembler $reassembler;
+
+    private Batcher $batcher;
+
     /**
+     * Only ports and configuration are injected; the pipeline's internal collaborators are created here (ADR-0018).
+     *
      * @param CacheItemPoolInterface|null $cache unit translations; used only when the provider implements
      *                                           CacheableProviderInterface. No expiry is set, configure it on the pool.
+     * @param TokenEstimatorInterface|null $tokenEstimator sizes batches against TranslationOptions::$tokenBudget;
+     *                                                     null means CharacterTokenEstimator (ADR-0015)
      */
     public function __construct(
         private TranslationProviderInterface $provider,
         ?CacheItemPoolInterface $cache = null,
         private ?LoggerInterface $logger = null,
-        private HtmlLoader $loader = new HtmlLoader(),
-        private Segmenter $segmenter = new Segmenter(),
-        private StructureValidator $validator = new StructureValidator(),
-        private Reassembler $reassembler = new Reassembler(),
         ?SkipRules $skipRules = null,
         ?TranslatableAttributes $translatableAttributes = null,
-        private Batcher $batcher = new Batcher(),
-        private TermChecker $termChecker = new TermChecker(),
+        ?TokenEstimatorInterface $tokenEstimator = null,
     ) {
         $this->skipRules = $skipRules ?? SkipRules::defaults();
         $this->translatableAttributes = $translatableAttributes ?? TranslatableAttributes::defaults();
         $this->cache = $cache instanceof CacheItemPoolInterface ? new UnitCache($cache) : null;
+        $this->loader = new HtmlLoader();
+        $this->segmenter = new Segmenter();
+        $this->validator = new StructureValidator();
+        $this->termChecker = new TermChecker();
+        $this->reassembler = new Reassembler();
+        $this->batcher = new Batcher($tokenEstimator ?? new CharacterTokenEstimator());
     }
 
     /**

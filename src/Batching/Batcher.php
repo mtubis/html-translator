@@ -12,6 +12,8 @@ use HtmlTranslator\Exception\InvalidArgumentException;
  *
  * The budget covers the unit texts and their JSON envelope in the prompt, not the instructions or the answer.
  * Order is preserved and units are never split; a unit over the budget gets a batch of its own.
+ *
+ * @internal part of the pipeline behind HtmlTranslator (ADR-0018)
  */
 final readonly class Batcher
 {

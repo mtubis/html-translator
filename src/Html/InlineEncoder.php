@@ -22,6 +22,8 @@ use HtmlTranslator\Domain\UnitText;
  * - text → escaped &, <, >
  *
  * Numbers follow opening order and restart for every run.
+ *
+ * @internal part of the pipeline behind HtmlTranslator (ADR-0018)
  */
 final readonly class InlineEncoder
 {

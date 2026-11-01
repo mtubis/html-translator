@@ -34,6 +34,8 @@ use WeakMap;
  * Context hints (plain text, whitespace collapsed, at most 200 characters): the document title and, per unit, the
  * nearest h1–h6 before it, whether or not that heading is translated, also inside a skipped subtree. A heading
  * inside a skipped inline element within a sentence (opaque, never visited) is not seen; real markup has none.
+ *
+ * @internal part of the pipeline behind HtmlTranslator (ADR-0018)
  */
 final readonly class Segmenter
 {

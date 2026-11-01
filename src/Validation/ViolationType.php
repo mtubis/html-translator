@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Validation;
 
+/** @internal part of the pipeline behind HtmlTranslator (ADR-0018) */
 enum ViolationType
 {
     case InvalidEncoding;

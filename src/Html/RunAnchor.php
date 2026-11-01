@@ -10,6 +10,8 @@ use HtmlTranslator\Exception\InvalidArgumentException;
 /**
  * Where a block or title unit lives in the DOM: the sibling nodes its translation replaces
  * and the original nodes behind its pseudo-tags (ADR-0007).
+ *
+ * @internal part of the pipeline behind HtmlTranslator (ADR-0018)
  */
 final readonly class RunAnchor
 {
