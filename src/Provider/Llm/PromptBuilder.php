@@ -178,7 +178,7 @@ final readonly class PromptBuilder
 
         // Filtered like the glossary: a profile can list 500 terms, and most batches contain none of them.
         $matcher = TermMatcher::in($plainTexts);
-        $doNotTranslate = array_values(array_filter($profile->doNotTranslate, $matcher->matches(...)));
+        $doNotTranslate = array_filter($profile->doNotTranslate, $matcher->matches(...));
         if ([] !== $doNotTranslate) {
             $sections[] = self::DO_NOT_TRANSLATE . "\n" . implode("\n", array_map(static fn(string $term): string => '- ' . $term, $doNotTranslate));
         }

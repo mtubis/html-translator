@@ -138,7 +138,9 @@ final readonly class LlmTranslationProvider implements CacheableProviderInterfac
             }
 
             $budget -= 2;
-            $halves = array_chunk($part, max(1, (int) ceil(\count($part) / 2)));
+            // The first half takes the odd unit.
+            $size = intdiv(\count($part) + 1, 2);
+            $halves = array_chunk($part, max(1, $size));
             foreach ($halves as $index => $half) {
                 $partBatch = $this->part($batch, $half);
 

@@ -92,7 +92,7 @@ final readonly class RetryPolicy
     public function backoffMilliseconds(int $retry, Randomizer $randomizer): int
     {
         $exponent = min(max($retry - 1, 0), self::MAX_EXPONENT);
-        $delay = min($this->maxDelayMilliseconds, $this->baseDelayMilliseconds * (1 << $exponent));
+        $delay = min($this->maxDelayMilliseconds, $this->baseDelayMilliseconds << $exponent);
         $half = intdiv($delay, 2);
 
         return $half + $randomizer->getInt(0, $delay - $half);
