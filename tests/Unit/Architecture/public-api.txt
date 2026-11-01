@@ -1,0 +1,487 @@
+final readonly class HtmlTranslator\Batching\CharacterTokenEstimator implements HtmlTranslator\Batching\TokenEstimatorInterface
+    public function estimate(string $text): int
+
+interface HtmlTranslator\Batching\TokenEstimatorInterface
+    public function estimate(string $text): int
+
+final readonly class HtmlTranslator\Domain\InlineTag
+    public int $number
+    public HtmlTranslator\Domain\InlineTagKind $kind
+    public static function of(int $number, HtmlTranslator\Domain\InlineTagKind $kind): self
+
+enum HtmlTranslator\Domain\InlineTagKind
+    case Paired
+    case Void
+    case Opaque
+
+final readonly class HtmlTranslator\Domain\Locale implements Stringable
+    public string $language
+    public ?string $script
+    public ?string $region
+    public function __toString(): string
+    public function equals(self $other): bool
+    public static function fromString(string $tag): self
+    public function isRightToLeft(): bool
+    public function toString(): string
+
+final readonly class HtmlTranslator\Domain\LocalePair
+    public ?HtmlTranslator\Domain\Locale $source
+    public HtmlTranslator\Domain\Locale $target
+    public function isAutoDetect(): bool
+    public static function of(?HtmlTranslator\Domain\Locale $source, HtmlTranslator\Domain\Locale $target): self
+
+final readonly class HtmlTranslator\Domain\TranslationUnit
+    public HtmlTranslator\Domain\UnitId $id
+    public HtmlTranslator\Domain\UnitKind $kind
+    public string $text
+    public array $inlineTags
+    public string $leadingWhitespace
+    public string $trailingWhitespace
+    public static function fromText(HtmlTranslator\Domain\UnitId $id, HtmlTranslator\Domain\UnitKind $kind, string $text, array $inlineTags = []): self
+
+final readonly class HtmlTranslator\Domain\UnitId implements Stringable
+    public function __toString(): string
+    public function equals(self $other): bool
+    public static function fromString(string $id): self
+    public function toString(): string
+
+enum HtmlTranslator\Domain\UnitKind
+    case Block
+    case Attribute
+    case Title
+
+final class HtmlTranslator\Domain\UnitText
+    public static function escape(string $plain): string
+    public static function hasTranslatableCharacter(string $plain): bool
+    public static function plainText(string $text): string
+    public static function tokenize(string $text): array
+
+final readonly class HtmlTranslator\Domain\UnitTextToken
+    public HtmlTranslator\Domain\UnitTextTokenKind $kind
+    public ?int $number
+    public string $text
+    public static function close(int $number, string $source): self
+    public static function open(int $number, string $source): self
+    public static function rawMarkup(string $source): self
+    public static function text(string $decoded): self
+    public static function void(int $number, string $source): self
+
+enum HtmlTranslator\Domain\UnitTextTokenKind
+    case Text
+    case Open
+    case Close
+    case Void
+    case RawMarkup
+
+final class HtmlTranslator\Exception\InvalidArgumentException extends InvalidArgumentException implements HtmlTranslator\Exception\TranslatorException
+
+final class HtmlTranslator\Exception\InvalidHtmlException extends InvalidArgumentException implements HtmlTranslator\Exception\TranslatorException
+
+final class HtmlTranslator\Exception\LogicException extends LogicException implements HtmlTranslator\Exception\TranslatorException
+
+final class HtmlTranslator\Exception\ProviderException extends RuntimeException implements HtmlTranslator\Exception\TranslatorException
+    public private(set) ?int $statusCode
+    public private(set) ?string $vendorCode
+    public static function fromHttpResponse(int $statusCode, string $message, ?string $vendorCode = NULL, ?Throwable $previous = NULL): self
+
+final class HtmlTranslator\Exception\StructureValidationException extends RuntimeException implements HtmlTranslator\Exception\TranslatorException
+
+interface HtmlTranslator\Exception\TranslatorException extends Stringable, Throwable
+
+final class HtmlTranslator\Exception\UntrustedText
+    public static function quote(string $text, int $maxLength = 200): string
+
+enum HtmlTranslator\FallbackStrategy
+    case TextNodesOnly
+    case KeepOriginal
+    case Throw
+
+final readonly class HtmlTranslator\HtmlTranslator
+    public function __construct(HtmlTranslator\Provider\TranslationProviderInterface $provider, ?Psr\Cache\CacheItemPoolInterface $cache = NULL, ?Psr\Log\LoggerInterface $logger = NULL, ?HtmlTranslator\Html\SkipRules $skipRules = NULL, ?HtmlTranslator\Html\TranslatableAttributes $translatableAttributes = NULL, ?HtmlTranslator\Batching\TokenEstimatorInterface $tokenEstimator = NULL)
+    public function translate(string $html, HtmlTranslator\Domain\Locale $target, ?HtmlTranslator\TranslationOptions $options = NULL): HtmlTranslator\TranslatedDocument
+
+final readonly class HtmlTranslator\Html\SkipRules
+    public const array ALWAYS_SKIPPED_ELEMENTS = ['script', 'style', 'xmp', 'iframe', 'noembed', 'noframes', 'noscript', 'plaintext', 'template']
+    public static function defaults(): self
+    public function withClass(string $class): self
+    public function withElement(string $name): self
+    public function withoutClass(string $class): self
+    public function withoutElement(string $name): self
+
+final readonly class HtmlTranslator\Html\TranslatableAttributes
+    public static function defaults(): self
+    public function withAttribute(string $name): self
+    public function withMetaName(string $name): self
+    public function withoutAttribute(string $name): self
+    public function withoutMetaName(string $name): self
+
+final readonly class HtmlTranslator\Issue
+    public HtmlTranslator\Domain\UnitId $unitId
+    public HtmlTranslator\IssueType $type
+    public string $message
+    public function __construct(HtmlTranslator\Domain\UnitId $unitId, HtmlTranslator\IssueType $type, string $message)
+
+enum HtmlTranslator\IssueType
+    case InvalidStructure
+    case ProviderFailure
+    case MissingTranslation
+    case PartiallyTranslated
+    case TermViolation
+
+enum HtmlTranslator\Profile\Formality: string
+    case Default = 'default'
+    case Formal = 'formal'
+    case Informal = 'informal'
+
+final readonly class HtmlTranslator\Profile\Glossary
+    public const int MAX_ENTRIES = 500
+    public static function empty(): self
+    public function entries(): array
+    public static function fromArray(array $terms): self
+    public function isEmpty(): bool
+    public function matching(array $texts): self
+    public static function of(HtmlTranslator\Profile\GlossaryEntry ...$entries): self
+    public function with(HtmlTranslator\Profile\GlossaryEntry $entry): self
+
+final readonly class HtmlTranslator\Profile\GlossaryEntry
+    public const int MAX_TERM_LENGTH = 200
+    public string $source
+    public string $target
+    public static function of(string $source, string $target): self
+
+enum HtmlTranslator\Profile\TermPolicy: string
+    case TranslateAll = 'translate_all'
+    case PreferOriginalTechnicalTerms = 'prefer_original_technical_terms'
+    case KeepOriginal = 'keep_original'
+
+final readonly class HtmlTranslator\Profile\TranslationProfile
+    public const int MAX_DOMAIN_LENGTH = 200
+    public const int MAX_INSTRUCTIONS_LENGTH = 2000
+    public const int MAX_DO_NOT_TRANSLATE_TERMS = 500
+    public array $doNotTranslate
+    public ?string $domain
+    public ?string $instructions
+    public HtmlTranslator\Profile\Formality $formality
+    public HtmlTranslator\Profile\TermPolicy $termPolicy
+    public HtmlTranslator\Profile\Glossary $glossary
+    public static function default(): self
+    public function fingerprint(): string
+    public static function legal(): self
+    public static function marketing(): self
+    public static function technical(): self
+    public function withDoNotTranslate(string ...$terms): self
+    public function withDomain(?string $domain): self
+    public function withFormality(HtmlTranslator\Profile\Formality $formality): self
+    public function withGlossary(HtmlTranslator\Profile\Glossary $glossary): self
+    public function withInstructions(?string $instructions): self
+    public function withTermPolicy(HtmlTranslator\Profile\TermPolicy $termPolicy): self
+
+final readonly class HtmlTranslator\Progress
+    public int $batchesDone
+    public int $batchesTotal
+    public int $unitsDone
+    public int $unitsTotal
+    public function __construct(int $batchesDone, int $batchesTotal, int $unitsDone, int $unitsTotal)
+
+final readonly class HtmlTranslator\Provider\BatchContext
+    public ?string $title
+    public array $headings
+    public array $unitHeadings
+    public static function forUnits(?string $title, array $headingByUnit): self
+    public function isEmpty(): bool
+    public static function none(): self
+
+final readonly class HtmlTranslator\Provider\BatchResult
+    public array $translations
+    public array $failures
+    public array $permanentFailures
+    public ?HtmlTranslator\Provider\TokenUsage $usage
+    public function __construct(array $translations, array $failures = [], array $permanentFailures = [], ?HtmlTranslator\Provider\TokenUsage $usage = NULL)
+    public function withUsage(?HtmlTranslator\Provider\TokenUsage $usage): self
+
+interface HtmlTranslator\Provider\CacheableProviderInterface extends HtmlTranslator\Provider\TranslationProviderInterface
+    public function cacheId(): string
+
+final readonly class HtmlTranslator\Provider\Correction
+    public string $previousTranslation
+    public string $problems
+    public function __construct(string $previousTranslation, string $problems)
+    public static function forMissingUnit(): self
+
+final readonly class HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicChatModel implements HtmlTranslator\Provider\Llm\ChatModelInterface
+    public function __construct(Psr\Http\Client\ClientInterface $client, Psr\Http\Message\RequestFactoryInterface $requestFactory, Psr\Http\Message\StreamFactoryInterface $streamFactory, HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig $config, HtmlTranslator\Provider\Llm\Bridge\Retrier $retrier = new \HtmlTranslator\Provider\Llm\Bridge\Retrier())
+    public function complete(HtmlTranslator\Provider\Llm\ChatRequest $request): HtmlTranslator\Provider\Llm\ChatResponse
+    public function modelId(): string
+
+final readonly class HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig
+    public const string DEFAULT_BASE_URL = 'https://api.anthropic.com/v1'
+    public const string DEFAULT_API_VERSION = '2023-06-01'
+    public const int DEFAULT_MAX_OUTPUT_TOKENS = 16000
+    public const string REFUSAL_FALLBACKS_BETA = 'server-side-fallback-2026-07-01'
+    public array $betas
+    public string $model
+    public string $baseUrl
+    public string $apiVersion
+    public int $defaultMaxOutputTokens
+    public ?HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicEffort $effort
+    public bool $refusalFallbacks
+    public function __construct(string $model, string $apiKey, string $baseUrl = self::DEFAULT_BASE_URL, string $apiVersion = self::DEFAULT_API_VERSION, int $defaultMaxOutputTokens = self::DEFAULT_MAX_OUTPUT_TOKENS, ?HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicEffort $effort = NULL, bool $refusalFallbacks = false, array $extraHeaders = [], array $betas = [])
+    public function __debugInfo(): array
+    public function modelId(): string
+
+enum HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicEffort: string
+    case Low = 'low'
+    case Medium = 'medium'
+    case High = 'high'
+    case XHigh = 'xhigh'
+    case Max = 'max'
+
+enum HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode: string
+    case None = 'none'
+    case JsonObject = 'json_object'
+    case JsonSchema = 'json_schema'
+    case JsonSchemaOnly = 'json_schema_only'
+
+final readonly class HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleChatModel implements HtmlTranslator\Provider\Llm\ChatModelInterface
+    public function __construct(Psr\Http\Client\ClientInterface $client, Psr\Http\Message\RequestFactoryInterface $requestFactory, Psr\Http\Message\StreamFactoryInterface $streamFactory, HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig $config, HtmlTranslator\Provider\Llm\Bridge\Retrier $retrier = new \HtmlTranslator\Provider\Llm\Bridge\Retrier())
+    public function complete(HtmlTranslator\Provider\Llm\ChatRequest $request): HtmlTranslator\Provider\Llm\ChatResponse
+    public function modelId(): string
+
+final readonly class HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig
+    public const string MAX_TOKENS = 'max_tokens'
+    public const string MAX_COMPLETION_TOKENS = 'max_completion_tokens'
+    public string $name
+    public string $baseUrl
+    public string $model
+    public HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode $jsonMode
+    public string $maxTokensField
+    public function __construct(string $name, string $baseUrl, string $model, ?string $apiKey = NULL, HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode $jsonMode = \HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode::JsonObject, string $maxTokensField = self::MAX_TOKENS, array $extraHeaders = [])
+    public function __debugInfo(): array
+    public static function gemini(string $apiKey, string $model): self
+    public static function lmStudio(string $model, string $baseUrl = 'http://localhost:1234/v1'): self
+    public function modelId(): string
+    public static function ollama(string $model, string $baseUrl = 'http://localhost:11434/v1'): self
+    public static function openAi(string $apiKey, string $model, HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode $jsonMode = \HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode::JsonSchema): self
+    public static function vllm(string $model, string $baseUrl = 'http://localhost:8000/v1', ?string $apiKey = NULL): self
+
+final readonly class HtmlTranslator\Provider\Llm\Bridge\RetriedResponse
+    public Psr\Http\Message\ResponseInterface $response
+    public int $attempts
+    public function __construct(Psr\Http\Message\ResponseInterface $response, int $attempts)
+
+final readonly class HtmlTranslator\Provider\Llm\Bridge\Retrier
+    public function __construct(HtmlTranslator\Provider\Llm\Bridge\RetryPolicy $policy = new \HtmlTranslator\Provider\Llm\Bridge\RetryPolicy(), HtmlTranslator\Provider\Llm\Bridge\SleeperInterface $sleeper = new \HtmlTranslator\Provider\Llm\Bridge\UsleepSleeper(), Random\Randomizer $randomizer = new \Random\Randomizer())
+    public function send(Psr\Http\Client\ClientInterface $client, Psr\Http\Message\RequestInterface $request): HtmlTranslator\Provider\Llm\Bridge\RetriedResponse
+
+final readonly class HtmlTranslator\Provider\Llm\Bridge\RetryPolicy
+    public const array DEFAULT_RETRYABLE_STATUSES = [408, 429, 500, 502, 503, 504, 529]
+    public const int MAX_ATTEMPTS = 10
+    public const int MAX_DELAY_MILLISECONDS = 3600000
+    public array $retryableStatuses
+    public int $maxAttempts
+    public int $baseDelayMilliseconds
+    public int $maxDelayMilliseconds
+    public bool $retryNetworkErrors
+    public function __construct(int $maxAttempts = 3, int $baseDelayMilliseconds = 1000, int $maxDelayMilliseconds = 30000, array $retryableStatuses = self::DEFAULT_RETRYABLE_STATUSES, bool $retryNetworkErrors = true)
+    public static function default(): self
+    public static function none(): self
+    public function retries(int $status): bool
+
+interface HtmlTranslator\Provider\Llm\Bridge\SleeperInterface
+    public function sleep(int $milliseconds): void
+
+final class HtmlTranslator\Provider\Llm\Bridge\TransportFailure extends RuntimeException implements HtmlTranslator\Exception\TranslatorException
+    public readonly int $attempts
+    public function __construct(int $attempts, Psr\Http\Client\ClientExceptionInterface $last)
+
+final readonly class HtmlTranslator\Provider\Llm\Bridge\UsleepSleeper implements HtmlTranslator\Provider\Llm\Bridge\SleeperInterface
+    public function sleep(int $milliseconds): void
+
+final readonly class HtmlTranslator\Provider\Llm\ChatMessage
+    public HtmlTranslator\Provider\Llm\ChatRole $role
+    public string $content
+    public function __construct(HtmlTranslator\Provider\Llm\ChatRole $role, string $content)
+
+interface HtmlTranslator\Provider\Llm\ChatModelInterface
+    public function complete(HtmlTranslator\Provider\Llm\ChatRequest $request): HtmlTranslator\Provider\Llm\ChatResponse
+    public function modelId(): string
+
+final readonly class HtmlTranslator\Provider\Llm\ChatRequest
+    public array $messages
+    public ?float $temperature
+    public bool $jsonResponse
+    public ?int $maxOutputTokens
+    public ?HtmlTranslator\Provider\Llm\JsonSchema $jsonSchema
+    public function __construct(array $messages, ?float $temperature = NULL, bool $jsonResponse = false, ?int $maxOutputTokens = NULL, ?HtmlTranslator\Provider\Llm\JsonSchema $jsonSchema = NULL)
+
+final readonly class HtmlTranslator\Provider\Llm\ChatResponse
+    public string $content
+    public string $model
+    public ?int $inputTokens
+    public ?int $outputTokens
+    public ?HtmlTranslator\Provider\Llm\FinishReason $finishReason
+    public function __construct(string $content, string $model, ?int $inputTokens = NULL, ?int $outputTokens = NULL, ?HtmlTranslator\Provider\Llm\FinishReason $finishReason = NULL)
+
+enum HtmlTranslator\Provider\Llm\ChatRole: string
+    case System = 'system'
+    case User = 'user'
+    case Assistant = 'assistant'
+
+enum HtmlTranslator\Provider\Llm\FinishReason
+    case Stop
+    case Length
+    case ContentFilter
+    case Refusal
+    case Other
+
+final readonly class HtmlTranslator\Provider\Llm\JsonSchema
+    public string $json
+    public static function fromJson(string $json): self
+
+final readonly class HtmlTranslator\Provider\Llm\LlmTranslationProvider implements HtmlTranslator\Provider\CacheableProviderInterface, HtmlTranslator\Provider\TranslationProviderInterface
+    public function __construct(HtmlTranslator\Provider\Llm\ChatModelInterface $chatModel)
+    public function cacheId(): string
+    public function translate(HtmlTranslator\Provider\TranslationBatch $batch): HtmlTranslator\Provider\BatchResult
+
+abstract class HtmlTranslator\Provider\Llm\Testing\ChatModelContractTestCase extends PHPUnit\Framework\TestCase
+    protected const string API_KEY = 'sk-contract-SECRET-0123456789'
+    public static function finishReasons(): iterable
+    public static function httpErrors(): iterable
+    public function it_can_be_called_more_than_once(): void
+    public function it_does_not_keep_a_transport_exception_that_holds_the_request(): void
+    public function it_falls_back_to_its_model_and_no_token_counts_when_the_server_sends_none(): void
+    public function it_has_a_stable_model_id(): void
+    public function it_leaves_optional_settings_out_when_not_given(): void
+    public function it_maps_finish_reasons(HtmlTranslator\Provider\Llm\FinishReason $reason): void
+    public function it_reports_a_body_of_unexpected_shape(): void
+    public function it_reports_a_malformed_body(): void
+    public function it_reports_http_errors_with_status_and_vendor_code(int $statusCode, ?string $vendorCode, bool $jsonErrorBody): void
+    public function it_returns_content_model_and_token_counts(): void
+    public function it_sends_messages_roles_options_and_its_model(): void
+    public function it_wraps_transport_errors_without_leaking_credentials(): void
+    abstract protected function modelFor(HtmlTranslator\Provider\Llm\Testing\ChatScenario $scenario): HtmlTranslator\Provider\Llm\ChatModelInterface
+    abstract protected function recordedRequest(): HtmlTranslator\Provider\Llm\Testing\RecordedChatRequest
+    protected function setUp(): void
+    protected function tearDown(): void
+
+final readonly class HtmlTranslator\Provider\Llm\Testing\ChatScenario
+    public HtmlTranslator\Provider\Llm\Testing\ChatScenarioKind $kind
+    public ?string $content
+    public ?string $model
+    public ?int $inputTokens
+    public ?int $outputTokens
+    public ?HtmlTranslator\Provider\Llm\FinishReason $finishReason
+    public ?int $statusCode
+    public ?string $vendorCode
+    public ?string $errorMessage
+    public bool $jsonErrorBody
+    public static function httpError(int $statusCode, ?string $vendorCode, string $errorMessage, bool $jsonErrorBody = true): self
+    public static function malformedBody(): self
+    public static function networkError(string $errorMessage): self
+    public static function success(string $content, ?string $model, ?int $inputTokens = NULL, ?int $outputTokens = NULL, ?HtmlTranslator\Provider\Llm\FinishReason $finishReason = \HtmlTranslator\Provider\Llm\FinishReason::Stop): self
+    public static function transportError(string $errorMessage): self
+    public static function unexpectedShape(): self
+
+enum HtmlTranslator\Provider\Llm\Testing\ChatScenarioKind
+    case Success
+    case HttpError
+    case MalformedBody
+    case UnexpectedShape
+    case TransportError
+    case NetworkError
+
+final class HtmlTranslator\Provider\Llm\Testing\FakeChatModel implements HtmlTranslator\Provider\Llm\ChatModelInterface
+    public private(set) array $requests
+    public static function answering(Closure $answer): self
+    public function complete(HtmlTranslator\Provider\Llm\ChatRequest $request): HtmlTranslator\Provider\Llm\ChatResponse
+    public function modelId(): string
+    public function withModelId(string $modelId): self
+    public static function withResponses(HtmlTranslator\Provider\Llm\ChatResponse|HtmlTranslator\Exception\ProviderException ...$responses): self
+
+final class HtmlTranslator\Provider\Llm\Testing\FakeSleeper implements HtmlTranslator\Provider\Llm\Bridge\SleeperInterface
+    public private(set) array $delays
+    public function sleep(int $milliseconds): void
+
+final readonly class HtmlTranslator\Provider\Llm\Testing\RecordedChatRequest
+    public array $messages
+    public ?float $temperature
+    public bool $jsonResponse
+    public ?int $maxOutputTokens
+    public ?string $model
+    public ?string $jsonSchema
+    public function __construct(array $messages, ?float $temperature, bool $jsonResponse, ?int $maxOutputTokens, ?string $model, ?string $jsonSchema = NULL)
+
+final readonly class HtmlTranslator\Provider\Testing\PseudoLocalizationProvider implements HtmlTranslator\Provider\CacheableProviderInterface, HtmlTranslator\Provider\TranslationProviderInterface
+    public function __construct(int $corruptEvery = 0, bool $corruptRetries = false)
+    public function cacheId(): string
+    public static function corruptingEvery(int $every, bool $persistent = false): self
+    public function translate(HtmlTranslator\Provider\TranslationBatch $batch): HtmlTranslator\Provider\BatchResult
+
+abstract class HtmlTranslator\Provider\Testing\TranslationProviderContractTestCase extends PHPUnit\Framework\TestCase
+    protected const string API_KEY = 'sk-contract-SECRET-0123456789'
+    protected function assertFulfilsTheContract(HtmlTranslator\Provider\TranslationBatch $batch, HtmlTranslator\Provider\BatchResult $result): void
+    protected function assertTranslatesEverything(HtmlTranslator\Provider\TranslationBatch $batch, HtmlTranslator\Provider\BatchResult $result): void
+    protected function batch(array $units, array $corrections = []): HtmlTranslator\Provider\TranslationBatch
+    protected function detectsTheSourceLanguage(): bool
+    public function it_accepts_corrections(): void
+    public function it_has_a_stable_cache_id_when_it_is_cacheable(): void
+    public function it_reports_an_undecodable_answer_as_a_provider_exception(): void
+    public function it_reports_an_unreachable_service_as_a_provider_exception(): void
+    public function it_translates_a_batch_of_the_default_size(): void
+    public function it_translates_a_batch_with_a_profile(): void
+    public function it_translates_a_single_unit(): void
+    public function it_translates_several_batches_with_one_instance(): void
+    public function it_translates_units_of_every_kind_with_their_structure(): void
+    public function it_translates_without_a_known_source_language(): void
+    protected function locales(): HtmlTranslator\Domain\LocalePair
+    abstract protected function provider(): HtmlTranslator\Provider\TranslationProviderInterface
+    protected function providerWithUndecodableAnswers(): ?HtmlTranslator\Provider\TranslationProviderInterface
+    protected function setUp(): void
+    protected function tearDown(): void
+    protected function unavailableProvider(): ?HtmlTranslator\Provider\TranslationProviderInterface
+    protected function unit(string $id, string $text, array $tags = [], HtmlTranslator\Domain\UnitKind $kind = \HtmlTranslator\Domain\UnitKind::Block): HtmlTranslator\Domain\TranslationUnit
+
+final readonly class HtmlTranslator\Provider\TokenUsage
+    public ?int $inputTokens
+    public ?int $outputTokens
+    public function __construct(?int $inputTokens, ?int $outputTokens)
+    public static function reported(?int $inputTokens, ?int $outputTokens): ?self
+    public static function sum(?self $left, ?self $right): ?self
+
+final readonly class HtmlTranslator\Provider\TranslationBatch
+    public HtmlTranslator\Profile\TranslationProfile $profile
+    public HtmlTranslator\Provider\BatchContext $context
+    public HtmlTranslator\Domain\LocalePair $locales
+    public array $units
+    public array $corrections
+    public function __construct(HtmlTranslator\Domain\LocalePair $locales, array $units, array $corrections = [], ?HtmlTranslator\Profile\TranslationProfile $profile = NULL, ?HtmlTranslator\Provider\BatchContext $context = NULL)
+
+interface HtmlTranslator\Provider\TranslationProviderInterface
+    public function translate(HtmlTranslator\Provider\TranslationBatch $batch): HtmlTranslator\Provider\BatchResult
+
+final readonly class HtmlTranslator\TranslatedDocument
+    public function __construct(string $html, bool $complete, array $issues, HtmlTranslator\TranslationStats $stats)
+    public function html(): string
+    public function isComplete(): bool
+    public function issues(): array
+    public function stats(): HtmlTranslator\TranslationStats
+
+final readonly class HtmlTranslator\TranslationOptions
+    public int $maxCorrectiveRetries
+    public int $batchSize
+    public int $tokenBudget
+    public HtmlTranslator\Profile\TranslationProfile $profile
+    public ?HtmlTranslator\Domain\Locale $source
+    public HtmlTranslator\FallbackStrategy $fallback
+    public ?Closure $onProgress
+    public function __construct(?HtmlTranslator\Domain\Locale $source = NULL, HtmlTranslator\FallbackStrategy $fallback = \HtmlTranslator\FallbackStrategy::KeepOriginal, int $maxCorrectiveRetries = 2, int $batchSize = 20, ?Closure $onProgress = NULL, ?HtmlTranslator\Profile\TranslationProfile $profile = NULL, int $tokenBudget = 2000)
+
+final readonly class HtmlTranslator\TranslationStats
+    public int $units
+    public int $batches
+    public int $retries
+    public float $durationSeconds
+    public ?int $inputTokens
+    public ?int $outputTokens
+    public int $cacheHits
+    public function __construct(int $units, int $batches, int $retries, float $durationSeconds, ?int $inputTokens = NULL, ?int $outputTokens = NULL, int $cacheHits = 0)
