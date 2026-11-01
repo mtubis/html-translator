@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Tests\Unit\Support;
 
+use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode;
+use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig;
 use HtmlTranslator\Tests\Support\IntegrationProviders;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -118,6 +120,38 @@ final class IntegrationProvidersTest extends TestCase
     {
         self::assertSame('HTML_TRANSLATOR_OPENAI_API_KEY', IntegrationProviders::requiredVariable('openai'));
         self::assertSame('HTML_TRANSLATOR_OLLAMA_MODEL', IntegrationProviders::requiredVariable('ollama'));
+    }
+
+    #[Test]
+    public function a_json_mode_argument_overrides_the_presets_mode(): void
+    {
+        putenv('HTML_TRANSLATOR_VLLM_API_KEY=vllm-key');
+
+        $config = IntegrationProviders::config('vllm', 'qwen', null, JsonMode::JsonObject);
+
+        self::assertInstanceOf(OpenAiCompatibleConfig::class, $config);
+        self::assertSame(JsonMode::JsonObject, $config->jsonMode);
+        self::assertSame('Bearer vllm-key', $config->headers()['Authorization'] ?? null, 'The mode must not shift the key.');
+        self::assertSame('http://localhost:8000/v1/chat/completions', $config->endpoint());
+    }
+
+    #[Test]
+    public function without_a_json_mode_argument_the_preset_keeps_its_mode(): void
+    {
+        $config = IntegrationProviders::config('lmstudio', 'qwen');
+
+        self::assertInstanceOf(OpenAiCompatibleConfig::class, $config);
+        self::assertSame(JsonMode::JsonSchemaOnly, $config->jsonMode);
+    }
+
+    #[Test]
+    public function it_rejects_a_json_mode_for_anthropic(): void
+    {
+        putenv('HTML_TRANSLATOR_ANTHROPIC_API_KEY=sk-ant-test');
+
+        $this->expectException(UnexpectedValueException::class);
+
+        IntegrationProviders::config('anthropic', null, null, JsonMode::JsonSchema);
     }
 
     #[Test]

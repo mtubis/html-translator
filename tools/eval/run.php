@@ -8,6 +8,8 @@ declare(strict_types=1);
  */
 
 use HtmlTranslator\Exception\TranslatorException;
+use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode;
+use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig;
 use HtmlTranslator\Provider\Llm\PromptBuilder;
 use HtmlTranslator\Tests\Support\GoldenFixtures;
 use HtmlTranslator\Tests\Support\IntegrationProviders;
@@ -20,11 +22,12 @@ use HtmlTranslator\Tools\Eval\Report;
 require __DIR__ . '/../../vendor/autoload.php';
 
 const USAGE = <<<'TEXT'
-    Usage: php tools/eval/run.php --provider=<name> [--model=<model>] [--base-url=<url>] [--fixtures=<a,b>] [--out=<dir>]
+    Usage: php tools/eval/run.php --provider=<name> [--model=<model>] [--base-url=<url>] [--json-mode=<mode>] [--fixtures=<a,b>] [--out=<dir>]
 
       --provider   openai, anthropic, gemini, ollama, vllm, lmstudio, or pseudo (no network, checks the tool itself)
       --model      overrides HTML_TRANSLATOR_<PROVIDER>_MODEL
       --base-url   overrides HTML_TRANSLATOR_<PROVIDER>_BASE_URL (local servers only)
+      --json-mode  none, json_object, json_schema or json_schema_only instead of the preset's mode (not anthropic)
       --fixtures   comma-separated fixture names (default: all)
       --out        report directory (default: tools/eval/out)
 
@@ -44,13 +47,13 @@ function option(array $options, string $name): ?string
 
 // getopt() silently drops unknown options, which would run the default model over every fixture.
 foreach (array_slice($argv, 1) as $argument) {
-    if (1 !== preg_match('/^--(?:(?:provider|model|base-url|fixtures|out)=.*|help)$/s', $argument)) {
+    if (1 !== preg_match('/^--(?:(?:provider|model|base-url|json-mode|fixtures|out)=.*|help)$/s', $argument)) {
         fwrite(STDERR, sprintf("Unknown argument \"%s\".\n\n%s", $argument, USAGE));
         exit(1);
     }
 }
 
-$options = getopt('', ['provider:', 'model:', 'base-url:', 'fixtures:', 'out:', 'help']);
+$options = getopt('', ['provider:', 'model:', 'base-url:', 'json-mode:', 'fixtures:', 'out:', 'help']);
 $options = false === $options ? [] : $options;
 if (isset($options['help'])) {
     fwrite(STDOUT, USAGE);
@@ -63,17 +66,21 @@ if (null === $provider) {
     exit(1);
 }
 
+$jsonModeUsed = null;
 try {
     if ('pseudo' === $provider) {
         $chatModel = PseudoLocalizingChatModel::create();
     } else {
-        $config = IntegrationProviders::config($provider, option($options, 'model'), option($options, 'base-url'));
+        $jsonModeOption = option($options, 'json-mode');
+        $jsonMode = null === $jsonModeOption ? null : (JsonMode::tryFrom($jsonModeOption) ?? throw new UnexpectedValueException(sprintf('Unknown JSON mode "%s".', $jsonModeOption)));
+        $config = IntegrationProviders::config($provider, option($options, 'model'), option($options, 'base-url'), $jsonMode);
         if (null === $config) {
             fwrite(STDERR, sprintf("Set %s in .env (see .env.dist) and load it: set -a; . ./.env; set +a\n", IntegrationProviders::requiredVariable($provider)));
             exit(1);
         }
 
         $chatModel = IntegrationProviders::chatModel($config);
+        $jsonModeUsed = $config instanceof OpenAiCompatibleConfig ? $config->jsonMode->value : null;
     }
 } catch (TranslatorException|UnexpectedValueException $exception) {
     fwrite(STDERR, $exception->getMessage() . "\n");
@@ -102,15 +109,15 @@ if (!is_dir($directory) && !mkdir($directory, 0o777, true) && !is_dir($directory
 $model = new CallCountingChatModel($chatModel);
 $startedAt = new DateTimeImmutable();
 $results = [];
-$base = $directory . '/' . new Report($model->modelId(), PromptBuilder::VERSION, $startedAt, [])->fileName();
-fwrite(STDOUT, sprintf("Evaluating %s on %d fixtures (prompt %s)\n", $model->modelId(), count($fixtures), PromptBuilder::VERSION));
+$base = $directory . '/' . new Report($model->modelId(), PromptBuilder::VERSION, $startedAt, [], $jsonModeUsed)->fileName();
+fwrite(STDOUT, sprintf("Evaluating %s%s on %d fixtures (prompt %s)\n", $model->modelId(), null === $jsonModeUsed ? '' : ' (JSON mode ' . $jsonModeUsed . ')', count($fixtures), PromptBuilder::VERSION));
 
 // Rewritten after every fixture, so an interrupted run keeps what it has paid for.
-new EvalRunner($model)->run($fixtures, static function (FixtureResult $result) use ($model, $startedAt, $base, &$results): void {
+new EvalRunner($model)->run($fixtures, static function (FixtureResult $result) use ($model, $startedAt, $base, $jsonModeUsed, &$results): void {
     $results[] = $result;
     fwrite(STDOUT, sprintf("  %-28s %s, %d issue(s), %.1fs%s\n", $result->fixture, $result->complete ? 'complete' : 'incomplete', $result->issueCount(), $result->durationSeconds, null === $result->error ? '' : ' — ' . $result->error));
 
-    $report = new Report($model->modelId(), PromptBuilder::VERSION, $startedAt, $results);
+    $report = new Report($model->modelId(), PromptBuilder::VERSION, $startedAt, $results, $jsonModeUsed);
     if (false === file_put_contents($base . '.md', $report->toMarkdown()) || false === file_put_contents($base . '.json', $report->toJson())) {
         fwrite(STDERR, sprintf("Cannot write the report to %s.md/.json.\n", $base));
         exit(1);

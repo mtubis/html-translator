@@ -7,6 +7,7 @@ namespace HtmlTranslator\Tests\Support;
 use Closure;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
+use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig;
 use HtmlTranslator\Provider\Llm\ChatModelInterface;
@@ -60,23 +61,31 @@ final class IntegrationProviders
     /**
      * The provider's configuration from the environment, with optional overrides; null when it is not configured:
      * hosted APIs need their key, local servers a model (from the environment or $model). $baseUrl applies to local
-     * servers and Anthropic (e.g. a gateway).
+     * servers and Anthropic (e.g. a gateway). $jsonMode overrides the preset's mode (OpenAI-compatible providers only).
      *
-     * @throws UnexpectedValueException for an unknown provider
+     * @throws UnexpectedValueException for an unknown provider, or a JSON mode for Anthropic
      */
-    public static function config(string $provider, ?string $model = null, ?string $baseUrl = null): OpenAiCompatibleConfig|AnthropicConfig|null
+    public static function config(string $provider, ?string $model = null, ?string $baseUrl = null, ?JsonMode $jsonMode = null): OpenAiCompatibleConfig|AnthropicConfig|null
     {
+        if ($jsonMode instanceof JsonMode && 'anthropic' === $provider) {
+            throw new UnexpectedValueException('Anthropic has no JSON mode to choose; it always sends the answer schema.');
+        }
+
         [$required, $modelVariable, $defaultModel, $baseUrlVariable] = self::definition($provider);
         $model ??= self::variable($modelVariable) ?? $defaultModel;
         $baseUrl ??= null === $baseUrlVariable ? null : self::variable($baseUrlVariable);
 
+        // Named-argument spreads let each preset keep its own defaults for whatever is not overridden.
+        $mode = $jsonMode instanceof JsonMode ? ['jsonMode' => $jsonMode] : [];
+        $url = null === $baseUrl ? [] : ['baseUrl' => $baseUrl];
+
         return match ($provider) {
-            'openai' => self::withKey($required, static fn(string $key): OpenAiCompatibleConfig => OpenAiCompatibleConfig::openAi($key, $model ?? '')),
+            'openai' => self::withKey($required, static fn(string $key): OpenAiCompatibleConfig => OpenAiCompatibleConfig::openAi($key, $model ?? '', ...$mode)),
             'anthropic' => self::withKey($required, static fn(string $key): AnthropicConfig => new AnthropicConfig($model ?? '', $key, baseUrl: $baseUrl ?? AnthropicConfig::DEFAULT_BASE_URL)),
-            'gemini' => self::withKey($required, static fn(string $key): OpenAiCompatibleConfig => OpenAiCompatibleConfig::gemini($key, $model ?? '')),
-            'ollama' => null === $model ? null : (null === $baseUrl ? OpenAiCompatibleConfig::ollama($model) : OpenAiCompatibleConfig::ollama($model, $baseUrl)),
-            'vllm' => null === $model ? null : OpenAiCompatibleConfig::vllm($model, $baseUrl ?? 'http://localhost:8000/v1', self::variable('HTML_TRANSLATOR_VLLM_API_KEY')),
-            'lmstudio' => null === $model ? null : (null === $baseUrl ? OpenAiCompatibleConfig::lmStudio($model) : OpenAiCompatibleConfig::lmStudio($model, $baseUrl)),
+            'gemini' => self::withKey($required, static fn(string $key): OpenAiCompatibleConfig => OpenAiCompatibleConfig::gemini($key, $model ?? '', ...$mode)),
+            'ollama' => null === $model ? null : OpenAiCompatibleConfig::ollama($model, ...$url, ...$mode),
+            'vllm' => null === $model ? null : OpenAiCompatibleConfig::vllm($model, ...[...$url, 'apiKey' => self::variable('HTML_TRANSLATOR_VLLM_API_KEY'), ...$mode]),
+            'lmstudio' => null === $model ? null : OpenAiCompatibleConfig::lmStudio($model, ...$url, ...$mode),
             default => throw new UnexpectedValueException(\sprintf('No configuration for provider "%s".', $provider)),
         };
     }
