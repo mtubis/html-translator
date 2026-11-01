@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Tests\Unit\Provider\Llm\Bridge\Anthropic;
 
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Exception\UntrustedText;
@@ -61,6 +62,7 @@ use Throwable;
 #[UsesClass(TransportFailure::class)]
 #[UsesClass(TokenUsage::class)]
 #[UsesClass(FakeSleeper::class)]
+#[UsesClass(ArrayArgument::class)]
 final class AnthropicChatModelTest extends TestCase
 {
     private const string API_KEY = 'sk-ant-test-SECRET-0123456789';

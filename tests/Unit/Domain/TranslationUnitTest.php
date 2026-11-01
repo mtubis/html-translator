@@ -9,7 +9,9 @@ use HtmlTranslator\Domain\InlineTagKind;
 use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitKind;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -20,6 +22,8 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(InlineTag::class)]
 #[UsesClass(UnitId::class)]
 #[UsesClass(InvalidArgumentException::class)]
+#[UsesClass(ArrayArgument::class)]
+#[UsesClass(UntrustedText::class)]
 final class TranslationUnitTest extends TestCase
 {
     #[Test]
@@ -128,5 +132,25 @@ final class TranslationUnitTest extends TestCase
         $this->expectExceptionMessage($kind->name);
 
         TranslationUnit::fromText(UnitId::fromString('a1'), $kind, 'Logo <x1/>', [InlineTag::of(1, InlineTagKind::Void)]);
+    }
+
+    #[Test]
+    public function it_rejects_inline_tags_that_are_not_inline_tags(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('inlineTags[0] must be an instance of HtmlTranslator\\Domain\\InlineTag, got string.');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        TranslationUnit::fromText(UnitId::fromString('u1'), UnitKind::Block, 'x', ['g1']);
+    }
+
+    #[Test]
+    public function it_rejects_inline_tags_that_are_not_a_list(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('inlineTags must be a list, got key "g1".');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        TranslationUnit::fromText(UnitId::fromString('u1'), UnitKind::Block, '<g1>x</g1>', ['g1' => InlineTag::of(1, InlineTagKind::Paired)]);
     }
 }

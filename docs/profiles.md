@@ -76,8 +76,32 @@ $glossary->isEmpty();   // Glossary::empty() is the empty glossary
 ```
 
 A glossary belongs to one target language: build one profile per target locale. Several source terms may share a
-target term. `fromArray()` expects string values; validate untyped configuration first, because a non-string value
-raises a `TypeError`.
+target term. `fromArray()` checks its argument at runtime, see below.
+
+## Building a profile from configuration
+
+A profile can be built from YAML or a PHP array, as the Symfony bundle and the Laravel package do. The entry points
+that take arrays check every element at runtime and throw `InvalidArgumentException` for a wrong one, never a
+`TypeError`. The message names the parameter, the key and the type of the value, never the value itself:
+
+```php
+use HtmlTranslator\Profile\Glossary;
+use HtmlTranslator\Profile\TranslationProfile;
+
+$config = ['glossary' => ['pull request' => 'pull request', '2024' => 'MMXXIV'], 'do_not_translate' => ['GitHub']];
+
+$profile = TranslationProfile::technical()
+    ->withGlossary(Glossary::fromArray($config['glossary']))     // numeric source terms such as "2024" are fine
+    ->withDoNotTranslateTerms($config['do_not_translate']);      // a list; use withDoNotTranslate(...) in typed code
+```
+
+- `Glossary::fromArray()` takes a map of source term → target term. A list (`['pull request', 'branch']`, a common
+  YAML slip) is rejected: `terms must map source terms to target terms, got a list.` PHP cannot tell such a list from
+  a map whose source terms are exactly "0", "1", … in order; build that rare glossary with
+  `Glossary::of(GlossaryEntry::of('0', 'zero'), …)`.
+- `withDoNotTranslateTerms()` takes a list of strings. Spreading an untyped array into the variadic
+  `withDoNotTranslate()` would fail with a `TypeError` under `strict_types`.
+- A non-string element is rejected with e.g. `terms["pull request"] must be a string, got int.`
 
 ## How the profile reaches the model
 
@@ -118,7 +142,8 @@ Presets are starting points; change any field with the `with…()` methods.
 
 ## Limits
 
-Limits keep prompts bounded. Breaking one throws `HtmlTranslator\Exception\InvalidArgumentException`.
+Limits keep prompts bounded. Breaking one throws `HtmlTranslator\Exception\InvalidArgumentException`, as does a wrong
+element in an array argument (see [Building a profile from configuration](#building-a-profile-from-configuration)).
 
 | What | Limit |
 |---|---|

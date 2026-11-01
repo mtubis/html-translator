@@ -11,6 +11,7 @@ use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\GlossaryEntry;
@@ -76,6 +77,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(JsonSchema::class)]
 #[UsesClass(TokenUsage::class)]
 #[UsesClass(ProviderException::class)]
+#[UsesClass(ArrayArgument::class)]
 final class LlmTranslationProviderContractTest extends TranslationProviderContractTestCase
 {
     protected function provider(): TranslationProviderInterface

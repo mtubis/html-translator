@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Tests\Unit\Provider;
 
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\BatchResult;
@@ -18,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(InvalidArgumentException::class)]
 #[UsesClass(UntrustedText::class)]
 #[UsesClass(TokenUsage::class)]
+#[UsesClass(ArrayArgument::class)]
 final class BatchResultTest extends TestCase
 {
     #[Test]
@@ -107,5 +109,35 @@ final class BatchResultTest extends TestCase
         $this->expectExceptionMessage('"u3"');
 
         new BatchResult([], [], ['u3' => '']);
+    }
+
+    #[Test]
+    public function it_rejects_a_translation_that_is_not_a_string(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('translations["u1"] must be a string, got int.');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        new BatchResult(['u1' => 5]);
+    }
+
+    #[Test]
+    public function it_rejects_a_failure_reason_that_is_not_a_string(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('failures["u1"] must be a string, got null.');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        new BatchResult([], ['u1' => null]);
+    }
+
+    #[Test]
+    public function it_rejects_a_permanent_failure_reason_that_is_not_a_string(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('permanentFailures["u1"] must be a string, got bool.');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        new BatchResult([], permanentFailures: ['u1' => true]);
     }
 }

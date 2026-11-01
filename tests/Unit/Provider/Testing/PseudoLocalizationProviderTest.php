@@ -13,6 +13,7 @@ use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitKind;
 use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\GlossaryEntry;
@@ -46,6 +47,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(GlossaryEntry::class)]
 #[UsesClass(ProfileText::class)]
 #[UsesClass(BatchContext::class)]
+#[UsesClass(ArrayArgument::class)]
 final class PseudoLocalizationProviderTest extends TestCase
 {
     #[Test]

@@ -9,6 +9,7 @@ use HtmlTranslator\Domain\LocalePair;
 use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitKind;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\TranslationProfile;
@@ -36,6 +37,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(Glossary::class)]
 #[UsesClass(TranslationProfile::class)]
 #[UsesClass(BatchContext::class)]
+#[UsesClass(ArrayArgument::class)]
 final class ResponseParserTest extends TestCase
 {
     /**

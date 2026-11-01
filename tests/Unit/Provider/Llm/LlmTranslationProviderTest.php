@@ -11,6 +11,7 @@ use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitKind;
 use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Profile\Glossary;
@@ -60,6 +61,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(JsonSchema::class)]
 #[UsesClass(TokenUsage::class)]
 #[UsesClass(UntrustedText::class)]
+#[UsesClass(ArrayArgument::class)]
 final class LlmTranslationProviderTest extends TestCase
 {
     private const string ANSWER = '{"units": [{"id": "u1", "text": "Jeden"}, {"id": "u2", "text": "Dwa"}]}';

@@ -11,6 +11,7 @@ use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\GlossaryEntry;
 use HtmlTranslator\Profile\ProfileText;
@@ -50,6 +51,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(GlossaryEntry::class)]
 #[UsesClass(ProfileText::class)]
 #[UsesClass(BatchContext::class)]
+#[UsesClass(ArrayArgument::class)]
 final class PseudoLocalizationProviderContractTest extends TranslationProviderContractTestCase
 {
     protected function provider(): TranslationProviderInterface

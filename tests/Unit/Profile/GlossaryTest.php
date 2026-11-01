@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Tests\Unit\Profile;
 
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\GlossaryEntry;
 use HtmlTranslator\Profile\ProfileText;
@@ -19,6 +21,8 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(TermMatcher::class)]
 #[UsesClass(GlossaryEntry::class)]
 #[UsesClass(ProfileText::class)]
+#[UsesClass(ArrayArgument::class)]
+#[UsesClass(UntrustedText::class)]
 final class GlossaryTest extends TestCase
 {
     #[Test]
@@ -204,5 +208,64 @@ final class GlossaryTest extends TestCase
         }
 
         return $terms;
+    }
+
+    #[Test]
+    public function it_rejects_a_target_that_is_not_a_string(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('terms["pull request"] must be a string, got int.');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        Glossary::fromArray(['pull request' => 1]);
+    }
+
+    #[Test]
+    public function it_rejects_a_list_where_a_map_of_terms_is_expected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('terms must map source terms to target terms, got a list.');
+
+        Glossary::fromArray(['pull request', 'merge request']);
+    }
+
+    #[Test]
+    public function it_rejects_texts_to_match_that_are_not_strings(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('texts[1] must be a string, got int.');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        Glossary::fromArray(['a' => 'b'])->matching(['a', 1]);
+    }
+
+    #[Test]
+    public function it_rejects_texts_to_match_that_are_not_a_list(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('texts must be a list, got key "x".');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        Glossary::fromArray(['a' => 'b'])->matching(['x' => 'a']);
+    }
+
+    /**
+     * PHP cannot tell ['0' => 'zero'] from a list, so it is rejected like a list; of() builds such a glossary (#78).
+     */
+    #[Test]
+    public function it_rejects_source_terms_that_make_a_list_and_builds_them_with_of(): void
+    {
+        self::assertSame(['0'], array_map(static fn(GlossaryEntry $entry): string => $entry->source, Glossary::of(GlossaryEntry::of('0', 'zero'))->entries()));
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('terms must map source terms to target terms, got a list.');
+
+        Glossary::fromArray(['0' => 'zero']);
+    }
+
+    #[Test]
+    public function it_takes_a_numeric_source_term_from_an_array_key(): void
+    {
+        self::assertSame(['2024'], array_map(static fn(GlossaryEntry $entry): string => $entry->source, Glossary::fromArray(['2024' => 'MMXXIV'])->entries()));
     }
 }

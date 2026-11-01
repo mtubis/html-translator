@@ -6,6 +6,7 @@ namespace HtmlTranslator\Tests\Unit\Provider\Llm\Bridge\OpenAiCompatible;
 
 use Closure;
 use Exception;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\HttpSecrets;
@@ -21,6 +22,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(InvalidArgumentException::class)]
 #[UsesClass(UntrustedText::class)]
 #[UsesClass(HttpSecrets::class)]
+#[UsesClass(ArrayArgument::class)]
 final class OpenAiCompatibleConfigTest extends TestCase
 {
     private const string API_KEY = 'sk-test-SECRET-0123456789';
@@ -210,5 +212,18 @@ final class OpenAiCompatibleConfigTest extends TestCase
     public function it_accepts_numeric_header_names(): void
     {
         self::assertSame('1', new OpenAiCompatibleConfig('x', 'https://api.example.test/v1', 'model', extraHeaders: ['123' => '1'])->headers()[123] ?? null);
+    }
+
+    #[Test]
+    public function it_rejects_an_extra_header_value_that_is_not_a_string_without_naming_it(): void
+    {
+        try {
+            // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+            new OpenAiCompatibleConfig('acme', 'https://llm.example.test/v1', 'm', extraHeaders: ['X-Org' => 'acme', 'X-Secret-Token' => ['nested']]);
+            self::fail('Expected an InvalidArgumentException.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertSame('extraHeaders entry #2 must be a string, got array.', $exception->getMessage());
+            self::assertStringNotContainsString('X-Secret-Token', $exception->getMessage());
+        }
     }
 }

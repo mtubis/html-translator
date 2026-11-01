@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace HtmlTranslator\Tests\Unit\Provider\Llm\Bridge;
 
 use Closure;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\RetryPolicy;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -18,6 +20,8 @@ use ReflectionClass;
 
 #[CoversClass(RetryPolicy::class)]
 #[UsesClass(InvalidArgumentException::class)]
+#[UsesClass(ArrayArgument::class)]
+#[UsesClass(UntrustedText::class)]
 final class RetryPolicyTest extends TestCase
 {
     #[Test]
@@ -163,5 +167,25 @@ final class RetryPolicyTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         $create();
+    }
+
+    #[Test]
+    public function it_rejects_retryable_statuses_that_are_not_a_list(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('retryableStatuses must be a list, got key "busy".');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        new RetryPolicy(retryableStatuses: ['busy' => 503]);
+    }
+
+    #[Test]
+    public function it_rejects_a_retryable_status_that_is_not_an_int(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('retryableStatuses[1] must be an int, got string.');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        new RetryPolicy(retryableStatuses: [429, '503']);
     }
 }

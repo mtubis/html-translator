@@ -6,6 +6,7 @@ namespace HtmlTranslator\Tests\Unit\Provider\Llm\Bridge\Anthropic;
 
 use Closure;
 use Exception;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
@@ -21,6 +22,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(InvalidArgumentException::class)]
 #[UsesClass(UntrustedText::class)]
 #[UsesClass(HttpSecrets::class)]
+#[UsesClass(ArrayArgument::class)]
 final class AnthropicConfigTest extends TestCase
 {
     private const string API_KEY = 'sk-ant-test-SECRET-0123456789';
@@ -126,12 +128,6 @@ final class AnthropicConfigTest extends TestCase
         $config = new AnthropicConfig('claude-opus-5-5', self::API_KEY, betas: ['a-beta-2026-01-01']);
 
         self::assertSame('a-beta-2026-01-01', $config->headers()['anthropic-beta'] ?? null);
-    }
-
-    #[Test]
-    public function it_keeps_betas_as_a_list(): void
-    {
-        self::assertSame(['a-beta-2026-01-01'], new AnthropicConfig('claude-opus-5-5', self::API_KEY, betas: ['first' => 'a-beta-2026-01-01'])->betas);
     }
 
     #[Test]
@@ -261,6 +257,40 @@ final class AnthropicConfigTest extends TestCase
         } catch (InvalidArgumentException $exception) {
             self::assertStringNotContainsString(self::API_KEY, $exception->getMessage());
             self::assertStringNotContainsString(self::API_KEY, $exception->getTraceAsString());
+        }
+    }
+
+    #[Test]
+    public function it_rejects_a_beta_that_is_not_a_string(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('betas[1] must be a string, got int.');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        new AnthropicConfig('claude-opus-5-5', self::API_KEY, betas: ['a-beta-2026-01-01', 7]);
+    }
+
+    #[Test]
+    public function it_rejects_betas_that_are_not_a_list(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('betas must be a list, got key "x".');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        new AnthropicConfig('claude-opus-5-5', self::API_KEY, betas: ['x' => 'a-beta-2026-01-01']);
+    }
+
+    #[Test]
+    public function it_rejects_an_extra_header_value_that_is_not_a_string_without_naming_it(): void
+    {
+        try {
+            // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+            new AnthropicConfig('claude-opus-5-5', self::API_KEY, extraHeaders: ['X-Secret-Token' => 123456]);
+            self::fail('Expected an InvalidArgumentException.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertSame('extraHeaders entry #1 must be a string, got int.', $exception->getMessage());
+            self::assertStringNotContainsString('X-Secret-Token', $exception->getMessage());
+            self::assertStringNotContainsString(self::API_KEY, (string) $exception);
         }
     }
 }

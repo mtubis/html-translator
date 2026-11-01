@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace HtmlTranslator\Tests\Unit\Profile;
 
 use Closure;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Profile\Formality;
 use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\GlossaryEntry;
@@ -22,6 +24,8 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(ProfileText::class)]
 #[UsesClass(Glossary::class)]
 #[UsesClass(GlossaryEntry::class)]
+#[UsesClass(ArrayArgument::class)]
+#[UsesClass(UntrustedText::class)]
 final class TranslationProfileTest extends TestCase
 {
     #[Test]
@@ -358,5 +362,31 @@ final class TranslationProfileTest extends TestCase
     private static function terms(int $count): array
     {
         return array_map(static fn(int $i): string => 'Term ' . $i, range(1, $count));
+    }
+
+    #[Test]
+    public function it_takes_do_not_translate_terms_from_a_list(): void
+    {
+        self::assertSame(['Symfony', 'Doctrine'], TranslationProfile::default()->withDoNotTranslateTerms(['Symfony', 'Doctrine'])->doNotTranslate);
+    }
+
+    #[Test]
+    public function it_rejects_a_do_not_translate_term_that_is_not_a_string(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('terms[1] must be a string, got int.');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        TranslationProfile::default()->withDoNotTranslateTerms(['Symfony', 2024]);
+    }
+
+    #[Test]
+    public function it_rejects_do_not_translate_terms_that_are_not_a_list(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('terms must be a list, got key "php".');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        TranslationProfile::default()->withDoNotTranslateTerms(['php' => 'PHP']);
     }
 }

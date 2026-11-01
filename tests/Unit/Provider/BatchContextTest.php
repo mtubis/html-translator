@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Tests\Unit\Provider;
 
+use HtmlTranslator\Exception\ArrayArgument;
+use HtmlTranslator\Exception\InvalidArgumentException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\BatchContext;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(BatchContext::class)]
+#[UsesClass(ArrayArgument::class)]
+#[UsesClass(UntrustedText::class)]
 final class BatchContextTest extends TestCase
 {
     #[Test]
@@ -68,5 +74,15 @@ final class BatchContextTest extends TestCase
 
         self::assertTrue($context->isEmpty());
         self::assertSame([], $context->unitHeadings);
+    }
+
+    #[Test]
+    public function it_rejects_a_heading_that_is_not_a_string(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('headingByUnit["u1"] must be a string or null, got int.');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        BatchContext::forUnits('Title', ['u1' => 5]);
     }
 }

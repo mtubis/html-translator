@@ -15,10 +15,24 @@ All notable changes to this project are documented here. The format follows [Kee
   tokens, `LlmTranslationProvider` for answers it could not read, and `TranslationStats` now counts these tokens on
   corrective retries and in the text-node fallback. When `translate()` throws a `ProviderException` (also with
   `FallbackStrategy::Throw`), its `usage` holds the tokens of the document so far (#77).
+- `TranslationProfile::withDoNotTranslateTerms(array $terms)`: `withDoNotTranslate()` for terms from configuration,
+  checked at runtime (#78).
 - `ChatModelContractTestCase::it_reports_one_sided_token_counts()`: an adapter must keep a count the server does not
   send unknown (`null`), not 0 (#77).
 
 ### Changed
+- Every public entry point that takes an array checks its elements at runtime and throws `InvalidArgumentException`
+  instead of a `TypeError` (or silently accepting a wrong element): `Glossary::fromArray()` and `matching()`, the
+  `extraHeaders` of both configs, `AnthropicConfig::$betas`, `RetryPolicy`'s `retryableStatuses`,
+  `TranslationUnit::fromText()`, `BatchContext::forUnits()`, `BatchResult`, `TranslationBatch` and
+  `TranslatedDocument`. Messages name the parameter, the key and the type of the value, never the value (#78).
+- Arguments documented as lists reject other arrays instead of keeping only their values: `AnthropicConfig`'s `betas`,
+  `RetryPolicy`'s `retryableStatuses`, `TranslationBatch`'s `units`, `TranslationUnit::fromText()`'s `inlineTags` and
+  `TranslatedDocument`'s `issues`. A provider that splits a batch with `array_filter()` must pass
+  `array_values(...)` to `TranslationBatch` (#78).
+- `Glossary::fromArray()` rejects a non-empty list of terms instead of using their positions as source terms; a
+  glossary whose source terms are exactly "0", "1", … is built with `Glossary::of()` (#78).
+- `RecordedChatRequest` checks that `messages` is a list of [role, content] string pairs (#78).
 - `ProviderException::fromHttpResponse()` no longer throws `InvalidArgumentException` for a status outside 100–599
   (sent by non-compliant PSR-7 implementations): the exception then has no `statusCode` and code 0 (#77).
 - `ProviderException::$vendorCode` is `null` when the vendor's code is not a single line of at most 100 characters
