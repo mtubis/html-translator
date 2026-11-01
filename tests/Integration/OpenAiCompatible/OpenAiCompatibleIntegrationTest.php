@@ -55,6 +55,11 @@ final class OpenAiCompatibleIntegrationTest extends TestCase
 
         $result = GoldenFixtures::translate($directory, new LlmTranslationProvider(IntegrationProviders::chatModel($config)));
 
+        // First, so a weak translation does not hide it: a vendor that renames its usage fields would otherwise leave
+        // the counts null without failing anything (#82). Every preset documents that it reports usage.
+        self::assertGreaterThan(0, $result->stats()->inputTokens ?? 0, \sprintf('%s reported no input tokens for "%s".', $config->modelId(), $fixture));
+        self::assertGreaterThan(0, $result->stats()->outputTokens ?? 0, \sprintf('%s reported no output tokens for "%s".', $config->modelId(), $fixture));
+
         self::assertSame([], array_map(
             static fn(Issue $issue): string => \sprintf('%s %s: %s', $issue->unitId, $issue->type->name, $issue->message),
             $result->issues(),
