@@ -49,10 +49,27 @@ use PHPUnit\Framework\TestCase;
 final class PseudoLocalizationProviderTest extends TestCase
 {
     #[Test]
-    public function its_cache_id_does_not_depend_on_corruption(): void
+    public function providers_with_the_same_settings_share_a_cache_id(): void
     {
-        self::assertSame('pseudo-localization', new PseudoLocalizationProvider()->cacheId());
-        self::assertSame('pseudo-localization', PseudoLocalizationProvider::corruptingEvery(2)->cacheId());
+        self::assertSame(new PseudoLocalizationProvider()->cacheId(), new PseudoLocalizationProvider(0)->cacheId());
+        self::assertSame(PseudoLocalizationProvider::corruptingEvery(2)->cacheId(), new PseudoLocalizationProvider(2)->cacheId());
+        self::assertSame(PseudoLocalizationProvider::corruptingEvery(1, persistent: true)->cacheId(), new PseudoLocalizationProvider(1, true)->cacheId());
+    }
+
+    #[Test]
+    public function its_cache_id_names_the_corruption_settings(): void
+    {
+        $ids = [
+            new PseudoLocalizationProvider()->cacheId(),
+            PseudoLocalizationProvider::corruptingEvery(2)->cacheId(),
+            PseudoLocalizationProvider::corruptingEvery(1)->cacheId(),
+            PseudoLocalizationProvider::corruptingEvery(1, persistent: true)->cacheId(),
+        ];
+
+        self::assertSame(
+            ['pseudo-localization', 'pseudo-localization+corrupt=2', 'pseudo-localization+corrupt=1', 'pseudo-localization+corrupt=1+retries'],
+            $ids,
+        );
     }
 
     /**

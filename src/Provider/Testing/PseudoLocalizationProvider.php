@@ -71,11 +71,16 @@ final readonly class PseudoLocalizationProvider implements CacheableProviderInte
     }
 
     /**
-     * The same for every instance: corrupted translations are invalid, so they never reach a cache.
+     * Names the corruption settings. Corrupted translations are invalid and never reach a cache, but a corrupting
+     * provider must not read a clean one's entries either: answered from them, it would corrupt nothing.
      */
     public function cacheId(): string
     {
-        return 'pseudo-localization';
+        if (0 === $this->corruptEvery) {
+            return 'pseudo-localization';
+        }
+
+        return 'pseudo-localization+corrupt=' . $this->corruptEvery . ($this->corruptRetries ? '+retries' : '');
     }
 
     public function translate(TranslationBatch $batch): BatchResult

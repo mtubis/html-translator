@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows [Kee
 - `ChatModelContractTestCase` and `TranslationProviderContractTestCase` restore `zend.exception_ignore_args` after each
   test. They turned it off for the rest of the process, so later tests of the package recorded the arguments of every
   frame in every exception trace (#88).
+- `PseudoLocalizationProvider::cacheId()` names the corruption settings (`pseudo-localization+corrupt=2`,
+  `pseudo-localization+corrupt=1+retries`). A corrupting provider that shared a cache with a clean one was answered
+  from the clean one's entries and so corrupted nothing. The id of a clean provider is unchanged; existing cache
+  entries of corrupting providers are no longer read, which is harmless (#90).
 
 ## [0.4.0] - 2026-10-13
 

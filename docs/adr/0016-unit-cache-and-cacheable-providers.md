@@ -21,8 +21,9 @@ Alternatives considered:
   data, and different whenever the output would differ. `LlmTranslationProvider` returns
   `llm:<modelId>:<PromptBuilder::VERSION>`; `ChatModelInterface::modelId()` therefore names every adapter setting that
   changes answers (`AnthropicConfig`: `+effort=<level>`, `+fallbacks`), and a change to the text `ResponseParser`
-  returns needs a new `PromptBuilder::VERSION`. `PseudoLocalizationProvider` returns `pseudo-localization`. A
-  decorator that changes translations prefixes the wrapped provider's id; one around a non-cacheable provider does
+  returns needs a new `PromptBuilder::VERSION`. `PseudoLocalizationProvider` returns `pseudo-localization`, plus
+  `+corrupt=<n>[+retries]` when it corrupts units, so a corrupting instance is not answered from a clean one's entries.
+  A decorator that changes translations prefixes the wrapped provider's id; one around a non-cacheable provider does
   not implement the interface.
 - `HtmlTranslator` takes `cache: ?CacheItemPoolInterface` (PSR-6). With a provider that is not cacheable, nothing is
   cached and a notice is logged per `translate()` call; no exception, so decorators keep working.
