@@ -66,7 +66,7 @@ final readonly class BatchContext
      * @param array<string, string> $sources unit id → id of the unit in this context whose heading it gets
      *                                       (itself, or the unit a text node of the fallback comes from)
      *
-     * @internal for HtmlTranslator, which builds the context of each batch (ADR-0018)
+     * @internal for HtmlTranslator and LlmTranslationProvider, which select the context of each batch or part (ADR-0018)
      */
     public function select(array $sources): self
     {

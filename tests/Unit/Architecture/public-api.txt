@@ -343,7 +343,7 @@ final readonly class HtmlTranslator\Provider\Llm\JsonSchema
     public static function fromJson(string $json): HtmlTranslator\Provider\Llm\JsonSchema
 
 final readonly class HtmlTranslator\Provider\Llm\LlmTranslationProvider implements HtmlTranslator\Provider\CacheableProviderInterface, HtmlTranslator\Provider\TranslationProviderInterface
-    public function __construct(HtmlTranslator\Provider\Llm\ChatModelInterface $chatModel)
+    public function __construct(HtmlTranslator\Provider\Llm\ChatModelInterface $chatModel, bool $isolateRefusals = true)
     public function cacheId(): string
     public function translate(HtmlTranslator\Provider\TranslationBatch $batch): HtmlTranslator\Provider\BatchResult
 

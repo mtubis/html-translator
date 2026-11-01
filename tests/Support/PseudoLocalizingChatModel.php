@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Tests\Support;
 
+use Closure;
 use HtmlTranslator\Domain\Locale;
 use HtmlTranslator\Domain\LocalePair;
 use HtmlTranslator\Domain\TranslationUnit;
@@ -30,16 +31,36 @@ final class PseudoLocalizingChatModel
 
     public static function create(): FakeChatModel
     {
+        return self::refusing(static fn(array $ids): bool => false);
+    }
+
+    /**
+     * Refuses a request when $refuses says so for the ids of its units (as a model refuses a batch with one
+     * problematic sentence), and answers it like create() otherwise. Every answer reports the number of its units as
+     * input tokens and 1 output token, so tests can count what isolating a refusal cost.
+     *
+     * $refuses may also return the FinishReason to refuse with, or throw (e.g. a ProviderException on the n-th call).
+     *
+     * @param Closure(list<string>): (bool|FinishReason) $refuses
+     */
+    public static function refusing(Closure $refuses, FinishReason $reason = FinishReason::Refusal): FakeChatModel
+    {
         $provider = new PseudoLocalizationProvider();
 
-        return FakeChatModel::answering(static function (ChatRequest $request) use ($provider): ChatResponse {
-            $batch = new TranslationBatch(LocalePair::of(null, Locale::fromString('pl')), self::units($request));
+        return FakeChatModel::answering(static function (ChatRequest $request) use ($provider, $refuses, $reason): ChatResponse {
+            $units = self::units($request);
+            $ids = array_map(static fn(TranslationUnit $unit): string => $unit->id->toString(), $units);
+            $refusal = $refuses($ids);
+            if (false !== $refusal) {
+                return new ChatResponse('I cannot help with that.', self::MODEL, \count($units), 1, $refusal instanceof FinishReason ? $refusal : $reason);
+            }
+
             $answer = [];
-            foreach ($provider->translate($batch)->translations as $id => $text) {
+            foreach ($provider->translate(new TranslationBatch(LocalePair::of(null, Locale::fromString('pl')), $units))->translations as $id => $text) {
                 $answer[] = ['id' => $id, 'text' => $text];
             }
 
-            return new ChatResponse(json_encode(['units' => $answer], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE), self::MODEL, finishReason: FinishReason::Stop);
+            return new ChatResponse(json_encode(['units' => $answer], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE), self::MODEL, \count($units), 1, FinishReason::Stop);
         })->withModelId(self::MODEL);
     }
 
