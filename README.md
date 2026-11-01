@@ -141,7 +141,7 @@ exceptions implement `HtmlTranslator\Exception\TranslatorException`. See the [us
 - [Architecture](docs/ARCHITECTURE.md) and [decisions](docs/adr/).
 - [Backward compatibility promise](docs/adr/0018-public-api-and-backward-compatibility-promise.md): what is public
   API, what is an extension point and what is `@internal`.
-- [Changelog](CHANGELOG.md).
+- [Changelog](CHANGELOG.md) and [upgrading from 0.4 to 1.0](UPGRADE-1.0.md).
 
 ## Framework integrations
 
