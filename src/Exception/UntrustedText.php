@@ -9,7 +9,14 @@ namespace HtmlTranslator\Exception;
  * safe to quote in an exception or issue message: bounded, valid UTF-8 and on one line, so it cannot flood logs or
  * forge, colour or reorder log lines.
  *
- * @internal
+ * Public API for integrations that report configuration or input errors the way the core does (ADR-0018). quote()
+ * guarantees, and changing any of this is a breaking change:
+ * - the result is valid UTF-8: each invalid byte sequence becomes U+FFFD;
+ * - at most $maxLength characters of the text are kept, the ellipsis (…) included, before escaping;
+ * - line feed, carriage return and tab become \n, \r and \t; other C0/C1 controls, DEL, line and paragraph separators
+ *   and bidi controls become \u{XXXX}; the result has no line break;
+ * - nothing else is changed: no quotes are added and backslashes are not escaped.
+ * Secrets are not redacted: never pass one in.
  */
 final class UntrustedText
 {
@@ -22,7 +29,7 @@ final class UntrustedText
      * Backslashes are not escaped, so a literal "\n" in the text reads like an escaped line break; neither can break
      * a log line.
      *
-     * @param int $maxLength characters of the original text kept, the ellipsis included; at least 1
+     * @param int $maxLength characters of the original text kept, the ellipsis included; values below 1 count as 1
      */
     public static function quote(string $text, int $maxLength = 200): string
     {

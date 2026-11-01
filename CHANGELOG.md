@@ -8,6 +8,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - A backward compatibility promise: every class is public API, an extension point or `@internal`, and
   `tests/Unit/Architecture/public-api.txt` lists the public signatures; a test fails on any difference
   ([ADR-0018](docs/adr/0018-public-api-and-backward-compatibility-promise.md), #76).
+- `Exception\UntrustedText::quote()` is public API for integrations that quote configuration or input values in their
+  own messages; its guarantees are documented in the usage guide (#87).
 
 ### Changed
 - `HtmlTranslator` takes a custom token estimator as `tokenEstimator: TokenEstimatorInterface` instead of
