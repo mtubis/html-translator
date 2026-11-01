@@ -103,7 +103,9 @@ new OpenAiCompatibleConfig(
   `error.type` or Gemini's `status`; a code that is not a single plain line of at most 100 characters is dropped).
   `usage` holds the tokens a failing response reported. A status outside 100–599 from a non-compliant PSR-7
   implementation gives an exception without `statusCode`. A refused or content-filtered batch is not an exception:
-  its units are reported as issues and handled by the fallback strategy.
+  `LlmTranslationProvider` sends it again in halves to find the refused units (at most 2 × ⌈log2 n⌉ further calls for
+  n units; `isolateRefusals: false` turns this off), and only those are reported as issues and handled by the fallback
+  strategy ([ADR-0019](adr/0019-isolating-refused-units.md)).
 
 ## Anthropic
 
@@ -147,8 +149,9 @@ $translator = new HtmlTranslator(new LlmTranslationProvider($model));
   matters for older models. `LlmTranslationProvider` sends none.
 - **Prefill**: a conversation that ends with an assistant message is rejected before the call
   (`InvalidArgumentException`), since current models answer it with HTTP 400.
-- **Refusals**: a declined request (`stop_reason: "refusal"`) becomes `FinishReason::Refusal`; its units are reported
-  as permanent failures. With `refusalFallbacks: true` the adapter sends the `server-side-fallback-2026-07-01` beta,
+- **Refusals**: a declined request (`stop_reason: "refusal"`) becomes `FinishReason::Refusal`; `LlmTranslationProvider`
+  sends the batch again in halves to find the refused units, and only those are reported as permanent failures
+  ([ADR-0019](adr/0019-isolating-refused-units.md)). With `refusalFallbacks: true` the adapter sends the `server-side-fallback-2026-07-01` beta,
   and the API may answer with a fallback model instead (`ChatResponse::$model` names it). Available on the Claude API
   only; check that your model supports it.
 - **Betas**: `betas` enables beta features without a library release. Each value must be in the form of Anthropic's beta

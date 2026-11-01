@@ -15,6 +15,10 @@ All notable changes to this project are documented here. The format follows [Kee
   tokens, `LlmTranslationProvider` for answers it could not read, and `TranslationStats` now counts these tokens on
   corrective retries and in the text-node fallback. When `translate()` throws a `ProviderException` (also with
   `FallbackStrategy::Throw`), its `usage` holds the tokens of the document so far (#77).
+- A batch the model refuses is no longer lost as a whole: `LlmTranslationProvider` sends it again in halves, breadth
+  first, until the refused units are found; only they fail permanently and get an issue. It costs at most
+  2 × ⌈log2 n⌉ further calls for n units, counted in the token stats; `isolateRefusals: false` turns it off
+  ([ADR-0019](docs/adr/0019-isolating-refused-units.md), #79).
 - `TranslationProfile::withDoNotTranslateTerms(array $terms)`: `withDoNotTranslate()` for terms from configuration,
   checked at runtime (#78).
 - `ChatModelContractTestCase::it_reports_one_sided_token_counts()`: an adapter must keep a count the server does not

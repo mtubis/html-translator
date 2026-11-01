@@ -132,7 +132,8 @@ InvalidStructure: The translation of unit "u1" is still invalid after 2 correcti
 <p>[!! Ŕéáð ţĥé !!] <a href="/guide">[!! ĝüíðé !!]</a>[!! . !!]</p>
 ```
 
-`IssueType` tells you what happened: `InvalidStructure`, `ProviderFailure` (the model refused the unit),
+`IssueType` tells you what happened: `InvalidStructure`, `ProviderFailure` (the model refused the unit; a refused
+batch is sent again in parts until the refused units are found, so the others are still translated),
 `MissingTranslation`, `PartiallyTranslated` (the `TextNodesOnly` fallback left some text nodes in the source language)
 and `TermViolation` (the translation changed a term of the profile; it is used anyway).
 
