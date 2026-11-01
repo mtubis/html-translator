@@ -13,6 +13,7 @@ final readonly class FixtureResult
      * @param array<string, int> $issues issue type → count
      * @param ?string $error message of the exception that stopped the translation
      * @param int $callsWithContext model calls whose prompt carried context hints (page title, section headings)
+     * @param int $cacheHits units taken from the unit cache instead of the model; they are part of $units
      */
     public function __construct(
         public string $fixture,
@@ -27,6 +28,7 @@ final readonly class FixtureResult
         public ?int $outputTokens,
         public ?string $error = null,
         public int $callsWithContext = 0,
+        public int $cacheHits = 0,
     ) {}
 
     public function issueCount(): int

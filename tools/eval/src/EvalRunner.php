@@ -7,6 +7,7 @@ namespace HtmlTranslator\Tools\Eval;
 use Closure;
 use HtmlTranslator\Provider\Llm\LlmTranslationProvider;
 use HtmlTranslator\Tests\Support\GoldenFixtures;
+use Psr\Cache\CacheItemPoolInterface;
 use Throwable;
 
 /**
@@ -14,8 +15,12 @@ use Throwable;
  */
 final readonly class EvalRunner
 {
+    /**
+     * @param ?CacheItemPoolInterface $cache unit cache shared by every fixture of every run() call
+     */
     public function __construct(
         private CallCountingChatModel $model,
+        private ?CacheItemPoolInterface $cache = null,
     ) {}
 
     /**
@@ -45,10 +50,10 @@ final readonly class EvalRunner
         $started = hrtime(true);
 
         try {
-            $document = GoldenFixtures::translate($directory, new LlmTranslationProvider($this->model));
+            $document = GoldenFixtures::translate($directory, new LlmTranslationProvider($this->model), $this->cache);
         } catch (Throwable $exception) {
             // Anything stops only this fixture, so a paid run is not lost. Adapter messages carry no credentials.
-            // Without a document there are no stats, so the tokens of a failed fixture are unknown.
+            // Without a document there are no stats, so the tokens of a failed fixture are unknown and no cache hits.
             $counts = $this->model->counts();
             $error = $exception::class . ': ' . $exception->getMessage();
 
@@ -64,6 +69,6 @@ final readonly class EvalRunner
         $stats = $document->stats();
         $counts = $this->model->counts();
 
-        return new FixtureResult($name, $document->isComplete(), $issues, $stats->units, $stats->batches, $stats->retries, $stats->durationSeconds, $counts['calls'], $stats->inputTokens, $stats->outputTokens, callsWithContext: $counts['callsWithContext']);
+        return new FixtureResult($name, $document->isComplete(), $issues, $stats->units, $stats->batches, $stats->retries, $stats->durationSeconds, $counts['calls'], $stats->inputTokens, $stats->outputTokens, callsWithContext: $counts['callsWithContext'], cacheHits: $stats->cacheHits);
     }
 }

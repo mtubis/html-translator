@@ -12,20 +12,33 @@ php tools/eval/run.php --provider=pseudo       # no network: checks the tool its
 
 Options: `--provider` (`openai`, `gemini`, `ollama`, `vllm`, `lmstudio`, `pseudo`), `--model` and `--base-url`
 (override the `.env` values), `--json-mode` (`none`, `json_object`, `json_schema` or `json_schema_only` instead of
-the preset's mode, to compare modes; not for `anthropic`), `--fixtures` (comma-separated names, default all), `--out` (default `tools/eval/out/`).
-`composer eval -- --provider=…` works too.
+the preset's mode, to compare modes; not for `anthropic`), `--fixtures` (comma-separated names, default all),
+`--cache` (one in-memory unit cache shared by the fixtures of the run, so units repeated across fixtures are cache
+hits), `--allow-failures` (see exit codes), `--out` (default `tools/eval/out/`). `composer eval -- --provider=…` works
+too.
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| 0 | every fixture is complete, or `--allow-failures` was passed |
+| 1 | usage or setup error: unknown argument, fixture or JSON mode, missing `.env` variable, report not writable |
+| 2 | a fixture is incomplete or ended in an error; the report is still written |
+
+So a CI job can tell a model or prompt that got worse (2) from a run that could not start (1).
 
 ## Report
 
 `tools/eval/out/<date>-<time>-<model id>-<JSON mode>.md` and `.json` (the directory is git-ignored; Anthropic and
-`pseudo` have no JSON mode), with the prompt version (`PromptBuilder::VERSION`), the model id, the JSON mode, and per
-fixture:
+`pseudo` have no JSON mode), with the prompt version (`PromptBuilder::VERSION`), the model id, the JSON mode, whether a cache
+was used and its hits in total, and per fixture:
 
 | Column | Meaning |
 |---|---|
 | Complete | every unit translated and valid (`TranslatedDocument::isComplete()`) |
 | Issues | issues by type, or the error that stopped the translation |
 | Units, Batches | from `TranslationStats` |
+| Cache hits | units taken from the cache (`TranslationStats::$cacheHits`), part of Units; 0 without `--cache` |
 | Retried | units sent again with feedback |
 | Calls | requests to the model, including corrective retries, parse retries and failed requests |
 | Context | calls whose prompt carried context hints (page title, section headings; ADR-0013) out of all calls |
