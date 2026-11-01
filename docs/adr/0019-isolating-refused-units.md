@@ -1,6 +1,6 @@
 # 0019. Isolating refused units
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-01
 
 ## Context
