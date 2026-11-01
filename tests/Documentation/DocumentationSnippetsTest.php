@@ -122,6 +122,33 @@ final class DocumentationSnippetsTest extends TestCase
     }
 
     /**
+     * Documents with PHP blocks that are not run: their snippets illustrate decisions and are not meant to run (#75).
+     */
+    private const array NOT_RUN = ['docs/ARCHITECTURE.md'];
+
+    /**
+     * A new guide with PHP blocks must be added to documents(), or to NOT_RUN with a reason. Only files under version
+     * control count, so local notes stay out of it.
+     */
+    #[Test]
+    public function it_runs_every_document_with_php_snippets(): void
+    {
+        $tracked = shell_exec('git -C ' . escapeshellarg(self::ROOT) . " ls-files -- README.md 'docs/*.md'");
+        if (!\is_string($tracked) || '' === trim($tracked)) {
+            self::markTestSkipped('Not a git checkout.');
+        }
+
+        $run = array_map(static fn(array $document): string => $document[0], iterator_to_array(self::documents(), false));
+        foreach (explode("\n", trim($tracked)) as $document) {
+            $markdown = file_get_contents(self::ROOT . '/' . $document);
+            self::assertIsString($markdown);
+            if (1 === preg_match('/^[ \t]*(?:```|~~~)[ \t]*php/im', $markdown)) {
+                self::assertContains($document, [...$run, ...self::NOT_RUN], \sprintf('%s has PHP snippets that no test runs.', $document));
+            }
+        }
+    }
+
+    /**
      * @param array<string, string> $substitutions
      */
     #[Test]

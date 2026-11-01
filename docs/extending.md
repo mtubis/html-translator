@@ -89,9 +89,10 @@ echo $translator->translate('<p>Click "Save" to keep your changes.</p>', Locale:
 <p>[!! Çļíçķ „Šáṽé” ţö ķééþ ýöüŕ çĥáñĝéš. !!]</p>
 ```
 
-Its contract test only says how to build the provider. `provider()` is required; override `unreachableProvider()` and
-`undecodableProvider()` for a provider with a service of its own (they are skipped otherwise), and `locales()` for a
-provider that does not translate English to Polish:
+Its contract test only says how to build the provider. `provider()` is required. A provider with a service of its own
+also overrides `unavailableProvider()` (configured so that the service cannot be reached) and
+`providerWithUndecodableAnswers()`; their tests are skipped otherwise. Override `locales()` for an engine that does not
+translate English to Polish, and `detectsTheSourceLanguage()` for one that needs a source language:
 
 ```php
 use HtmlTranslator\Provider\Testing\TranslationProviderContractTestCase;
@@ -115,8 +116,13 @@ parsing, the corrective retries and the refusal isolation are shared, so an adap
 - turns a `TransportFailure` into a `ProviderException` at once, without keeping it: its previous exception holds the
   request with the key header;
 - throws `ProviderException::fromHttpResponse()` for HTTP errors, with the vendor's code and the tokens a failing
-  response reports (`usage:`), and a `ProviderException` for bodies it cannot read;
-- maps the vendor's finish reason to `FinishReason` and keeps a token count the server does not send `null`;
+  response reports (`usage:`), and a `ProviderException` for bodies it cannot read: every failure is a
+  `ProviderException`, so encode requests so that they cannot fail (substitute invalid UTF-8) and check every field
+  of an answer before building a `ChatResponse`;
+- maps the vendor's finish reason to `FinishReason`, keeps a token count the server does not send `null`, and drops
+  negative and non-integer counts (`TokenUsage` rejects them); a wrapper that rethrows a `ProviderException` with more
+  tokens uses `withUsage()`;
+- keeps the key out of messages, traces and dumps (`#[\SensitiveParameter]`, `\SensitiveParameterValue`);
 - names every setting that changes answers in `modelId()`, which is part of the cache key.
 
 The adapter for Acme Chat, a made-up API:
@@ -142,15 +148,20 @@ use Psr\Http\Message\StreamFactoryInterface;
  */
 final readonly class AcmeChatModel implements ChatModelInterface
 {
+    private \SensitiveParameterValue $apiKey;
+
     public function __construct(
         private ClientInterface $client,
         private RequestFactoryInterface $requests,
         private StreamFactoryInterface $streams,
         private string $model,
-        #[\SensitiveParameter] private string $apiKey,
+        #[\SensitiveParameter] string $apiKey,
         private string $baseUrl = 'https://api.acme.test/v1',
         private Retrier $retrier = new Retrier(),
-    ) {}
+    ) {
+        // Wrapped, so var_dump() or print_r() of the adapter, or of a translator holding it, does not show the key.
+        $this->apiKey = new \SensitiveParameterValue($apiKey);
+    }
 
     public function modelId(): string
     {
@@ -165,9 +176,9 @@ final readonly class AcmeChatModel implements ChatModelInterface
             'temperature' => $request->temperature,
             'max_tokens' => $request->maxOutputTokens,
             'json' => $request->jsonResponse,
-        ], \JSON_THROW_ON_ERROR);
+        ], \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE);
         $httpRequest = $this->requests->createRequest('POST', $this->baseUrl . '/chat')
-            ->withHeader('Authorization', 'Bearer ' . $this->apiKey)
+            ->withHeader('Authorization', 'Bearer ' . $this->apiKey->getValue())
             ->withHeader('Content-Type', 'application/json')
             ->withBody($this->streams->createStream($body));
 
@@ -191,7 +202,7 @@ final readonly class AcmeChatModel implements ChatModelInterface
 
             throw ProviderException::fromHttpResponse(
                 $status,
-                \sprintf('Acme Chat returned HTTP %d%s', $status, \is_string($message) ? ': ' . $this->quote($message) : '.'),
+                \sprintf('Acme Chat returned HTTP %d%s.', $status, \is_string($message) ? ': ' . $this->quote($message) : ''),
                 \is_string($code) ? $code : null,
                 usage: $usage,
             );
@@ -204,7 +215,7 @@ final readonly class AcmeChatModel implements ChatModelInterface
 
         $model = $data['model'] ?? null;
 
-        return new ChatResponse($text, \is_string($model) ? $model : $this->model, $usage?->inputTokens, $usage?->outputTokens, match ($data['stop'] ?? null) {
+        return new ChatResponse($text, \is_string($model) && '' !== trim($model) ? $model : $this->model, $usage?->inputTokens, $usage?->outputTokens, match ($data['stop'] ?? null) {
             null => null,
             'end' => FinishReason::Stop,
             'length' => FinishReason::Length,
@@ -224,7 +235,7 @@ final readonly class AcmeChatModel implements ChatModelInterface
      */
     private function quote(string $message): string
     {
-        return UntrustedText::quote(str_replace($this->apiKey, '[redacted]', $message));
+        return UntrustedText::quote(str_replace($this->apiKey->getValue(), '[redacted]', $message));
     }
 }
 ```
@@ -308,7 +319,9 @@ final class AcmeChatModelContractTest extends ChatModelContractTestCase
 }
 ```
 
-The adapter sends no answer schema, so `RecordedChatRequest::$jsonSchema` stays null. An adapter for an API with
+The matches over `ChatScenarioKind` and `FinishReason` list every case: a minor version may add one (ADR-0018), and
+the test then fails until it handles it, which is what a contract test should do. The adapter sends no answer
+schema, so `RecordedChatRequest::$jsonSchema` stays null. An adapter for an API with
 structured outputs sends `ChatRequest::$jsonSchema` and records it; the contract then checks that it arrives
 unchanged.
 
@@ -353,19 +366,23 @@ application on an event loop passes a sleeper that suspends the current task ins
 use HtmlTranslator\Provider\Llm\Bridge\RetryPolicy;
 use HtmlTranslator\Provider\Llm\Bridge\SleeperInterface;
 
-final class LoopSleeper implements SleeperInterface
+final readonly class CallbackSleeper implements SleeperInterface
 {
-    /** @var list<int> */
-    public array $waits = [];
+    /**
+     * @param \Closure(int): void $wait waits the given milliseconds without blocking the loop
+     */
+    public function __construct(
+        private \Closure $wait,
+    ) {}
 
     public function sleep(int $milliseconds): void
     {
-        // e.g. Revolt\EventLoop's delay() or Amp\delay($milliseconds / 1000) in a real application.
-        $this->waits[] = $milliseconds;
+        ($this->wait)($milliseconds);
     }
 }
 
-$retrier = new Retrier(new RetryPolicy(maxAttempts: 4), new LoopSleeper());
+// With amphp/amp, for example: the current fiber is suspended, other tasks go on.
+$retrier = new Retrier(new RetryPolicy(maxAttempts: 4), new CallbackSleeper(static fn(int $milliseconds) => \Amp\delay($milliseconds / 1000)));
 ```
 
 Pass the retrier to the chat model adapter, e.g. `new OpenAiCompatibleChatModel($http, $http, $http, $config,

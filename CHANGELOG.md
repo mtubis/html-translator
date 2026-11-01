@@ -6,9 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [1.0.0] - 2026-11-02
 
-The API freeze: the public API is reviewed, frozen and covered by a backward compatibility promise
-([ADR-0018](docs/adr/0018-public-api-and-backward-compatibility-promise.md)); a refused batch is split to find the
-refused units ([ADR-0019](docs/adr/0019-isolating-refused-units.md)). Upgrading from 0.4: [UPGRADE-1.0.md](UPGRADE-1.0.md).
+The API freeze, under a backward compatibility promise ([ADR-0018](docs/adr/0018-public-api-and-backward-compatibility-promise.md)); see [UPGRADE-1.0.md](UPGRADE-1.0.md).
 
 ### Added
 - A backward compatibility promise: every class is public API, an extension point or `@internal`, and
@@ -30,8 +28,9 @@ refused units ([ADR-0019](docs/adr/0019-isolating-refused-units.md)). Upgrading 
 - `ChatModelContractTestCase::it_reports_one_sided_token_counts()`: an adapter must keep a count the server does not
   send unknown (`null`), not 0 (#77).
 - [Extension guide](docs/extending.md): a provider of one's own, a chat model adapter, a token estimator and a sleeper,
-  with their contract tests; every PHP snippet of the README and the guides runs in the documentation test suite, and
-  [UPGRADE-1.0.md](UPGRADE-1.0.md) (#85).
+  with their contract tests. Every PHP snippet of the README and the guides runs in the documentation test suite, and
+  the contract tests of the guide run in PHPUnit (#85).
+- [UPGRADE-1.0.md](UPGRADE-1.0.md): what code written for 0.4 needs to change (#85).
 
 ### Changed
 - Behaviour change: the `gemini()`, `ollama()` and `vllm()` presets send the answer schema (`JsonMode::JsonSchema`) instead of

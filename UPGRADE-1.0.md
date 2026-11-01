@@ -22,10 +22,9 @@ now and created by the class that uses them. A custom token estimator moves from
  );
 ```
 
-The constructors are now `HtmlTranslator($provider, $cache, $logger, $skipRules, $translatableAttributes,
-$tokenEstimator)` and `LlmTranslationProvider($chatModel, $isolateRefusals)`. Code that passed `skipRules` or
-`translatableAttributes` by position (the 8th and 9th argument in 0.4) passes them by name. Code that passed only the
-provider, the cache and the logger needs no change.
+Pass everything after the provider (or the chat model) by name: the position of optional parameters is not part of
+the API (ADR-0018), and `skipRules` and `translatableAttributes`, the 8th and 9th argument in 0.4, moved. Code that
+passed only the provider, the cache and the logger needs no change.
 
 ### Internal classes
 
@@ -73,8 +72,13 @@ pass the previous mode by name:
 
 When a model refuses a batch, `LlmTranslationProvider` now sends it again in halves until the refused units are found,
 instead of failing every unit of the batch ([ADR-0019](docs/adr/0019-isolating-refused-units.md), #79). That costs at
-most 2 × ⌈log2 n⌉ further calls for n units, counted in the token stats. To keep the 0.4 behaviour, pass
-`isolateRefusals: false` to `LlmTranslationProvider`.
+most 2 × ⌈log2 n⌉ further calls per refused batch of n units, counted in the token stats. To keep the 0.4 behaviour,
+pass `isolateRefusals: false` to `LlmTranslationProvider`.
+
+### Token stats count more calls
+
+`TranslationStats` now also counts the tokens of calls that failed but reported usage, on corrective retries and in
+the text-node fallback (#77). Totals compared with 0.4 runs may come out higher.
 
 ### `ProviderException`
 
