@@ -59,7 +59,7 @@ final class PublicApiTest extends TestCase
                 public int $limit
                 public ArrayObject $items
                 public function __construct(int $limit = 10, HtmlTranslator\Tests\Unit\Architecture\Fixture\SampleMode $mode = \HtmlTranslator\Tests\Unit\Architecture\Fixture\SampleMode::Fast, ArrayObject $items = new \ArrayObject([0 => 1, 1 => 2]))
-                public static function create(string ...$tags): self
+                public static function create(string ...$tags): HtmlTranslator\Tests\Unit\Architecture\Fixture\SampleService
                 public function run(?HtmlTranslator\Tests\Unit\Architecture\Fixture\SampleHelper $helper = NULL): HtmlTranslator\Tests\Unit\Architecture\Fixture\SampleMode
 
             TXT;

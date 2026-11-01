@@ -199,7 +199,7 @@ final readonly class PublicApiDump
                 $constant->isFinal() && !$class->isFinal() ? 'final' : '',
                 $this->visibility($constant),
                 'const',
-                $this->type($constant->getType()),
+                $this->type($constant->getType(), $class->getName()),
                 $constant->getName(),
             ]) . ' = ' . $this->value($constant->getValue());
         }
@@ -210,7 +210,7 @@ final readonly class PublicApiDump
                 $this->setVisibility($property),
                 $property->isStatic() ? 'static' : '',
                 $property->isReadOnly() && !$class->isReadOnly() ? 'readonly' : '',
-                $this->type($property->getType()),
+                $this->type($property->getType(), $class->getName()),
                 '$' . $property->getName(),
             ]);
         }
@@ -223,7 +223,7 @@ final readonly class PublicApiDump
                 $method->isStatic() ? 'static' : '',
                 'function',
             ]) . ' ' . $method->getName() . '(' . implode(', ', array_map($this->parameter(...), $method->getParameters())) . ')'
-                . ($method->getReturnType() instanceof ReflectionType ? ': ' . $this->type($method->getReturnType()) : '');
+                . ($method->getReturnType() instanceof ReflectionType ? ': ' . $this->type($method->getReturnType(), $class->getName()) : '');
         }
 
         return $members;
@@ -346,7 +346,7 @@ final readonly class PublicApiDump
     private function parameter(ReflectionParameter $parameter): string
     {
         $rendered = trim(implode(' ', [
-            $this->type($parameter->getType()),
+            $this->type($parameter->getType(), $parameter->getDeclaringClass()?->getName() ?? ''),
             ($parameter->isPassedByReference() ? '&' : '') . ($parameter->isVariadic() ? '...' : '') . '$' . $parameter->getName(),
         ]));
 
@@ -385,9 +385,17 @@ final readonly class PublicApiDump
         return implode(' ', array_filter($words, static fn(string $word): bool => '' !== $word));
     }
 
-    private function type(?ReflectionType $type): string
+    /**
+     * PHP 8.5 prints `self` as the class name and 8.4 does not; the class name is used on both, so the snapshot does
+     * not depend on the PHP version.
+     */
+    private function type(?ReflectionType $type, string $class): string
     {
-        return $type instanceof ReflectionType ? (string) $type : '';
+        if (!$type instanceof ReflectionType) {
+            return '';
+        }
+
+        return '' === $class ? (string) $type : (preg_replace('/(?<![\w\\\\])self(?![\w\\\\])/', $class, (string) $type) ?? (string) $type);
     }
 
     /**
