@@ -1,6 +1,6 @@
 # 0018. Public API and the backward compatibility promise
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-01
 - Amends: [0010](0010-public-api-of-core-0-1.md) (injectable collaborators), [0015](0015-token-budget-batching.md)
   (`batcher` becomes `tokenEstimator`), [0017](0017-term-checks-after-translation.md) (`termChecker` is not injected)
