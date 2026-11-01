@@ -7,7 +7,9 @@ Translate HTML documents with large language models — **without breaking the m
 - **Any model**: OpenAI, Anthropic, Gemini, or self-hosted (Ollama, vLLM, LM Studio) behind one interface, built on PSR-18 — bring your own HTTP client.
 - **Honest results**: partial failures are reported as issues on the result object instead of silently producing broken HTML.
 
-> **Status:** early development (0.x). The public API may change until 1.0. See [ROADMAP](docs/ROADMAP.md).
+> **Status:** stable. The public API follows Semantic Versioning under the
+> [backward compatibility promise](docs/adr/0018-public-api-and-backward-compatibility-promise.md); upgrading from 0.4:
+> [UPGRADE-1.0.md](UPGRADE-1.0.md). See [ROADMAP](docs/ROADMAP.md).
 
 ## Requirements
 
@@ -17,7 +19,7 @@ factories, e.g. `symfony/http-client` with `nyholm/psr7`.
 ## Installation
 
 ```bash
-composer require mtubis/html-translator:^0.4
+composer require mtubis/html-translator:^1.0
 composer require symfony/http-client nyholm/psr7   # or any other PSR-18 client
 ```
 
@@ -136,10 +138,12 @@ exceptions implement `HtmlTranslator\Exception\TranslatorException`. See the [us
   costs, errors.
 - [Providers](docs/providers.md): configuration, JSON modes, timeouts, retries and errors of each adapter.
 - [Translation profiles](docs/profiles.md): domain, formality, glossary and term policy.
+- [Extending](docs/extending.md): your own provider, chat model adapter, token estimator or sleeper, with their
+  contract tests.
 - [Architecture](docs/ARCHITECTURE.md) and [decisions](docs/adr/).
 - [Backward compatibility promise](docs/adr/0018-public-api-and-backward-compatibility-promise.md): what is public
   API, what is an extension point and what is `@internal`.
-- [Changelog](CHANGELOG.md).
+- [Changelog](CHANGELOG.md) and [upgrading from 0.4 to 1.0](UPGRADE-1.0.md).
 
 ## Framework integrations
 

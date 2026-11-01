@@ -236,29 +236,7 @@ pass their own, and tests `Provider\Llm\Testing\FakeSleeper`, which records the 
 
 ## Writing your own
 
-- **A chat model for another API**: implement `Provider\Llm\ChatModelInterface` and pass
-  `Provider\Llm\Testing\ChatModelContractTestCase` (it needs `phpunit/phpunit`).
-  Since 0.4 its scenarios include `ChatScenarioKind::NetworkError`: the fake transport throws a PSR-18
-  `NetworkExceptionInterface` holding the request. The adapter must name the transport message, and neither its
-  exception chain nor the arguments recorded in its traces may hold the request, a client exception or the key.
-  Send through `Provider\Llm\Bridge\Retrier` for transport retries: `send()` returns a `RetriedResponse` (the last
-  response and the number of attempts) and throws a `TransportFailure` when the client fails; turn that into a
-  `ProviderException` at once without keeping it, since its previous exception holds the request.
-  When a response the adapter rejects reports tokens (an error body or a body it cannot read), pass them as
-  `usage:` to the `ProviderException`, so the stats count what the call cost; drop negative and non-integer counts
-  first (`TokenUsage` rejects them). A wrapper that rethrows a `ProviderException` with more tokens uses
-  `withUsage()`.
-- **Batches and results are checked**: `TranslationBatch` and `BatchResult` throw `InvalidArgumentException` for a
-  wrong element type (a `units` array with gaps from `array_filter()` needs `array_values()`; a translation decoded
-  with `json_decode()` may be an int, e.g. a model answering `42`). That is a bug in the provider, not a
-  `ProviderException`, so it is not turned into an issue: filter and convert what a vendor sends first.
-- **A non-LLM engine**: implement `Provider\TranslationProviderInterface` and pass
-  `Provider\Testing\TranslationProviderContractTestCase`. Report tokens in `BatchResult::$usage` (`TokenUsage`) when the engine
-  reports them; leave it null otherwise (engines billed by characters too, since the stats count tokens).
-  To let `HtmlTranslator` reuse its translations from a unit cache, implement
-  `Provider\CacheableProviderInterface` instead: `cacheId()` names everything that changes the output (engine, model,
-  settings), e.g. `deepl:formal`, never a credential and never per-batch data such as locales (ADR-0016). Without it the
-  provider works, but nothing is cached. A decorator that changes translations prefixes the wrapped provider's id with
-  its own settings; one around a provider that is not cacheable does not implement the interface.
-- **Chat model settings and the cache**: `ChatModelInterface::modelId()` is part of the cache key, so it names every
-  setting that changes answers (`AnthropicConfig` adds `+effort=<level>`, `+betas=<sorted list>` and `+fallbacks`).
+A chat model for another API (`ChatModelInterface`) and a non-LLM engine or decorator (`TranslationProviderInterface`,
+`CacheableProviderInterface`) are covered in the [extension guide](extending.md), with their contract tests. For chat
+models, `modelId()` is part of the cache key, so it names every setting that changes answers, as `AnthropicConfig`
+does with `+effort=<level>`, `+betas=<sorted list>` and `+fallbacks`.

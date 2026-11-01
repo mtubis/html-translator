@@ -27,7 +27,7 @@
         "psr/log": "^3.0"
     },
     "suggest": {
-        "phpunit/phpunit": "Required only when running the optional chat model adapter contract tests"
+        "phpunit/phpunit": "Required only when running the optional contract tests for providers and chat model adapters"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.95",

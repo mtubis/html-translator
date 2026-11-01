@@ -10,12 +10,12 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Runs every PHP snippet of the README, the usage guide, the provider guide and the profile guide, so the examples
- * cannot rot (#62, #75).
+ * Runs every PHP snippet of the README and of the guides in docs/, so the examples cannot rot (#62, #75, #85).
  *
  * The snippets of one file run as one script in a separate PHP process, in document order. The real HTTP client of
  * the model examples is swapped for PseudoLocalizingVendorApi, so no snippet needs the network. A ```text block
- * right after a snippet is the output it must print.
+ * right after a snippet is the output it must print. The contract test cases the extension guide declares run in
+ * PHPUnit as well.
  */
 #[CoversNothing]
 final class DocumentationSnippetsTest extends TestCase
@@ -111,6 +111,7 @@ final class DocumentationSnippetsTest extends TestCase
             '',
             self::PROVIDERS_CHECK,
         ];
+        yield 'docs/extending.md' => ['docs/extending.md', [], '', ''];
         // The guide refers to the usage guide for the translator.
         yield 'docs/profiles.md' => [
             'docs/profiles.md',
@@ -118,6 +119,33 @@ final class DocumentationSnippetsTest extends TestCase
             '$translator = new \\HtmlTranslator\\HtmlTranslator(new \\HtmlTranslator\\Provider\\Testing\\PseudoLocalizationProvider());',
             self::PROFILES_CHECK,
         ];
+    }
+
+    /**
+     * Documents with PHP blocks that are not run: their snippets illustrate decisions and are not meant to run (#75).
+     */
+    private const array NOT_RUN = ['docs/ARCHITECTURE.md'];
+
+    /**
+     * A new guide with PHP blocks must be added to documents(), or to NOT_RUN with a reason. Only files under version
+     * control count, so local notes stay out of it.
+     */
+    #[Test]
+    public function it_runs_every_document_with_php_snippets(): void
+    {
+        $tracked = shell_exec('git -C ' . escapeshellarg(self::ROOT) . " ls-files -- README.md 'docs/*.md'");
+        if (!\is_string($tracked) || '' === trim($tracked)) {
+            self::markTestSkipped('Not a git checkout.');
+        }
+
+        $run = array_map(static fn(array $document): string => $document[0], iterator_to_array(self::documents(), false));
+        foreach (explode("\n", trim($tracked)) as $document) {
+            $markdown = file_get_contents(self::ROOT . '/' . $document);
+            self::assertIsString($markdown);
+            if (1 === preg_match('/^[ \t]*(?:```|~~~)[ \t]*php/im', $markdown)) {
+                self::assertContains($document, [...$run, ...self::NOT_RUN], \sprintf('%s has PHP snippets that no test runs.', $document));
+            }
+        }
     }
 
     /**
@@ -158,6 +186,50 @@ final class DocumentationSnippetsTest extends TestCase
     }
 
     /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function contractTests(): iterable
+    {
+        yield 'provider' => ['docs/extending.md', 'PolishQuotesProviderContractTest'];
+        yield 'chat model' => ['docs/extending.md', 'AcmeChatModelContractTest'];
+    }
+
+    /**
+     * The document's script is saved under the test class's name, so PHPUnit runs that class from it.
+     */
+    #[Test]
+    #[DataProvider('contractTests')]
+    public function its_contract_tests_pass(string $document, string $testClass): void
+    {
+        $markdown = file_get_contents(self::ROOT . '/' . $document);
+        self::assertIsString($markdown);
+        $script = SnippetScript::build(MarkdownSnippets::fromMarkdown($markdown), self::ROOT . '/vendor/autoload.php', self::PRELUDE);
+        self::assertStringContainsString('class ' . $testClass . ' ', $script);
+
+        $directory = sys_get_temp_dir() . '/html-translator-docs-contract-' . bin2hex(random_bytes(6));
+        self::assertTrue(mkdir($directory));
+        $file = $directory . '/' . $testClass . '.php';
+        file_put_contents($file, $script);
+
+        $errorFile = $directory . '/stderr';
+
+        try {
+            [$exitCode, $output, $errors] = $this->runProcess([\PHP_BINARY, self::ROOT . '/vendor/bin/phpunit', '--no-configuration', '--do-not-record-test-run-history', $file], $errorFile);
+        } finally {
+            unlink($file);
+            unlink($errorFile);
+            rmdir($directory);
+        }
+
+        $output .= $errors;
+
+        self::assertSame(0, $exitCode, \sprintf("%s failed:\n%s", $testClass, $output));
+        // Skipped tests are fine (a provider without a service of its own skips the unreachable-service tests); any other
+        // issue, such as a risky test or a deprecation, makes PHPUnit print "OK, but there were issues!".
+        self::assertMatchesRegularExpression('/^OK(?: \(\d+ tests?, |, but some tests were skipped!$)/m', $output, \sprintf("PHPUnit reported issues for %s:\n%s", $testClass, $output));
+    }
+
+    /**
      * @return array{int, string, string} exit code, stdout, stderr
      */
     private function runScript(string $script): array
@@ -169,23 +241,33 @@ final class DocumentationSnippetsTest extends TestCase
         file_put_contents($file, $script);
 
         try {
-            // stderr goes to a file: two pipes could block each other when a snippet writes a lot to stderr.
-            $process = proc_open(
-                [\PHP_BINARY, '-d', 'error_reporting=-1', '-d', 'display_errors=stderr', '-d', 'zend.assertions=1', $file],
-                [1 => ['pipe', 'w'], 2 => ['file', $errorFile, 'w']],
-                $pipes,
-                self::ROOT,
-            );
-            self::assertIsResource($process);
-            $stdout = $pipes[1] ?? self::fail('No stdout pipe.');
-            $output = stream_get_contents($stdout);
-            fclose($stdout);
-            $exitCode = proc_close($process);
-            $errors = file_get_contents($errorFile);
+            return $this->runProcess([\PHP_BINARY, '-d', 'error_reporting=-1', '-d', 'display_errors=stderr', '-d', 'zend.assertions=1', $file], $errorFile);
         } finally {
             unlink($file);
             unlink($errorFile);
         }
+    }
+
+    /**
+     * @param list<string> $command
+     *
+     * @return array{int, string, string} exit code, stdout, stderr
+     */
+    private function runProcess(array $command, string $errorFile): array
+    {
+        // stderr goes to a file: two pipes could block each other when a snippet writes a lot to stderr.
+        $process = proc_open(
+            $command,
+            [1 => ['pipe', 'w'], 2 => ['file', $errorFile, 'w']],
+            $pipes,
+            self::ROOT,
+        );
+        self::assertIsResource($process);
+        $stdout = $pipes[1] ?? self::fail('No stdout pipe.');
+        $output = stream_get_contents($stdout);
+        fclose($stdout);
+        $exitCode = proc_close($process);
+        $errors = file_get_contents($errorFile);
 
         self::assertIsString($output);
         self::assertIsString($errors);
