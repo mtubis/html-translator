@@ -21,8 +21,9 @@ use HtmlTranslator\Provider\TranslationBatch;
  * only the second parse error is kept, as the previous exception.
  * A batch the model refuses (content filter, refusal) fails permanently for all its units: re-sending it would be
  * refused again.
- * The result carries the tokens of both calls when it asked twice. A batch that ends in a ProviderException reports no
- * usage, also not the tokens of a call that answered before (an unparsable or cut-off answer).
+ * The result carries the tokens of both calls when it asked twice. A batch that ends in a ProviderException carries
+ * them on the exception instead: the tokens of answers that could not be read, and of the first answer when the second
+ * call fails (the chat model's exception is passed on with them added).
  * Cacheable (ADR-0016): the cache id names the chat model and the prompt version.
  */
 final readonly class LlmTranslationProvider implements CacheableProviderInterface
@@ -63,17 +64,23 @@ final readonly class LlmTranslationProvider implements CacheableProviderInterfac
             return $this->read($response, $batch)->withUsage($firstUsage);
         } catch (ProviderException $exception) {
             if (FinishReason::Length === $response->finishReason) {
-                throw $this->withModel($exception);
+                throw $this->withModel($exception, $firstUsage);
             }
         }
 
-        // Outside the try: errors of the chat model pass through unchanged, also on the second call.
-        $response = $this->chatModel->complete($request);
+        try {
+            $response = $this->chatModel->complete($request);
+        } catch (ProviderException $exception) {
+            // The chat model's error passes through; only the tokens of the first answer are added to it.
+            throw $firstUsage instanceof TokenUsage ? $exception->withUsage(TokenUsage::sum($firstUsage, $exception->usage)) : $exception;
+        }
+
+        $usage = TokenUsage::sum($firstUsage, TokenUsage::reported($response->inputTokens, $response->outputTokens));
 
         try {
-            return $this->read($response, $batch)->withUsage(TokenUsage::sum($firstUsage, TokenUsage::reported($response->inputTokens, $response->outputTokens)));
+            return $this->read($response, $batch)->withUsage($usage);
         } catch (ProviderException $exception) {
-            throw $this->withModel($exception);
+            throw $this->withModel($exception, $usage);
         }
     }
 
@@ -97,8 +104,11 @@ final readonly class LlmTranslationProvider implements CacheableProviderInterfac
         return $this->responseParser->parse($response, $batch);
     }
 
-    private function withModel(ProviderException $exception): ProviderException
+    /**
+     * @param TokenUsage|null $usage the tokens of the answers that could not be read: they were billed all the same
+     */
+    private function withModel(ProviderException $exception, ?TokenUsage $usage): ProviderException
     {
-        return new ProviderException(\sprintf('%s Model: %s.', $exception->getMessage(), $this->chatModel->modelId()), 0, $exception);
+        return new ProviderException(\sprintf('%s Model: %s.', $exception->getMessage(), $this->chatModel->modelId()), 0, $exception, $usage);
     }
 }

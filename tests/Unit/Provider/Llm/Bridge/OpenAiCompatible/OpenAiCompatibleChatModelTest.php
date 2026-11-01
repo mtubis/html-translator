@@ -21,12 +21,14 @@ use HtmlTranslator\Provider\Llm\ChatRole;
 use HtmlTranslator\Provider\Llm\FinishReason;
 use HtmlTranslator\Provider\Llm\JsonSchema;
 use HtmlTranslator\Provider\Llm\Testing\FakeSleeper;
+use HtmlTranslator\Provider\TokenUsage;
 use HtmlTranslator\Tests\Support\FakeClientException;
 use HtmlTranslator\Tests\Support\FakeHttpClient;
 use HtmlTranslator\Tests\Support\FakeNetworkException;
 use HtmlTranslator\Tests\Support\FakeRequestException;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Nyholm\Psr7\Response;
+use Nyholm\Psr7\Stream;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -35,6 +37,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Http\Client\NetworkExceptionInterface;
 use Psr\Http\Client\RequestExceptionInterface;
 use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
 use Throwable;
 
@@ -55,6 +58,7 @@ use Throwable;
 #[UsesClass(RetryPolicy::class)]
 #[UsesClass(RetriedResponse::class)]
 #[UsesClass(TransportFailure::class)]
+#[UsesClass(TokenUsage::class)]
 #[UsesClass(FakeSleeper::class)]
 final class OpenAiCompatibleChatModelTest extends TestCase
 {
@@ -244,6 +248,58 @@ final class OpenAiCompatibleChatModelTest extends TestCase
         self::assertNull($exception->statusCode);
         self::assertSame(0, $exception->getCode());
         self::assertStringStartsWith('openai answered ', $exception->getMessage());
+    }
+
+    #[Test]
+    public function it_reports_the_usage_of_a_successful_response_it_cannot_read(): void
+    {
+        $body = '{"choices": [], "usage": {"prompt_tokens": 1200, "completion_tokens": 0}}';
+
+        $exception = $this->failure($this->model(new FakeHttpClient(static fn(): Response => new Response(200, [], $body))));
+
+        self::assertEquals(new TokenUsage(1200, 0), $exception->usage);
+    }
+
+    #[Test]
+    public function it_reports_the_usage_an_error_body_carries(): void
+    {
+        $body = '{"error": {"message": "The server had an error.", "type": "server_error"}, "usage": {"prompt_tokens": 5}}';
+
+        $exception = $this->failure($this->model(new FakeHttpClient(static fn(): Response => new Response(500, [], $body))));
+
+        self::assertSame(500, $exception->statusCode);
+        self::assertEquals(new TokenUsage(5, null), $exception->usage);
+        self::assertNull($this->failure($this->model(new FakeHttpClient(static fn(): Response => new Response(500, [], '{"error": {}}'))))->usage);
+    }
+
+    /**
+     * @return iterable<string, array{int}>
+     */
+    public static function impossibleStatuses(): iterable
+    {
+        yield 'zero' => [0];
+        yield '999' => [999];
+    }
+
+    /**
+     * A non-compliant PSR-7 implementation may report any status; it is still the provider's failure (#77).
+     */
+    #[Test]
+    #[DataProvider('impossibleStatuses')]
+    public function it_reports_an_impossible_status_as_a_provider_failure(int $status): void
+    {
+        $response = self::createStub(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn($status);
+        // psr/http-message 1.x (lowest dependencies) declares no return types, so an unconfigured stub returns null.
+        $response->method('getHeaderLine')->willReturn('');
+        $response->method('getBody')->willReturn(Stream::create('{"error": {"message": "Overloaded.", "code": "overloaded"}}'));
+
+        $exception = $this->failure($this->model(new FakeHttpClient(static fn(): ResponseInterface => $response)));
+
+        self::assertNull($exception->statusCode);
+        self::assertSame(0, $exception->getCode());
+        self::assertStringContainsString(\sprintf('HTTP %d', $status), $exception->getMessage());
+        self::assertSame('overloaded', $exception->vendorCode);
     }
 
     #[Test]

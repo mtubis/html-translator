@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HtmlTranslator\Tests\Contract;
 
 use HtmlTranslator\Exception\ProviderException;
+use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\ChatMessage;
 use HtmlTranslator\Provider\Llm\ChatModelInterface;
 use HtmlTranslator\Provider\Llm\ChatRequest;
@@ -32,6 +33,7 @@ use RuntimeException;
 #[UsesClass(RecordedChatRequest::class)]
 #[UsesClass(ChatModelContractTestCase::class)]
 #[UsesClass(JsonSchema::class)]
+#[UsesClass(UntrustedText::class)]
 final class FakeChatModelContractTest extends ChatModelContractTestCase
 {
     private const string MODEL = 'contract-configured-model';

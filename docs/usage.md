@@ -209,7 +209,10 @@ from the cache: 4 of 4 units, batches: 0
 
 With a language model, `stats()->inputTokens` and `outputTokens` add up the tokens reported by the API for every
 call of the document, retries included (`null` when the API reports none): multiply them by your model's prices to
-get the cost of a page. It is a lower bound: a call that ends in an error adds no tokens.
+get the cost of a page. A call that ends in an error counts too when its response reported tokens (an answer cut off
+at the output limit, a body the adapter cannot read); the total is only a lower bound when some calls reported none,
+e.g. a request that never reached the API. When `translate()` throws a `ProviderException`, its `usage` holds the
+tokens of the document up to that point.
 
 ## Errors
 
@@ -220,7 +223,7 @@ whole translation cannot go on. Every exception implements `HtmlTranslator\Excep
 |---|---|
 | `InvalidHtmlException` | The input is empty or whitespace only, or its elements are nested deeper than 1024 levels. |
 | `InvalidArgumentException` | Invalid options or settings, e.g. the same source and target locale. |
-| `ProviderException` | The provider cannot be used at all: network errors after transport retries, authentication, rate limits that do not end. `statusCode` and `vendorCode` say more. Also with `FallbackStrategy::Throw` for a refused or missing unit. |
+| `ProviderException` | The provider cannot be used at all: network errors after transport retries, authentication, rate limits that do not end. `statusCode` and `vendorCode` say more, `usage` holds the tokens of the document up to the failure. Also with `FallbackStrategy::Throw` for a refused or missing unit. |
 | `StructureValidationException` | Only with `FallbackStrategy::Throw`: a unit still breaks the markup after corrective retries. |
 
 ```php

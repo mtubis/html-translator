@@ -129,6 +129,19 @@ abstract class ChatModelContractTestCase extends TestCase
         self::assertSame(45, $response->outputTokens);
     }
 
+    /**
+     * Some servers report only one of the two counts; the other one stays unknown instead of becoming 0.
+     */
+    #[Test]
+    public function it_reports_one_sided_token_counts(): void
+    {
+        $inputOnly = $this->modelFor(ChatScenario::success('ok', 'contract-model', 120))->complete($this->request());
+        $outputOnly = $this->modelFor(ChatScenario::success('ok', 'contract-model', null, 45))->complete($this->request());
+
+        self::assertSame([120, null], [$inputOnly->inputTokens, $inputOnly->outputTokens]);
+        self::assertSame([null, 45], [$outputOnly->inputTokens, $outputOnly->outputTokens]);
+    }
+
     #[Test]
     public function it_falls_back_to_its_model_and_no_token_counts_when_the_server_sends_none(): void
     {

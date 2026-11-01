@@ -143,7 +143,11 @@ final readonly class HtmlTranslator
         $unitsDone = $cacheHits;
 
         foreach ($batches as $index => $batchUnits) {
-            [$translated, $failures, $batchRetries, $batchUsage] = $this->translateWithRetries($locales, $options->profile, $documentContext, $batchUnits, $options->maxCorrectiveRetries);
+            try {
+                [$translated, $failures, $batchRetries, $batchUsage] = $this->translateWithRetries($locales, $options->profile, $documentContext, $batchUnits, $options->maxCorrectiveRetries);
+            } catch (ProviderException $exception) {
+                throw $this->withDocumentUsage($exception, $usage);
+            }
             // Stored per batch, so a later batch that throws does not lose them; fallback output is never stored.
             $unitCache?->store($batchUnits, $translated, $locales, $profileFingerprint, $providerId);
 
@@ -152,7 +156,12 @@ final readonly class HtmlTranslator
             $usage = TokenUsage::sum($usage, $batchUsage);
 
             if ([] !== $failures) {
-                [$fallbackTranslations, $fallbackIssues, $fallbackComplete, $fallbackUsage] = $this->applyFallback($locales, $documentContext, $failures, $options);
+                try {
+                    [$fallbackTranslations, $fallbackIssues, $fallbackComplete, $fallbackUsage] = $this->applyFallback($locales, $documentContext, $failures, $options);
+                } catch (ProviderException $exception) {
+                    // FallbackStrategy::Throw for a refused or missing unit.
+                    throw $this->withDocumentUsage($exception, $usage);
+                }
                 $translations += $fallbackTranslations;
                 array_push($issues, ...$fallbackIssues);
                 $complete = $complete && $fallbackComplete;
@@ -269,7 +278,9 @@ final readonly class HtmlTranslator
      * @return array{array<string, string>, array<string, Failure>, int, ?TokenUsage} valid translations, the last
      *                                                                                failure of each failed unit in
      *                                                                                document order, units retried,
-     *                                                                                tokens of the calls that answered
+     *                                                                                tokens of the calls, failed
+     *                                                                                retries that reported some
+     *                                                                                included
      */
     private function translateWithRetries(LocalePair $locales, TranslationProfile $profile, BatchContext $documentContext, array $units, int $maxRetries): array
     {
@@ -297,6 +308,7 @@ final readonly class HtmlTranslator
                     throw $exception;
                 }
 
+                $usage = TokenUsage::sum($usage, $exception->usage);
                 $failures = array_map(fn(TranslationUnit $unit): array => $this->failure($unit, IssueType::ProviderFailure, $exception->getMessage(), cause: $exception), $pending);
 
                 break;
@@ -457,11 +469,13 @@ final readonly class HtmlTranslator
         }
 
         $result = null;
+        $failedUsage = null;
         $providerError = 'no translation';
         try {
             $result = [] === $pieces ? null : $this->provider->translate(new TranslationBatch($locales, $pieces, profile: $profile, context: $documentContext->select($pieceSources)));
         } catch (ProviderException $exception) {
             $providerError = $exception->getMessage();
+            $failedUsage = $exception->usage;
         }
 
         $translations = [];
@@ -506,7 +520,16 @@ final readonly class HtmlTranslator
             }
         }
 
-        return [$translations, $issues, $result?->usage];
+        return [$translations, $issues, $result->usage ?? $failedUsage];
+    }
+
+    /**
+     * translate() aborts without stats, so the exception carries the tokens of the document so far (#77); it passes
+     * through unchanged when no call reported any.
+     */
+    private function withDocumentUsage(ProviderException $exception, ?TokenUsage $usage): ProviderException
+    {
+        return $usage instanceof TokenUsage ? $exception->withUsage(TokenUsage::sum($usage, $exception->usage)) : $exception;
     }
 
     /**

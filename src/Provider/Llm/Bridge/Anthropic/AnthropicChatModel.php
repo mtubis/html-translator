@@ -16,6 +16,7 @@ use HtmlTranslator\Provider\Llm\ChatResponse;
 use HtmlTranslator\Provider\Llm\ChatRole;
 use HtmlTranslator\Provider\Llm\FinishReason;
 use HtmlTranslator\Provider\Llm\JsonSchema;
+use HtmlTranslator\Provider\TokenUsage;
 use JsonException;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
@@ -146,9 +147,11 @@ final readonly class AnthropicChatModel implements ChatModelInterface
     private function answer(string $body): ChatResponse
     {
         $data = $this->decode($body);
+        // A body the adapter cannot read may still have been billed: its usage goes on the exception.
+        $usage = $this->usage($data);
         $blocks = $data['content'] ?? null;
         if (!\is_array($blocks) || !array_is_list($blocks)) {
-            throw new ProviderException('anthropic answered without a content list.');
+            throw new ProviderException('anthropic answered without a content list.', usage: $usage);
         }
 
         $content = '';
@@ -159,22 +162,31 @@ final readonly class AnthropicChatModel implements ChatModelInterface
 
             $text = $block['text'] ?? null;
             if (!\is_string($text)) {
-                throw new ProviderException('anthropic answered with a text block without text.');
+                throw new ProviderException('anthropic answered with a text block without text.', usage: $usage);
             }
 
             $content .= $text;
         }
 
         $model = $data['model'] ?? null;
-        $usage = \is_array($data['usage'] ?? null) ? $data['usage'] : [];
 
         return new ChatResponse(
             $content,
             \is_string($model) && '' !== trim($model) ? $model : $this->config->model,
-            $this->tokens($usage['input_tokens'] ?? null),
-            $this->tokens($usage['output_tokens'] ?? null),
+            $usage?->inputTokens,
+            $usage?->outputTokens,
             $this->finishReason($data['stop_reason'] ?? null),
         );
+    }
+
+    /**
+     * @param array<mixed> $data
+     */
+    private function usage(array $data): ?TokenUsage
+    {
+        $usage = \is_array($data['usage'] ?? null) ? $data['usage'] : [];
+
+        return TokenUsage::reported($this->tokens($usage['input_tokens'] ?? null), $this->tokens($usage['output_tokens'] ?? null));
     }
 
     private function finishReason(mixed $reason): ?FinishReason
@@ -213,7 +225,7 @@ final readonly class AnthropicChatModel implements ChatModelInterface
             $message .= \sprintf(' (request %s)', $requestId);
         }
 
-        return ProviderException::fromHttpResponse($status, '' === $vendorMessage ? $message . '.' : $message . ': ' . $vendorMessage, $vendorCode);
+        return ProviderException::fromHttpResponse($status, '' === $vendorMessage ? $message . '.' : $message . ': ' . $vendorMessage, $vendorCode, usage: \is_array($data) ? $this->usage($data) : null);
     }
 
     /**
