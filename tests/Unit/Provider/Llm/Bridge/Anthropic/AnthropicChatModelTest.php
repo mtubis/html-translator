@@ -299,6 +299,8 @@ final class AnthropicChatModelTest extends TestCase
     {
         $response = self::createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn($status);
+        // psr/http-message 1.x (lowest dependencies) declares no return types, so an unconfigured stub returns null.
+        $response->method('getHeaderLine')->willReturn('');
         $response->method('getBody')->willReturn(Stream::create('{"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded."}}'));
 
         $exception = $this->failure($this->model(new FakeHttpClient(static fn(): ResponseInterface => $response)));

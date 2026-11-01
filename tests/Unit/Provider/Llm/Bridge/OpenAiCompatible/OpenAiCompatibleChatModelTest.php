@@ -290,6 +290,8 @@ final class OpenAiCompatibleChatModelTest extends TestCase
     {
         $response = self::createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn($status);
+        // psr/http-message 1.x (lowest dependencies) declares no return types, so an unconfigured stub returns null.
+        $response->method('getHeaderLine')->willReturn('');
         $response->method('getBody')->willReturn(Stream::create('{"error": {"message": "Overloaded.", "code": "overloaded"}}'));
 
         $exception = $this->failure($this->model(new FakeHttpClient(static fn(): ResponseInterface => $response)));
