@@ -147,6 +147,13 @@ final class ResponseParserTest extends TestCase
             [],
         ];
 
+        // The search goes on right after an opening bracket that is never closed, so the answer may start next to it.
+        yield 'a list right after an unclosed bracket' => [
+            '[[{"id": "u1", "text": "Jeden"}]',
+            ['u1' => 'Jeden'],
+            [],
+        ];
+
         yield 'unknown ids are ignored' => [
             '{"units": [{"id": "u1", "text": "Jeden"}, {"id": "u9", "text": "Dziewięć"}]}',
             ['u1' => 'Jeden'],

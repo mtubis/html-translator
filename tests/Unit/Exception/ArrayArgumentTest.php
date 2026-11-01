@@ -34,9 +34,9 @@ final class ArrayArgumentTest extends TestCase
         self::assertSame(['x' => 'a', 5 => 'b'], ArrayArgument::stringMap('terms', ['x' => 'a', 5 => 'b']));
         self::assertSame(['u1' => 'H', 'u2' => null], ArrayArgument::nullableStringMap('headings', ['u1' => 'H', 'u2' => null]));
         self::assertSame([$id], ArrayArgument::listOf('ids', [$id], UnitId::class));
-        self::assertSame(['u1' => $id], ArrayArgument::mapOf('ids', ['u1' => $id], UnitId::class));
+        self::assertSame(['u1' => $id, 'u2' => $id], ArrayArgument::mapOf('ids', ['u1' => $id, 'u2' => $id], UnitId::class));
         self::assertSame([], ArrayArgument::stringList('terms', []));
-        self::assertSame([['user', 'Hi']], ArrayArgument::arrayList('messages', [['user', 'Hi']]));
+        self::assertSame([['user', 'Hi'], ['assistant', 'Hello']], ArrayArgument::arrayList('messages', [['user', 'Hi'], ['assistant', 'Hello']]));
     }
 
     #[Test]
@@ -67,6 +67,14 @@ final class ArrayArgumentTest extends TestCase
 
         self::assertSame('terms["evil\nFAKE LOG LINE"] must be a string, got array.', $message);
         self::assertStringNotContainsString('sk-secret-value', $message);
+    }
+
+    #[Test]
+    public function it_shortens_a_quoted_key_to_100_characters(): void
+    {
+        $message = $this->messageOf(static fn(): array => ArrayArgument::stringMap('terms', [str_repeat('k', 101) => 1]));
+
+        self::assertSame('terms["' . str_repeat('k', 99) . '…"] must be a string, got int.', $message);
     }
 
     /**

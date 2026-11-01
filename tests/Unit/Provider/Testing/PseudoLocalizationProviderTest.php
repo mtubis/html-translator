@@ -182,6 +182,15 @@ final class PseudoLocalizationProviderTest extends TestCase
     }
 
     #[Test]
+    public function it_takes_the_number_only_from_an_id_that_is_letters_then_digits(): void
+    {
+        $provider = PseudoLocalizationProvider::corruptingEvery(1, persistent: true);
+        $batch = $this->batch([TranslationUnit::fromText(UnitId::fromString('nav-u3'), UnitKind::Block, 'Click')]);
+
+        self::assertSame(['nav-u3' => '[!! Çļíçķ !!]'], $provider->translate($batch)->translations);
+    }
+
+    #[Test]
     public function it_reports_no_failures(): void
     {
         self::assertSame([], PseudoLocalizationProvider::corruptingEvery(1)->translate($this->batch([$this->unit('u1', 'a')]))->failures);
