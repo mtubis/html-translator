@@ -40,7 +40,9 @@ final readonly class TokenUsage
 
     /**
      * Unknown counts add nothing, so a sum stays null until some usage reported that count, and a summed count is
-     * only a lower bound when some of the usages did not report it.
+     * only a lower bound when some of the usages did not report it. A count stops at PHP_INT_MAX instead of
+     * overflowing (counts come from response bodies, which may report anything up to it), and is then only a lower
+     * bound as well.
      */
     public static function sum(?self $left, ?self $right): ?self
     {
@@ -53,6 +55,8 @@ final readonly class TokenUsage
 
     private static function add(?int $left, ?int $right): ?int
     {
-        return null === $left || null === $right ? $left ?? $right : $left + $right;
+        // Counts are never negative, so PHP_INT_MAX - $right cannot overflow, and min() keeps the sum at most
+        // PHP_INT_MAX instead of letting PHP turn it into a float.
+        return null === $left || null === $right ? $left ?? $right : min($left, \PHP_INT_MAX - $right) + $right;
     }
 }

@@ -62,6 +62,8 @@ All notable changes to this project are documented here. The format follows [Kee
   `tokenEstimator` (#76).
 
 ### Fixed
+- `TokenUsage::sum()` no longer throws a `TypeError` when two counts add up to more than `PHP_INT_MAX` (a vendor may
+  report any count in a response body): the summed count stops at `PHP_INT_MAX` (#97).
 - Documentation snippets that did not run as written: in `docs/providers.md` the retry example used an undefined
   `$config` (of two different types) and the custom-server example lacked the `JsonMode` import; `docs/profiles.md`
   translated with `$profile` before building it, without the `Locale` and `TranslationOptions` imports. The snippets
