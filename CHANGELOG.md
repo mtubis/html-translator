@@ -61,6 +61,12 @@ All notable changes to this project are documented here. The format follows [Kee
   created by the class that uses them. Configure the pipeline with `skipRules`, `translatableAttributes` and
   `tokenEstimator` (#76).
 
+### Fixed
+- Documentation snippets that did not run as written: in `docs/providers.md` the retry example used an undefined
+  `$config` (of two different types) and the custom-server example lacked the `JsonMode` import; `docs/profiles.md`
+  translated with `$profile` before building it, without the `Locale` and `TranslationOptions` imports. The snippets
+  of both guides now run in the documentation test suite (#75).
+
 ## [0.4.1] - 2026-11-01
 
 Fixes found while building the Symfony bundle and the Laravel package.

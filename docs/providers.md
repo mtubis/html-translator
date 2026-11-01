@@ -71,6 +71,8 @@ default. The defaults were checked on 2026-11-01 against live servers, with `com
 For any other server, create the configuration directly:
 
 ```php
+use HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode;
+
 new OpenAiCompatibleConfig(
     name: 'together',                       // prefix of modelId(), e.g. "together:meta-llama/…"
     baseUrl: 'https://api.together.xyz/v1',
@@ -139,10 +141,8 @@ use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicChatModel;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicConfig;
 
 $http = new Psr18Client(HttpClient::create(['timeout' => 180]));
-$model = new AnthropicChatModel($http, $http, $http, new AnthropicConfig(
-    model: 'claude-opus-5-5',
-    apiKey: $_ENV['ANTHROPIC_API_KEY'],
-));
+$config = new AnthropicConfig(model: 'claude-opus-5-5', apiKey: $_ENV['ANTHROPIC_API_KEY']);
+$model = new AnthropicChatModel($http, $http, $http, $config);
 
 $translator = new HtmlTranslator(new LlmTranslationProvider($model));
 ```
@@ -228,7 +228,7 @@ use HtmlTranslator\Provider\Llm\Bridge\RetryPolicy;
 $model = new AnthropicChatModel($http, $http, $http, $config, new Retrier(new RetryPolicy(maxAttempts: 5, maxDelayMilliseconds: 60_000)));
 
 // No retries, e.g. when the HTTP client already retries:
-$model = new OpenAiCompatibleChatModel($http, $http, $http, $config, new Retrier(RetryPolicy::none()));
+$model = new OpenAiCompatibleChatModel($http, $http, $http, OpenAiCompatibleConfig::ollama('llama3.1'), new Retrier(RetryPolicy::none()));
 ```
 
 Waiting goes through the `SleeperInterface` port (default `UsleepSleeper`, which blocks); event-loop applications can

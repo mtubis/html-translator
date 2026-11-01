@@ -4,15 +4,6 @@ A `TranslationProfile` steers *how* text is translated: domain, formality, term 
 terms and free-form instructions (ARCHITECTURE §3). It is an immutable value object in `HtmlTranslator\Profile`;
 every `with…()` method returns a new profile.
 
-Pass it with the translation options; it applies to every call of the document, corrective retries and the
-text-node fallback included:
-
-```php
-$result = $translator->translate($html, Locale::fromString('pl'), new TranslationOptions(profile: $profile));
-```
-
-Providers that cannot be steered (`PseudoLocalizationProvider`, non-LLM engines) ignore it.
-
 ```php
 use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\GlossaryEntry;
@@ -25,6 +16,18 @@ $profile = TranslationProfile::technical()
     ->withDoNotTranslate('GitHub', 'Symfony')
     ->withInstructions('Address the reader directly.');
 ```
+
+Pass it with the translation options; it applies to every call of the document, corrective retries and the
+text-node fallback included (`$translator` is an `HtmlTranslator`, see the [usage guide](usage.md)):
+
+```php
+use HtmlTranslator\Domain\Locale;
+use HtmlTranslator\TranslationOptions;
+
+$result = $translator->translate($html, Locale::fromString('pl'), new TranslationOptions(profile: $profile));
+```
+
+Providers that cannot be steered (`PseudoLocalizationProvider`, non-LLM engines) ignore it.
 
 ## Fields
 
