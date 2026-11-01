@@ -89,39 +89,52 @@ final readonly class OpenAiCompatibleConfig
     }
 
     /**
-     * Gemini's OpenAI-compatible endpoint.
+     * Gemini's OpenAI-compatible endpoint. Sends the answer schema (json_schema); docs/providers.md lists the versions
+     * each preset's mode was checked with.
+     *
+     * @param JsonMode $jsonMode another mode for a server or model that does not support the default
      *
      * @throws InvalidArgumentException when the key or model is invalid
      */
-    public static function gemini(#[SensitiveParameter] string $apiKey, string $model): self
+    public static function gemini(#[SensitiveParameter] string $apiKey, string $model, JsonMode $jsonMode = JsonMode::JsonSchema): self
     {
-        return new self('gemini', 'https://generativelanguage.googleapis.com/v1beta/openai', $model, $apiKey);
+        return new self('gemini', 'https://generativelanguage.googleapis.com/v1beta/openai', $model, $apiKey, $jsonMode);
     }
 
     /**
+     * Sends the answer schema (json_schema); docs/providers.md lists the versions checked.
+     *
+     * @param JsonMode $jsonMode another mode for a server or model that does not support the default
+     *
      * @throws InvalidArgumentException when the model is blank or the URL invalid
      */
-    public static function ollama(string $model, string $baseUrl = 'http://localhost:11434/v1'): self
+    public static function ollama(string $model, string $baseUrl = 'http://localhost:11434/v1', JsonMode $jsonMode = JsonMode::JsonSchema): self
     {
-        return new self('ollama', $baseUrl, $model);
+        return new self('ollama', $baseUrl, $model, jsonMode: $jsonMode);
     }
 
     /**
+     * Sends the answer schema (json_schema); docs/providers.md lists the versions checked.
+     *
+     * @param JsonMode $jsonMode another mode for a server or model that does not support the default
+     *
      * @throws InvalidArgumentException when the model is blank, the URL or the key invalid
      */
-    public static function vllm(string $model, string $baseUrl = 'http://localhost:8000/v1', #[SensitiveParameter] ?string $apiKey = null): self
+    public static function vllm(string $model, string $baseUrl = 'http://localhost:8000/v1', #[SensitiveParameter] ?string $apiKey = null, JsonMode $jsonMode = JsonMode::JsonSchema): self
     {
-        return new self('vllm', $baseUrl, $model, $apiKey);
+        return new self('vllm', $baseUrl, $model, $apiKey, $jsonMode);
     }
 
     /**
      * LM Studio only offers structured output with a JSON schema and rejects json_object.
      *
+     * @param JsonMode $jsonMode another mode for a model that does not support the default, e.g. None (not JsonObject)
+     *
      * @throws InvalidArgumentException when the model is blank or the URL invalid
      */
-    public static function lmStudio(string $model, string $baseUrl = 'http://localhost:1234/v1'): self
+    public static function lmStudio(string $model, string $baseUrl = 'http://localhost:1234/v1', JsonMode $jsonMode = JsonMode::JsonSchemaOnly): self
     {
-        return new self('lmstudio', $baseUrl, $model, jsonMode: JsonMode::JsonSchemaOnly);
+        return new self('lmstudio', $baseUrl, $model, jsonMode: $jsonMode);
     }
 
     public function modelId(): string

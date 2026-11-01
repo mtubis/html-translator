@@ -261,12 +261,12 @@ final readonly class HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiC
     public string $maxTokensField
     public function __construct(string $name, string $baseUrl, string $model, ?string $apiKey = NULL, HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode $jsonMode = \HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode::JsonObject, string $maxTokensField = self::MAX_TOKENS, array $extraHeaders = [])
     public function __debugInfo(): array
-    public static function gemini(string $apiKey, string $model): HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig
-    public static function lmStudio(string $model, string $baseUrl = 'http://localhost:1234/v1'): HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig
+    public static function gemini(string $apiKey, string $model, HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode $jsonMode = \HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode::JsonSchema): HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig
+    public static function lmStudio(string $model, string $baseUrl = 'http://localhost:1234/v1', HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode $jsonMode = \HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode::JsonSchemaOnly): HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig
     public function modelId(): string
-    public static function ollama(string $model, string $baseUrl = 'http://localhost:11434/v1'): HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig
+    public static function ollama(string $model, string $baseUrl = 'http://localhost:11434/v1', HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode $jsonMode = \HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode::JsonSchema): HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig
     public static function openAi(string $apiKey, string $model, HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode $jsonMode = \HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode::JsonSchema): HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig
-    public static function vllm(string $model, string $baseUrl = 'http://localhost:8000/v1', ?string $apiKey = NULL): HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig
+    public static function vllm(string $model, string $baseUrl = 'http://localhost:8000/v1', ?string $apiKey = NULL, HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode $jsonMode = \HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\JsonMode::JsonSchema): HtmlTranslator\Provider\Llm\Bridge\OpenAiCompatible\OpenAiCompatibleConfig
 
 final readonly class HtmlTranslator\Provider\Llm\Bridge\RetriedResponse
     public Psr\Http\Message\ResponseInterface $response

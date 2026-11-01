@@ -25,6 +25,10 @@ All notable changes to this project are documented here. The format follows [Kee
   send unknown (`null`), not 0 (#77).
 
 ### Changed
+- Behaviour change: the `gemini()`, `ollama()` and `vllm()` presets send the answer schema (`JsonMode::JsonSchema`) instead of
+  `json_object`, after checks against live servers (versions in docs/providers.md). `gemini()`, `ollama()`, `vllm()`
+  and `lmStudio()` take another JSON mode as their last parameter, e.g. `JsonMode::JsonObject` for an older server
+  without structured outputs (#80).
 - Every public entry point that takes an array checks its elements at runtime and throws `InvalidArgumentException`
   instead of a `TypeError` (or silently accepting a wrong element): `Glossary::fromArray()` and `matching()`, the
   `extraHeaders` of both configs, `AnthropicConfig::$betas`, `RetryPolicy`'s `retryableStatuses`,

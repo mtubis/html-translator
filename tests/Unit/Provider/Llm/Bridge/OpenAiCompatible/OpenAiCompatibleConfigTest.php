@@ -43,12 +43,36 @@ final class OpenAiCompatibleConfigTest extends TestCase
     {
         yield 'OpenAI' => [OpenAiCompatibleConfig::openAi(self::API_KEY, 'gpt-4o-mini'), 'openai:gpt-4o-mini', 'https://api.openai.com/v1/chat/completions', 'Bearer ' . self::API_KEY, JsonMode::JsonSchema, 'max_completion_tokens'];
         yield 'OpenAI model without structured outputs' => [OpenAiCompatibleConfig::openAi(self::API_KEY, 'gpt-4-turbo', JsonMode::JsonObject), 'openai:gpt-4-turbo', 'https://api.openai.com/v1/chat/completions', 'Bearer ' . self::API_KEY, JsonMode::JsonObject, 'max_completion_tokens'];
-        yield 'Gemini' => [OpenAiCompatibleConfig::gemini(self::API_KEY, 'gemini-2.5-flash'), 'gemini:gemini-2.5-flash', 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', 'Bearer ' . self::API_KEY, JsonMode::JsonObject, 'max_tokens'];
-        yield 'Ollama' => [OpenAiCompatibleConfig::ollama('llama3.1'), 'ollama:llama3.1', 'http://localhost:11434/v1/chat/completions', null, JsonMode::JsonObject, 'max_tokens'];
-        yield 'Ollama on another host' => [OpenAiCompatibleConfig::ollama('llama3.1', 'http://gpu-box:11434/v1/'), 'ollama:llama3.1', 'http://gpu-box:11434/v1/chat/completions', null, JsonMode::JsonObject, 'max_tokens'];
-        yield 'vLLM' => [OpenAiCompatibleConfig::vllm('Qwen/Qwen2.5-7B-Instruct'), 'vllm:Qwen/Qwen2.5-7B-Instruct', 'http://localhost:8000/v1/chat/completions', null, JsonMode::JsonObject, 'max_tokens'];
-        yield 'vLLM with a key' => [OpenAiCompatibleConfig::vllm('qwen', 'https://vllm.example.test/v1', self::API_KEY), 'vllm:qwen', 'https://vllm.example.test/v1/chat/completions', 'Bearer ' . self::API_KEY, JsonMode::JsonObject, 'max_tokens'];
+        yield 'Gemini' => [OpenAiCompatibleConfig::gemini(self::API_KEY, 'gemini-2.5-flash'), 'gemini:gemini-2.5-flash', 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', 'Bearer ' . self::API_KEY, JsonMode::JsonSchema, 'max_tokens'];
+        yield 'Ollama' => [OpenAiCompatibleConfig::ollama('llama3.1'), 'ollama:llama3.1', 'http://localhost:11434/v1/chat/completions', null, JsonMode::JsonSchema, 'max_tokens'];
+        yield 'Ollama on another host' => [OpenAiCompatibleConfig::ollama('llama3.1', 'http://gpu-box:11434/v1/'), 'ollama:llama3.1', 'http://gpu-box:11434/v1/chat/completions', null, JsonMode::JsonSchema, 'max_tokens'];
+        yield 'vLLM' => [OpenAiCompatibleConfig::vllm('Qwen/Qwen2.5-7B-Instruct'), 'vllm:Qwen/Qwen2.5-7B-Instruct', 'http://localhost:8000/v1/chat/completions', null, JsonMode::JsonSchema, 'max_tokens'];
+        yield 'vLLM with a key' => [OpenAiCompatibleConfig::vllm('qwen', 'https://vllm.example.test/v1', self::API_KEY), 'vllm:qwen', 'https://vllm.example.test/v1/chat/completions', 'Bearer ' . self::API_KEY, JsonMode::JsonSchema, 'max_tokens'];
         yield 'LM Studio' => [OpenAiCompatibleConfig::lmStudio('qwen2.5-7b-instruct'), 'lmstudio:qwen2.5-7b-instruct', 'http://localhost:1234/v1/chat/completions', null, JsonMode::JsonSchemaOnly, 'max_tokens'];
+    }
+
+    /**
+     * @return iterable<string, array{OpenAiCompatibleConfig}>
+     */
+    public static function presetsWithAnotherJsonMode(): iterable
+    {
+        // Named, as documented: the mode comes after the base URL (and the vLLM key).
+        yield 'openai' => [OpenAiCompatibleConfig::openAi(self::API_KEY, 'm', jsonMode: JsonMode::None)];
+        yield 'gemini' => [OpenAiCompatibleConfig::gemini(self::API_KEY, 'm', jsonMode: JsonMode::None)];
+        yield 'ollama' => [OpenAiCompatibleConfig::ollama('m', jsonMode: JsonMode::None)];
+        yield 'vllm' => [OpenAiCompatibleConfig::vllm('m', jsonMode: JsonMode::None)];
+        yield 'vllm with a key' => [OpenAiCompatibleConfig::vllm('m', 'http://localhost:8000/v1', self::API_KEY, JsonMode::None)];
+        yield 'lmstudio' => [OpenAiCompatibleConfig::lmStudio('m', jsonMode: JsonMode::None)];
+    }
+
+    /**
+     * For a server version or model that does not support the preset's mode (#80).
+     */
+    #[Test]
+    #[DataProvider('presetsWithAnotherJsonMode')]
+    public function every_preset_takes_another_json_mode(OpenAiCompatibleConfig $config): void
+    {
+        self::assertSame(JsonMode::None, $config->jsonMode);
     }
 
     #[Test]
