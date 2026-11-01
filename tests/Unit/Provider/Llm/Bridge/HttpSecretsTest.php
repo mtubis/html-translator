@@ -6,6 +6,7 @@ namespace HtmlTranslator\Tests\Unit\Provider\Llm\Bridge;
 
 use Closure;
 use Exception;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\HttpSecrets;
@@ -18,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(HttpSecrets::class)]
 #[UsesClass(InvalidArgumentException::class)]
 #[UsesClass(UntrustedText::class)]
+#[UsesClass(ArrayArgument::class)]
 final class HttpSecretsTest extends TestCase
 {
     private const string API_KEY = 'sk-test-SECRET-0123456789';
@@ -28,6 +30,28 @@ final class HttpSecretsTest extends TestCase
     {
         parent::setUp();
         ini_set('zend.exception_ignore_args', '0');
+    }
+
+    /**
+     * Traces record arguments in this test (setUp), so the header array must not show up in any frame either (#78).
+     */
+    #[Test]
+    public function it_keeps_a_wrong_extra_header_out_of_the_message_and_the_trace(): void
+    {
+        try {
+            // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+            new HttpSecrets(self::API_KEY, ['X-Gateway' => 'gw-SECRET-value-longer-than-fifteen', 'X-Secret-Token' => 987654321], self::RESERVED);
+            self::fail('Expected an InvalidArgumentException.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertSame('extraHeaders entry #2 must be a string, got int.', $exception->getMessage());
+            // getTraceAsString() cuts strings at 15 characters; the recorded arguments themselves must hold no secret.
+            $trace = print_r(array_map(static fn(array $frame): array => $frame['args'] ?? [], $exception->getTrace()), true);
+            self::assertStringNotContainsString('gw-SECRET-value-longer-than-fifteen', $trace);
+            self::assertStringNotContainsString('987654321', $trace);
+            self::assertStringNotContainsString('X-Secret-Token', (string) $exception);
+            self::assertStringNotContainsString('987654321', (string) $exception);
+            self::assertStringNotContainsString(self::API_KEY, (string) $exception);
+        }
     }
 
     #[Test]

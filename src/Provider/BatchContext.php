@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Provider;
 
+use HtmlTranslator\Exception\ArrayArgument;
+use HtmlTranslator\Exception\InvalidArgumentException;
+
 /**
  * Document context hints for the units of one batch (ARCHITECTURE §6.3): the page title and the section heading
  * each unit belongs to, as plain source-language text. They help with short ambiguous texts such as button labels;
@@ -31,9 +34,12 @@ final readonly class BatchContext
     /**
      * @param ?string $title page title; an empty one counts as none
      * @param array<string, ?string> $headingByUnit unit id → its section heading, in batch order; an empty one counts as none
+     *
+     * @throws InvalidArgumentException when a heading is neither a string nor null
      */
     public static function forUnits(?string $title, array $headingByUnit): self
     {
+        ArrayArgument::nullableStringMap('headingByUnit', $headingByUnit);
         $headings = [];
         $unitHeadings = [];
         foreach ($headingByUnit as $id => $heading) {

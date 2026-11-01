@@ -14,6 +14,7 @@ use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\InvalidHtmlException;
 use HtmlTranslator\Exception\ProviderException;
@@ -108,6 +109,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(Glossary::class)]
 #[UsesClass(ProfileText::class)]
 #[UsesClass(UntrustedText::class)]
+#[UsesClass(ArrayArgument::class)]
 final class HtmlTranslatorTest extends TestCase
 {
     private const string FIXTURES = __DIR__ . '/../Fixtures/roundtrip';

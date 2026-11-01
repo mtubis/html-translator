@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Tests\Unit\Provider\Llm\Bridge;
 
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Provider\Llm\Bridge\RetriedResponse;
 use HtmlTranslator\Provider\Llm\Bridge\Retrier;
@@ -33,6 +34,7 @@ use Throwable;
 #[UsesClass(RetryPolicy::class)]
 #[UsesClass(InvalidArgumentException::class)]
 #[UsesClass(FakeSleeper::class)]
+#[UsesClass(ArrayArgument::class)]
 final class RetrierTest extends TestCase
 {
     private const string API_KEY = 'sk-test-SECRET-0123456789';

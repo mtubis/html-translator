@@ -9,6 +9,7 @@ use HtmlTranslator\Domain\LocalePair;
 use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitKind;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Profile\Glossary;
@@ -34,6 +35,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(Glossary::class)]
 #[UsesClass(ProfileText::class)]
 #[UsesClass(UntrustedText::class)]
+#[UsesClass(ArrayArgument::class)]
 final class TranslationBatchTest extends TestCase
 {
     #[Test]
@@ -110,5 +112,35 @@ final class TranslationBatchTest extends TestCase
     private function unit(string $id): TranslationUnit
     {
         return TranslationUnit::fromText(UnitId::fromString($id), UnitKind::Block, 'x');
+    }
+
+    #[Test]
+    public function it_rejects_units_that_are_not_translation_units(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('units[0] must be an instance of HtmlTranslator\\Domain\\TranslationUnit, got string.');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        new TranslationBatch(LocalePair::of(Locale::fromString('en'), Locale::fromString('pl')), ['u1']);
+    }
+
+    #[Test]
+    public function it_rejects_units_that_are_not_a_list(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('units must be a list, got key "u1".');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        new TranslationBatch(LocalePair::of(Locale::fromString('en'), Locale::fromString('pl')), ['u1' => TranslationUnit::fromText(UnitId::fromString('u1'), UnitKind::Block, 'x')]);
+    }
+
+    #[Test]
+    public function it_rejects_a_correction_that_is_not_a_correction(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('corrections["u1"] must be an instance of HtmlTranslator\\Provider\\Correction, got string.');
+
+        // @phpstan-ignore argument.type (deliberately wrong input: the runtime check is what is under test)
+        new TranslationBatch(LocalePair::of(Locale::fromString('en'), Locale::fromString('pl')), [TranslationUnit::fromText(UnitId::fromString('u1'), UnitKind::Block, 'x')], ['u1' => 'Broken tags.']);
     }
 }

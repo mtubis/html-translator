@@ -10,6 +10,7 @@ use HtmlTranslator\Batching\TokenEstimatorInterface;
 use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitKind;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -22,6 +23,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(TranslationUnit::class)]
 #[UsesClass(UnitId::class)]
 #[UsesClass(InvalidArgumentException::class)]
+#[UsesClass(ArrayArgument::class)]
 final class BatcherTest extends TestCase
 {
     #[Test]

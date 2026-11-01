@@ -160,6 +160,21 @@ $translator = new HtmlTranslator(new LlmTranslationProvider($model));
   `overloaded_error` for HTTP 529) and `usage`, as for OpenAI-compatible servers; the message names the request id,
   which Anthropic support asks for. Transient failures are retried, see [Retries](#retries).
 
+## Configuration from arrays
+
+The configs can be built from YAML or PHP arrays, as the Symfony bundle and the Laravel package do. Array arguments
+are checked at runtime: a wrong element throws `InvalidArgumentException`, never a `TypeError`, naming the parameter
+and the key (or, for secrets, only the position) and the type of the value, never the value itself.
+
+| Argument | Expected |
+|---|---|
+| `extraHeaders` (both configs) | header name → string value; a wrong value is reported as `extraHeaders entry #2 must be a string, got int.` without the header name |
+| `AnthropicConfig` `betas` | a list of strings; a map such as `['x' => 'beta']` is rejected (`betas must be a list, got key "x".`) |
+| `RetryPolicy` `retryableStatuses` | a list of ints from 400 to 599; the string `"503"` from configuration is rejected |
+
+Scalar settings (model, base URL, key) are typed parameters: convert them from configuration before passing them, e.g.
+with `(int)` for a limit read from an environment variable.
+
 ## Retries
 
 Both adapters retry transient failures through a `Retrier` (ARCHITECTURE §6.8):
@@ -206,6 +221,10 @@ pass their own, and tests `Provider\Llm\Testing\FakeSleeper`, which records the 
   `usage:` to the `ProviderException`, so the stats count what the call cost; drop negative and non-integer counts
   first (`TokenUsage` rejects them). A wrapper that rethrows a `ProviderException` with more tokens uses
   `withUsage()`.
+- **Batches and results are checked**: `TranslationBatch` and `BatchResult` throw `InvalidArgumentException` for a
+  wrong element type (a `units` array with gaps from `array_filter()` needs `array_values()`; a translation decoded
+  with `json_decode()` may be an int, e.g. a model answering `42`). That is a bug in the provider, not a
+  `ProviderException`, so it is not turned into an issue: filter and convert what a vendor sends first.
 - **A non-LLM engine**: implement `Provider\TranslationProviderInterface` and pass
   `Provider\Testing\TranslationProviderContractTestCase`. Report tokens in `BatchResult::$usage` (`TokenUsage`) when the engine
   reports them; leave it null otherwise (engines billed by characters too, since the stats count tokens).

@@ -13,6 +13,7 @@ use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitKind;
 use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Profile\Formality;
 use HtmlTranslator\Profile\Glossary;
 use HtmlTranslator\Profile\GlossaryEntry;
@@ -57,6 +58,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(UnitText::class)]
 #[UsesClass(UnitTextToken::class)]
 #[UsesClass(BatchContext::class)]
+#[UsesClass(ArrayArgument::class)]
 final class PromptBuilderTest extends TestCase
 {
     private const string GOLDEN_DIRECTORY = __DIR__ . '/Fixtures/prompts';

@@ -15,6 +15,7 @@ use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\FallbackStrategy;
@@ -110,6 +111,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(Glossary::class)]
 #[UsesClass(ProfileText::class)]
 #[UsesClass(UntrustedText::class)]
+#[UsesClass(ArrayArgument::class)]
 final class HtmlTranslatorCacheTest extends TestCase
 {
     private const string HTML = '<p>One <b>bold</b> line</p><p>Two</p><img alt="Three">';

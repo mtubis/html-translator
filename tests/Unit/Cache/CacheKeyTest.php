@@ -12,6 +12,7 @@ use HtmlTranslator\Domain\LocalePair;
 use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitKind;
+use HtmlTranslator\Exception\ArrayArgument;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -24,6 +25,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(InlineTag::class)]
 #[UsesClass(Locale::class)]
 #[UsesClass(LocalePair::class)]
+#[UsesClass(ArrayArgument::class)]
 final class CacheKeyTest extends TestCase
 {
     #[Test]

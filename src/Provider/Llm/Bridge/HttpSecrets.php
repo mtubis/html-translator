@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Provider\Llm\Bridge;
 
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\UntrustedText;
 use SensitiveParameter;
@@ -59,7 +60,7 @@ final readonly class HttpSecrets
         }
 
         $headers = [];
-        foreach ($extraHeaders as $header => $value) {
+        foreach (ArrayArgument::stringMap('extraHeaders', $extraHeaders, secret: true) as $header => $value) {
             $header = (string) $header;
             if (1 !== preg_match(self::HEADER_NAME, $header)) {
                 throw new InvalidArgumentException('An extra header has an invalid name.');

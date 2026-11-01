@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Provider;
 
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\UntrustedText;
 
@@ -26,7 +27,8 @@ final readonly class BatchResult
      * @param array<string, string> $permanentFailures unit id → why the provider will never translate it
      * @param TokenUsage|null $usage tokens used for the batch, null when the provider reports none
      *
-     * @throws InvalidArgumentException when a unit appears in more than one map, or a failure has no reason
+     * @throws InvalidArgumentException when a map holds something other than strings, a unit appears in more than one
+     *                                  map, or a failure has no reason
      */
     public function __construct(
         public array $translations,
@@ -34,6 +36,10 @@ final readonly class BatchResult
         public array $permanentFailures = [],
         public ?TokenUsage $usage = null,
     ) {
+        ArrayArgument::stringMap('translations', $translations);
+        ArrayArgument::stringMap('failures', $failures);
+        ArrayArgument::stringMap('permanentFailures', $permanentFailures);
+
         $overlap = array_keys(array_intersect_key($translations, $failures) + array_intersect_key($translations, $permanentFailures) + array_intersect_key($failures, $permanentFailures));
         foreach ($overlap as $id) {
             throw new InvalidArgumentException(\sprintf('Unit "%s" is reported more than once (translated, failed or permanently failed).', UntrustedText::quote((string) $id)));

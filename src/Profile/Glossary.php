@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Profile;
 
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 
 /**
@@ -43,15 +44,24 @@ final readonly class Glossary
     }
 
     /**
-     * @param array<array-key, string> $terms source term → target term; numeric source terms become integer keys in PHP.
-     *                                        A non-string target raises a TypeError, so validate untyped config first.
+     * Also for configuration (YAML, PHP arrays): every element is checked at runtime.
      *
-     * @throws InvalidArgumentException when a term is invalid, there are too many entries or a source term repeats
+     * @param array<array-key, string> $terms source term → target term; numeric source terms become integer keys in PHP,
+     *                                        and terms that are exactly "0", "1", … in order make a list, which is
+     *                                        rejected: build such a glossary with of()
+     *
+     * @throws InvalidArgumentException when $terms is a non-empty list instead of a map, a target is not a string, a term
+     *                                  is invalid, there are too many entries or a source term repeats
      */
     public static function fromArray(array $terms): self
     {
+        // A YAML list of terms instead of a map would otherwise become "0" → first term, "1" → second term.
+        if ([] !== $terms && array_is_list($terms)) {
+            throw new InvalidArgumentException('terms must map source terms to target terms, got a list.');
+        }
+
         $entries = [];
-        foreach ($terms as $source => $target) {
+        foreach (ArrayArgument::stringMap('terms', $terms) as $source => $target) {
             $entries[] = GlossaryEntry::of((string) $source, $target);
         }
 
@@ -79,10 +89,12 @@ final readonly class Glossary
      * whole words), so a prompt carries only the terms it needs.
      *
      * @param list<string> $texts plain text, without markup
+     *
+     * @throws InvalidArgumentException when $texts is not a list of strings
      */
     public function matching(array $texts): self
     {
-        $matcher = TermMatcher::in($texts);
+        $matcher = TermMatcher::in(ArrayArgument::stringList('texts', $texts));
 
         return new self(array_values(array_filter(
             $this->entries,

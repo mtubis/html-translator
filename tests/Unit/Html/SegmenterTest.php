@@ -12,6 +12,7 @@ use HtmlTranslator\Domain\InlineTag;
 use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitText;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\InvalidHtmlException;
 use HtmlTranslator\Html\AttributeAnchor;
@@ -48,6 +49,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(InlineTag::class)]
 #[UsesClass(InvalidArgumentException::class)]
 #[UsesClass(InvalidHtmlException::class)]
+#[UsesClass(ArrayArgument::class)]
 final class SegmenterTest extends TestCase
 {
     /**

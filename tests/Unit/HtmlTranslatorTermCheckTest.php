@@ -15,6 +15,7 @@ use HtmlTranslator\Domain\TranslationUnit;
 use HtmlTranslator\Domain\UnitId;
 use HtmlTranslator\Domain\UnitText;
 use HtmlTranslator\Domain\UnitTextToken;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\FallbackStrategy;
@@ -112,6 +113,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(Glossary::class)]
 #[UsesClass(ProfileText::class)]
 #[UsesClass(UntrustedText::class)]
+#[UsesClass(ArrayArgument::class)]
 final class HtmlTranslatorTermCheckTest extends TestCase
 {
     private const string HTML = '<p>Push it to <b>GitHub</b>.</p><p>Open a pull request.</p>';

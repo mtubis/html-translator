@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Tests\Contract;
 
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\Anthropic\AnthropicChatModel;
@@ -56,6 +57,7 @@ use Psr\Http\Message\RequestInterface;
 #[UsesClass(TransportFailure::class)]
 #[UsesClass(FakeSleeper::class)]
 #[UsesClass(TokenUsage::class)]
+#[UsesClass(ArrayArgument::class)]
 final class AnthropicChatModelContractTest extends ChatModelContractTestCase
 {
     private const string MODEL = 'contract-configured-model';

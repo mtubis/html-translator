@@ -6,6 +6,7 @@ namespace HtmlTranslator\Provider;
 
 use HtmlTranslator\Domain\LocalePair;
 use HtmlTranslator\Domain\TranslationUnit;
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Profile\TranslationProfile;
@@ -28,7 +29,8 @@ final readonly class TranslationBatch
      * @param TranslationProfile|null $profile null means TranslationProfile::default()
      * @param BatchContext|null $context null means BatchContext::none()
      *
-     * @throws InvalidArgumentException when there are no units, an id repeats, or a correction or context heading
+     * @throws InvalidArgumentException when $units is not a list of units, a correction is not a Correction, there are no
+     *                                  units, an id repeats, or a correction or context heading
      *                                  belongs to no unit of the batch
      */
     public function __construct(
@@ -41,6 +43,9 @@ final readonly class TranslationBatch
         if ([] === $units) {
             throw new InvalidArgumentException('A translation batch needs at least one unit.');
         }
+
+        ArrayArgument::listOf('units', $units, TranslationUnit::class);
+        ArrayArgument::mapOf('corrections', $corrections, Correction::class);
 
         $ids = array_map(static fn(TranslationUnit $unit): string => $unit->id->toString(), $units);
         foreach (array_diff_assoc($ids, array_unique($ids)) as $id) {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Provider\Llm\Bridge;
 
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use Random\Randomizer;
 
@@ -34,7 +35,7 @@ final readonly class RetryPolicy
      * @param list<int> $retryableStatuses HTTP error statuses (400–599) worth another attempt
      * @param bool $retryNetworkErrors retry PSR-18 network errors (no response at all)
      *
-     * @throws InvalidArgumentException when a setting is out of range
+     * @throws InvalidArgumentException when a setting is out of range or $retryableStatuses is not a list of ints
      */
     public function __construct(
         public int $maxAttempts = 3,
@@ -51,10 +52,11 @@ final readonly class RetryPolicy
             throw new InvalidArgumentException(\sprintf('Retry delays must satisfy 0 <= base (%d) <= maximum (%d) <= %d.', $baseDelayMilliseconds, $maxDelayMilliseconds, self::MAX_DELAY_MILLISECONDS));
         }
 
+        // Checked at runtime too: a status read from configuration as the string "429" would never match.
+        $retryableStatuses = ArrayArgument::intList('retryableStatuses', $retryableStatuses);
         foreach ($retryableStatuses as $status) {
-            // Checked at runtime too: a status read from configuration as the string "429" would never match.
-            if (!\is_int($status) || $status < 400 || $status > 599) {
-                throw new InvalidArgumentException(\sprintf('%s is not an error status worth retrying (an integer from 400 to 599).', var_export($status, true)));
+            if ($status < 400 || $status > 599) {
+                throw new InvalidArgumentException(\sprintf('%d is not an error status worth retrying (an integer from 400 to 599).', $status));
             }
         }
 

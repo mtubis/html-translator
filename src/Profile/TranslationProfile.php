@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Profile;
 
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 
 /**
@@ -134,6 +135,19 @@ final readonly class TranslationProfile
     public function withDoNotTranslate(string ...$terms): self
     {
         return new self($this->domain, $this->formality, $this->termPolicy, $this->glossary, array_values($terms), $this->instructions);
+    }
+
+    /**
+     * withDoNotTranslate() for configuration (YAML, PHP arrays): every element is checked at runtime, where spreading
+     * an untyped array into the variadic method would fail with a TypeError.
+     *
+     * @param list<string> $terms
+     *
+     * @throws InvalidArgumentException when $terms is not a list of strings, or for the reasons of withDoNotTranslate()
+     */
+    public function withDoNotTranslateTerms(array $terms): self
+    {
+        return $this->withDoNotTranslate(...ArrayArgument::stringList('terms', $terms));
     }
 
     /**

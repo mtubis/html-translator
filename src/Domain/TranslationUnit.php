@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Domain;
 
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 
 /**
@@ -35,11 +36,12 @@ final readonly class TranslationUnit
      * @param string $text unit text with pseudo-tags; surrounding HTML whitespace is split off
      * @param list<InlineTag> $inlineTags
      *
-     * @throws InvalidArgumentException when the text is blank, tag numbers repeat,
+     * @throws InvalidArgumentException when the text is blank, $inlineTags is not a list of InlineTags, tag numbers repeat,
      *                                  or a plain-text unit (attribute, title) has inline tags
      */
     public static function fromText(UnitId $id, UnitKind $kind, string $text, array $inlineTags = []): self
     {
+        $inlineTags = ArrayArgument::listOf('inlineTags', $inlineTags, InlineTag::class);
         $trimmed = trim($text, self::HTML_WHITESPACE);
 
         if ('' === $trimmed) {

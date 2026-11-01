@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HtmlTranslator\Provider\Llm\Bridge\Anthropic;
 
+use HtmlTranslator\Exception\ArrayArgument;
 use HtmlTranslator\Exception\InvalidArgumentException;
 use HtmlTranslator\Exception\UntrustedText;
 use HtmlTranslator\Provider\Llm\Bridge\HttpSecrets;
@@ -50,11 +51,11 @@ final readonly class AnthropicConfig
      * @param ?AnthropicEffort $effort output_config.effort; null leaves the model's default
      * @param bool $refusalFallbacks let the API answer a refused request with a fallback model (Claude API only)
      * @param array<array-key, string> $extraHeaders treated as secret like the key (PHP turns numeric names into int keys)
-     * @param array<array-key, string> $betas further anthropic-beta values, e.g. "some-feature-2026-01-01"; they may
-     *                                        change request or response shapes the adapter does not map
+     * @param list<string> $betas further anthropic-beta values, e.g. "some-feature-2026-01-01"; they may change request
+     *                            or response shapes the adapter does not map
      *
-     * @throws InvalidArgumentException when a setting is blank or invalid, a header is one the adapter sets itself, or a
-     *                                  beta is not in the form of Anthropic's beta names
+     * @throws InvalidArgumentException when a setting is blank or invalid, a header value is not a string or a header is
+     *                                  one the adapter sets itself, or $betas is not a list of Anthropic beta names
      */
     public function __construct(
         public string $model,
@@ -86,6 +87,7 @@ final readonly class AnthropicConfig
             throw new InvalidArgumentException(\sprintf('The default output limit must be at least 1, got %d.', $defaultMaxOutputTokens));
         }
 
+        $betas = ArrayArgument::stringList('betas', $betas);
         foreach ($betas as $beta) {
             if (1 !== preg_match(self::BETA, $beta)) {
                 throw new InvalidArgumentException(\sprintf('The Anthropic beta "%s" may contain only lowercase letters, digits, ".", "_" and "-".', UntrustedText::quote($beta)));
@@ -93,7 +95,7 @@ final readonly class AnthropicConfig
         }
 
         $this->secrets = $secrets;
-        $this->betas = array_values($betas);
+        $this->betas = $betas;
     }
 
     /**

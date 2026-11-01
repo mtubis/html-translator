@@ -173,6 +173,7 @@ final readonly class HtmlTranslator\Profile\TranslationProfile
     public static function marketing(): HtmlTranslator\Profile\TranslationProfile
     public static function technical(): HtmlTranslator\Profile\TranslationProfile
     public function withDoNotTranslate(string ...$terms): HtmlTranslator\Profile\TranslationProfile
+    public function withDoNotTranslateTerms(array $terms): HtmlTranslator\Profile\TranslationProfile
     public function withDomain(?string $domain): HtmlTranslator\Profile\TranslationProfile
     public function withFormality(HtmlTranslator\Profile\Formality $formality): HtmlTranslator\Profile\TranslationProfile
     public function withGlossary(HtmlTranslator\Profile\Glossary $glossary): HtmlTranslator\Profile\TranslationProfile
