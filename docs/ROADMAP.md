@@ -41,7 +41,7 @@ Goal: any HTML fixture round-trips through segmentation → pseudo-localization 
 - Refused batches are split to find the refused unit
 - JSON modes of the OpenAI-compatible presets verified against live servers
 - Tooling: `tools/eval` exit code and cache hits, token assertions in integration tests, nightly integration CI
-- Infection: mutation score locked in (covered MSI was 97 % at 0.4; ROADMAP asked for ≥ 85 %)
+- Infection: mutation score locked in at 100 % (covered MSI was 97 % at 0.4; ROADMAP asked for ≥ 85 %); equivalent mutants are listed in `infection.json5`
 - Docs complete (extension guide, `UPGRADE-1.0.md`, every snippet tested), 1.0.0 release
 
 ## Then
