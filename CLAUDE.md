@@ -19,6 +19,8 @@ Symfony bundle and Laravel package are separate repositories that depend on this
 - `declare(strict_types=1);` everywhere. PHPStan level max + strict rules, no baseline, no `@phpstan-ignore` without a comment explaining why.
 - Classes are `final` by default; value objects are `final readonly` with validation in the constructor or named constructors (`fromString`, `of`). Follow `src/Domain/Locale.php` as the style reference.
 - Constructor injection only; no static state, no service locators, no `new` of collaborators inside services (except value objects).
+  Exception (ADR-0018): a public class that composes `@internal` collaborators (`HtmlTranslator`, `LlmTranslationProvider`) creates them itself from its injected ports and configuration.
+- Public API: every class in `src/` is public API, an extension point or `@internal` (ADR-0018). After any change to a public signature run `php scripts/dump-public-api.php` and commit the diff of `tests/Unit/Architecture/public-api.txt`.
 - Interfaces for every port (things with I/O or multiple implementations). No interface for value objects or single-implementation internals.
 - Only PSR interfaces as runtime dependencies. No framework, no vendor SDK, no concrete HTTP client in `src/` (ADR-0002). Ask before adding any Composer dependency.
 - All exceptions implement `HtmlTranslator\Exception\TranslatorException`.

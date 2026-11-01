@@ -1,6 +1,7 @@
 # 0010. Public API shape of Core 0.1
 
-- Status: accepted; `batchSize` clause amended by [0015](0015-token-budget-batching.md)
+- Status: accepted; `batchSize` clause amended by [0015](0015-token-budget-batching.md), injectable collaborators
+  amended by [0018](0018-public-api-and-backward-compatibility-promise.md)
 - Date: 2026-10-11
 
 ## Context
@@ -12,7 +13,7 @@ Alternatives considered:
 
 ## Decision
 - `HtmlTranslator` and `TranslationOptions` are configured with **named arguments** beyond the first parameter (`provider`). Positional order is not part of the public API; new parameters (`cache`, `clock`, `profile`) are inserted where they read best and always have defaults.
-- `HtmlTranslator` collaborators are injectable as optional named parameters with defaults: `logger`, `loader`, `segmenter`, `validator`, `reassembler`, `skipRules`, `translatableAttributes`.
+- `HtmlTranslator` collaborators are injectable as optional named parameters with defaults: `logger`, `loader`, `segmenter`, `validator`, `reassembler`, `skipRules`, `translatableAttributes`. (Amended by ADR-0018: only ports and configuration are injectable.)
 - `TranslationOptions::$batchSize` is **provisional**: it exists until the token-based `Batcher` (0.4), which will take a token budget; then `batchSize` becomes an upper bound and is deprecated if it serves no purpose.
 - `FallbackStrategy` applies to every unit that has no valid translation after corrective retries: invalid structure, refused by the provider, or missing from its answer. With `Throw`, invalid structure raises `StructureValidationException`; a refused or missing unit raises `ProviderException`.
 - A `ProviderException` on a corrective retry or in the `TextNodesOnly` fallback call does not abort the document: the affected units are reported as issues (ADR-0004). Only a failure of a batch's first call propagates.
