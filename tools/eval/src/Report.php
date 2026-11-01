@@ -16,6 +16,7 @@ final readonly class Report
     /**
      * @param list<FixtureResult> $results
      * @param ?string $jsonMode the JSON mode of an OpenAI-compatible model, so runs of one model in two modes differ
+     * @param bool $sharedCache whether the fixtures shared an in-memory unit cache (--cache)
      */
     public function __construct(
         public string $modelId,
@@ -23,7 +24,21 @@ final readonly class Report
         public DateTimeImmutable $startedAt,
         public array $results,
         public ?string $jsonMode = null,
+        public bool $sharedCache = false,
     ) {}
+
+    /**
+     * Fixtures that are incomplete or ended in an error (a fixture with an error is never complete).
+     */
+    public function failureCount(): int
+    {
+        return \count(array_filter($this->results, static fn(FixtureResult $result): bool => !$result->complete));
+    }
+
+    public function hasFailures(): bool
+    {
+        return $this->failureCount() > 0;
+    }
 
     /**
      * e.g. "20261011-140501-openai-gpt-4o-mini-json-schema", without the extension.
@@ -54,10 +69,12 @@ final readonly class Report
                 $this->sum(static fn(FixtureResult $result): int => $result->calls),
                 $this->sum(static fn(FixtureResult $result): int => $result->callsWithContext),
             ),
+            \sprintf('- Cache: %s', $this->sharedCache ? 'in-memory, shared by the fixtures of this run' : 'none'),
+            \sprintf('- Cache hits: %d of %d units', $this->sum(static fn(FixtureResult $result): int => $result->cacheHits), $this->sum(static fn(FixtureResult $result): int => $result->units)),
             \sprintf('- Tokens: %s in, %s out%s', $this->tokens(array_map(static fn(FixtureResult $result): ?int => $result->inputTokens, $this->results)), $this->tokens(array_map(static fn(FixtureResult $result): ?int => $result->outputTokens, $this->results)), $this->uncountedTokens()),
             '',
-            '| Fixture | Complete | Issues | Units | Batches | Retried | Calls | Context | Tokens in | Tokens out | Seconds |',
-            '|---|---|---|---|---|---|---|---|---|---|---|',
+            '| Fixture | Complete | Issues | Units | Cache hits | Batches | Retried | Calls | Context | Tokens in | Tokens out | Seconds |',
+            '|---|---|---|---|---|---|---|---|---|---|---|---|',
         ];
 
         foreach ($this->results as $result) {
@@ -65,11 +82,12 @@ final readonly class Report
                 ? 'error: ' . str_replace(['|', "\n"], ['\|', ' '], $result->error)
                 : ([] === $result->issues ? '–' : implode(', ', array_map(static fn(string $type, int $count): string => $type . ' ' . $count, array_keys($result->issues), $result->issues)));
             $lines[] = \sprintf(
-                '| %s | %s | %s | %d | %d | %d | %d | %d/%d | %s | %s | %.1f |',
+                '| %s | %s | %s | %d | %d | %d | %d | %d | %d/%d | %s | %s | %.1f |',
                 $result->fixture,
                 $result->complete ? 'yes' : 'no',
                 $issues,
                 $result->units,
+                $result->cacheHits,
                 $result->batches,
                 $result->retries,
                 $result->calls,
@@ -90,6 +108,8 @@ final readonly class Report
             'modelId' => $this->modelId,
             'promptVersion' => $this->promptVersion,
             'jsonMode' => $this->jsonMode,
+            'sharedCache' => $this->sharedCache,
+            'cacheHits' => $this->sum(static fn(FixtureResult $result): int => $result->cacheHits),
             'startedAt' => $this->startedAt->format(DATE_ATOM),
             'php' => PHP_VERSION,
             'results' => array_map(get_object_vars(...), $this->results),

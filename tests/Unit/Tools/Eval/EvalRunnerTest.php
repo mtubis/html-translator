@@ -9,6 +9,7 @@ use HtmlTranslator\Exception\ProviderException;
 use HtmlTranslator\Provider\Llm\ChatResponse;
 use HtmlTranslator\Provider\Llm\Testing\FakeChatModel;
 use HtmlTranslator\Tests\Support\GoldenFixtures;
+use HtmlTranslator\Tests\Support\InMemoryCachePool;
 use HtmlTranslator\Tests\Support\PseudoLocalizingChatModel;
 use HtmlTranslator\Tools\Eval\CallCountingChatModel;
 use HtmlTranslator\Tools\Eval\EvalRunner;
@@ -40,6 +41,35 @@ final class EvalRunnerTest extends TestCase
             self::assertSame(1, $result->calls);
             self::assertNull($result->error);
         }
+    }
+
+    #[Test]
+    public function it_records_cache_hits_of_a_shared_pool(): void
+    {
+        $fixtures = array_intersect_key(GoldenFixtures::all(), array_flip(['table']));
+        $runner = new EvalRunner(new CallCountingChatModel(PseudoLocalizingChatModel::create()), new InMemoryCachePool());
+
+        $first = $runner->run($fixtures)[0] ?? self::fail('No result.');
+        $second = $runner->run($fixtures)[0] ?? self::fail('No result.');
+
+        self::assertSame(0, $first->cacheHits);
+        self::assertSame(1, $first->calls);
+        self::assertTrue($second->complete);
+        self::assertSame($second->units, $second->cacheHits);
+        self::assertSame(0, $second->calls, 'Every unit came from the cache.');
+    }
+
+    #[Test]
+    public function it_records_no_cache_hits_without_a_pool(): void
+    {
+        $fixtures = array_intersect_key(GoldenFixtures::all(), array_flip(['table']));
+        $runner = new EvalRunner(new CallCountingChatModel(PseudoLocalizingChatModel::create()));
+
+        $runner->run($fixtures);
+        $second = $runner->run($fixtures)[0] ?? self::fail('No result.');
+
+        self::assertSame(0, $second->cacheHits);
+        self::assertSame(1, $second->calls);
     }
 
     #[Test]
