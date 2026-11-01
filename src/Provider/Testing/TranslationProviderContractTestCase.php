@@ -45,6 +45,9 @@ abstract class TranslationProviderContractTestCase extends TestCase
     /** Surrounding whitespace the core strips from units and restores itself (HTML ASCII whitespace). */
     private const string HTML_WHITESPACE = " \t\n\f\r";
 
+    /** The setting before setUp(), restored by tearDown(): the contract runs next to other tests of the package. */
+    private string|false $previousIgnoreArgs = false;
+
     /**
      * A provider configured with API_KEY that translates whatever it is given; it must be usable for several batches.
      */
@@ -90,7 +93,16 @@ abstract class TranslationProviderContractTestCase extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        ini_set('zend.exception_ignore_args', '0');
+        $this->previousIgnoreArgs = ini_set('zend.exception_ignore_args', '0');
+    }
+
+    protected function tearDown(): void
+    {
+        if (false !== $this->previousIgnoreArgs) {
+            ini_set('zend.exception_ignore_args', $this->previousIgnoreArgs);
+        }
+
+        parent::tearDown();
     }
 
     #[Test]
