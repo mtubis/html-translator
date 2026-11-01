@@ -89,6 +89,8 @@ final readonly class TranslatableAttributes
      * Names of the element's attributes to translate, in document order; blank values are left out.
      *
      * @return list<string>
+     *
+     * @internal for the Segmenter (ADR-0018)
      */
     public function namesFor(Element $element): array
     {

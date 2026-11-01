@@ -38,6 +38,8 @@ final class UntrustedTextTest extends TestCase
         yield 'Arabic letter mark' => ["a\u{061C}b", 'a\u{061C}b'];
         yield 'invalid UTF-8' => ["Cze\xC5\x9B\xFF", "Cze\u{015B}\u{FFFD}"];
         yield 'emoji with zero-width joiner' => ["Dev 👩\u{200D}💻 ✓", "Dev 👩\u{200D}💻 ✓"];
+        yield 'backslash kept' => ['C:\\new\\tmp', 'C:\\new\\tmp'];
+        yield 'quotes kept, none added' => ['say "hi"', 'say "hi"'];
         yield 'cut before escaping' => [str_repeat("\n", 300), str_repeat('\n', 199) . '…'];
     }
 

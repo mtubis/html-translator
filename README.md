@@ -137,6 +137,8 @@ exceptions implement `HtmlTranslator\Exception\TranslatorException`. See the [us
 - [Providers](docs/providers.md): configuration, JSON modes, timeouts, retries and errors of each adapter.
 - [Translation profiles](docs/profiles.md): domain, formality, glossary and term policy.
 - [Architecture](docs/ARCHITECTURE.md) and [decisions](docs/adr/).
+- [Backward compatibility promise](docs/adr/0018-public-api-and-backward-compatibility-promise.md): what is public
+  API, what is an extension point and what is `@internal`.
 - [Changelog](CHANGELOG.md).
 
 ## Framework integrations

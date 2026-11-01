@@ -89,6 +89,8 @@ final readonly class SkipRules
     /**
      * Whether the element and everything below it is skipped by an element rule (looks at this element only).
      * Only these subtrees may be pruned: below translate="no" a descendant can switch translation back on.
+     *
+     * @internal for the Segmenter and InlineEncoder (ADR-0018)
      */
     public function skipsSubtree(Element $element): bool
     {
@@ -100,6 +102,8 @@ final readonly class SkipRules
     /**
      * The translate state of one element given its parent's, from its translate attribute and skip classes.
      * Lets a top-down walker carry the inherited state instead of calling excludes() for every element.
+     *
+     * @internal for the Segmenter and InlineEncoder (ADR-0018)
      */
     public function translates(Element $element, bool $parentTranslates): bool
     {
@@ -132,6 +136,8 @@ final readonly class SkipRules
     /**
      * Convenience check for a single element: walks all its ancestors, so do not call it for every node of a tree.
      * Decides about text only; the element's own attributes under an element rule are decided by the Segmenter.
+     *
+     * @internal for the Segmenter and InlineEncoder (ADR-0018)
      */
     public function excludes(Element $element): bool
     {

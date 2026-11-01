@@ -20,6 +20,8 @@ use HtmlTranslator\Profile\TranslationProfile;
  *   that translate their term are not checked: the model may inflect the target ("gałąź" → "gałęzi"). Equal means
  *   equal after mb_strtolower(), as in glossary deduplication.
  * Terms are quoted with UntrustedText (bounded, one line) since they end up in issue messages and logs.
+ *
+ * @internal part of the pipeline behind HtmlTranslator (ADR-0018)
  */
 final readonly class TermChecker
 {

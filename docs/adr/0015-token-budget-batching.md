@@ -39,7 +39,8 @@ Alternatives considered:
   stay within 0.8–2.5× of them (`tests/Integration/TokenEstimatorAccuracyTest`). Overestimating is preferred, since it
   only costs calls.
 - `HtmlTranslator` takes the Batcher as the optional named collaborator `batcher`. A custom estimator is passed as
-  `new Batcher($estimator)`, not as a separate parameter.
+  `new Batcher($estimator)`, not as a separate parameter. (Amended by ADR-0018: the Batcher is internal and
+  `HtmlTranslator` takes the estimator as `tokenEstimator`.)
 
 ## Consequences
 - With the defaults, documents whose units are short behave as before. Long units are now split across more calls,

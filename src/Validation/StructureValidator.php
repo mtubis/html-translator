@@ -19,6 +19,8 @@ use HtmlTranslator\Exception\UntrustedText;
  * order: empty translation; problems in text order (raw markup, tags in a plain-text unit, unknown tag, wrong
  * tag form, closing tag without opening, overlapping tags); unclosed tags in opening order; duplicates and
  * missing tags by ascending number. Each kind of tag problem is reported once per tag number.
+ *
+ * @internal part of the pipeline behind HtmlTranslator (ADR-0018)
  */
 final readonly class StructureValidator
 {

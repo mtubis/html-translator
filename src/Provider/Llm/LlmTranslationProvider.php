@@ -27,11 +27,19 @@ use HtmlTranslator\Provider\TranslationBatch;
  */
 final readonly class LlmTranslationProvider implements CacheableProviderInterface
 {
+    private PromptBuilder $promptBuilder;
+
+    private ResponseParser $responseParser;
+
+    /**
+     * The prompt builder and response parser are internal and created here (ADR-0018).
+     */
     public function __construct(
         private ChatModelInterface $chatModel,
-        private PromptBuilder $promptBuilder = new PromptBuilder(),
-        private ResponseParser $responseParser = new ResponseParser(),
-    ) {}
+    ) {
+        $this->promptBuilder = new PromptBuilder();
+        $this->responseParser = new ResponseParser();
+    }
 
     /**
      * "llm:<model id>:<prompt version>", e.g. "llm:openai:gpt-4o-mini:2026-10.4".

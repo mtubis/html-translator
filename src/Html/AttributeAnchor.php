@@ -8,6 +8,8 @@ use Dom\Element;
 
 /**
  * Where an attribute unit lives in the DOM.
+ *
+ * @internal part of the pipeline behind HtmlTranslator (ADR-0018)
  */
 final readonly class AttributeAnchor
 {

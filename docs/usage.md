@@ -239,3 +239,30 @@ HtmlTranslator\Exception\InvalidArgumentException: Source and target locale are 
 
 Messages never contain API keys, and text they quote from the input, the model or the API is shortened and kept on
 one line, so they are safe to log.
+
+### Quoting untrusted text in your own messages
+
+Integrations that report their own errors, e.g. about configuration values from `.env`, can quote text the way the
+core does with `HtmlTranslator\Exception\UntrustedText::quote(string $text, int $maxLength = 200)`. It is public API
+(ADR-0018) and guarantees:
+
+- valid UTF-8: each invalid byte sequence becomes U+FFFD;
+- at most `$maxLength` characters of the text, the ellipsis (`…`) included, are kept before escaping (values below 1
+  count as 1);
+- one line: line feed, carriage return and tab become `\n`, `\r` and `\t`; other control characters, DEL, line and
+  paragraph separators and bidi controls, which could forge or reorder log lines, become `\u{XXXX}`;
+- nothing else changes: no quotes are added and backslashes are not escaped.
+
+It does not redact secrets: never pass one in.
+
+```php
+use HtmlTranslator\Exception\UntrustedText;
+
+$formality = "casual\n\u{202E}x"; // e.g. read from an environment variable
+
+echo 'formality: expected one of default, formal, informal, got "', UntrustedText::quote($formality, 50), "\"\n";
+```
+
+```text
+formality: expected one of default, formal, informal, got "casual\n\u{202E}x"
+```

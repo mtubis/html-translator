@@ -16,6 +16,8 @@ use stdClass;
  * Tolerated: a bare list instead of the object, a Markdown code fence or prose around the JSON, a trailing comma.
  * Unit texts are returned as written without surrounding whitespace; checking them is the validator's job. The answer
  * never appears in exception messages: it is untrusted and may repeat customer content.
+ *
+ * @internal used by LlmTranslationProvider (ADR-0018)
  */
 final class ResponseParser
 {

@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+- A backward compatibility promise: every class is public API, an extension point or `@internal`, and
+  `tests/Unit/Architecture/public-api.txt` lists the public signatures; a test fails on any difference
+  ([ADR-0018](docs/adr/0018-public-api-and-backward-compatibility-promise.md), #76).
+- `Exception\UntrustedText::quote()` is public API for integrations that quote configuration or input values in their
+  own messages; its guarantees are documented in the usage guide (#87).
+
+### Changed
+- `HtmlTranslator` takes a custom token estimator as `tokenEstimator: TokenEstimatorInterface` instead of
+  `batcher: new Batcher($estimator)` (#76).
+- Marked `@internal`, no longer covered by Semantic Versioning: the HTML pipeline (`Html\HtmlLoader`, `Segmenter`,
+  `InlineEncoder`, `Reassembler`, `LoadedDocument`, `SegmentedDocument`, `RunAnchor`, `AttributeAnchor`), the
+  `Validation` namespace (`StructureValidator`, `TermChecker`, `ValidationResult`, `Violation`, `ViolationType`),
+  `Batching\Batcher`, `Provider\Llm\PromptBuilder` and `ResponseParser`, and the pipeline-only methods
+  `SkipRules::excludes()`, `skipsSubtree()`, `translates()`, `TranslatableAttributes::namesFor()` and
+  `BatchContext::select()` (#76).
+
+### Removed
+- The `HtmlTranslator` parameters `loader`, `segmenter`, `validator`, `reassembler`, `termChecker` and `batcher`, and
+  the `LlmTranslationProvider` parameters `promptBuilder` and `responseParser`: these collaborators are internal and
+  created by the class that uses them. Configure the pipeline with `skipRules`, `translatableAttributes` and
+  `tokenEstimator` (#76).
+
 ## [0.4.1] - 2026-11-01
 
 Fixes found while building the Symfony bundle and the Laravel package.

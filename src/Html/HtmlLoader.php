@@ -25,6 +25,8 @@ use HtmlTranslator\Exception\InvalidHtmlException;
  *   a <tr> after cells, a <tfoot> after rows or a nested <table> are dropped while their cells and rows stay.
  * Leading <col>s are parsed in a <colgroup> only when nothing but columns follows; a <colgroup> context drops any
  * other content, text included, so otherwise they are parsed in a <table> and get an implied <colgroup>.
+ *
+ * @internal part of the pipeline behind HtmlTranslator (ADR-0018)
  */
 final class HtmlLoader
 {

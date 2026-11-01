@@ -17,6 +17,8 @@ use HtmlTranslator\Exception\UntrustedText;
  * Contract for reassembly: an attribute unit of an inline element points at the same node as the
  * pseudo-tag of its run (RunAnchor::$tags), so attribute units must be applied before runs are
  * replaced with clones of their tag nodes (paired tags shallow, void and opaque tags deep).
+ *
+ * @internal part of the pipeline behind HtmlTranslator (ADR-0018)
  */
 final readonly class SegmentedDocument
 {

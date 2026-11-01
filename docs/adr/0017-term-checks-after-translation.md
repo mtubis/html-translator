@@ -31,7 +31,8 @@ Alternatives considered:
   in profile order. The translation is used anyway: `isComplete()` is unaffected, there is no retry, no fallback and
   no extra provider call, also with `FallbackStrategy::Throw`. Term issues follow the other issues of the document.
   A message names at most three terms, then "and N more"; terms are quoted with `UntrustedText`.
-- `HtmlTranslator` takes the checker as an optional named collaborator, `termChecker` (ADR-0010).
+- `HtmlTranslator` takes the checker as an optional named collaborator, `termChecker` (ADR-0010). (Amended by
+  ADR-0018: the checker is internal and created by `HtmlTranslator`.)
 
 ## Consequences
 - Product names and kept terms changed by the model show up in `issues()` and in the log.

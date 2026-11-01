@@ -35,6 +35,8 @@ use HtmlTranslator\Exception\UntrustedText;
  * Call apply() once per segmented document, with the complete map: replaced nodes leave the document, so a
  * later call cannot reach them. Every translation and anchor is checked before the DOM is touched (a safety
  * net; retry-facing validation is StructureValidator's job), so a failing call changes nothing.
+ *
+ * @internal part of the pipeline behind HtmlTranslator (ADR-0018)
  */
 final readonly class Reassembler
 {
