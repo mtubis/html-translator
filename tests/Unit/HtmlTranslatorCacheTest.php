@@ -265,6 +265,20 @@ final class HtmlTranslatorCacheTest extends TestCase
     }
 
     #[Test]
+    public function a_corrupting_pseudo_provider_is_not_answered_from_a_clean_ones_entries(): void
+    {
+        $options = new TranslationOptions(maxCorrectiveRetries: 0);
+        new HtmlTranslator(new PseudoLocalizationProvider(), cache: $this->pool)->translate('<p>Hello <b>world</b></p>', Locale::fromString('pl'), $options);
+        $clean = new HtmlTranslator(new PseudoLocalizationProvider(), cache: $this->pool)->translate('<p>Hello <b>world</b></p>', Locale::fromString('pl'), $options);
+        self::assertSame(1, $clean->stats()->cacheHits, 'Clean providers share their entries.');
+
+        $result = new HtmlTranslator(PseudoLocalizationProvider::corruptingEvery(1), cache: $this->pool)->translate('<p>Hello <b>world</b></p>', Locale::fromString('pl'), $options);
+
+        self::assertSame(0, $result->stats()->cacheHits);
+        self::assertCount(1, $result->issues());
+    }
+
+    #[Test]
     public function it_does_not_cache_units_that_kept_their_original_text(): void
     {
         // u2 is refused for good, a1 stays invalid however often it is retried.
