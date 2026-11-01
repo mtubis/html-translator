@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-01
+
+Fixes found while building the Symfony bundle and the Laravel package.
+
 ### Fixed
 - `ChatModelContractTestCase` and `TranslationProviderContractTestCase` restore `zend.exception_ignore_args` after each
   test. They turned it off for the rest of the process, so later tests of the package recorded the arguments of every
@@ -134,5 +138,6 @@ The pipeline without any model. Not tagged.
 - Golden fixture harness and seed corpus (#9); project skeleton, architecture documentation and
   [ADR-0001](docs/adr/0001-record-architecture-decisions.md)–[ADR-0010](docs/adr/0010-public-api-of-core-0-1.md) (#1). Lenient decoding of model output is described in [ADR-0009](docs/adr/0009-lenient-decoding-of-model-output.md).
 
-[Unreleased]: https://github.com/mtubis/html-translator/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/mtubis/html-translator/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/mtubis/html-translator/releases/tag/v0.4.1
 [0.4.0]: https://github.com/mtubis/html-translator/releases/tag/v0.4.0
