@@ -90,4 +90,25 @@ final class TokenUsageTest extends TestCase
     {
         self::assertEquals($expected, TokenUsage::sum($left, $right));
     }
+
+    /**
+     * Counts come from response bodies, so they can be huge (#97).
+     *
+     * @return iterable<string, array{TokenUsage, TokenUsage, TokenUsage}>
+     */
+    public static function hugeSums(): iterable
+    {
+        yield 'input tokens beyond PHP_INT_MAX' => [new TokenUsage(\PHP_INT_MAX, 1), new TokenUsage(1, 1), new TokenUsage(\PHP_INT_MAX, 2)];
+        yield 'output tokens beyond PHP_INT_MAX' => [new TokenUsage(1, \PHP_INT_MAX - 1), new TokenUsage(1, 2), new TokenUsage(2, \PHP_INT_MAX)];
+        yield 'both counts at PHP_INT_MAX' => [new TokenUsage(\PHP_INT_MAX, \PHP_INT_MAX), new TokenUsage(\PHP_INT_MAX, \PHP_INT_MAX), new TokenUsage(\PHP_INT_MAX, \PHP_INT_MAX)];
+        yield 'exactly PHP_INT_MAX' => [new TokenUsage(\PHP_INT_MAX - 5, 1), new TokenUsage(5, 1), new TokenUsage(\PHP_INT_MAX, 2)];
+        yield 'just below PHP_INT_MAX' => [new TokenUsage(\PHP_INT_MAX - 5, 1), new TokenUsage(4, 1), new TokenUsage(\PHP_INT_MAX - 1, 2)];
+    }
+
+    #[Test]
+    #[DataProvider('hugeSums')]
+    public function it_stops_a_summed_count_at_php_int_max(TokenUsage $left, TokenUsage $right, TokenUsage $expected): void
+    {
+        self::assertEquals($expected, TokenUsage::sum($left, $right));
+    }
 }
