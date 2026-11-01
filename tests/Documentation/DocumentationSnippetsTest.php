@@ -10,7 +10,8 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Runs every PHP snippet of the README and the usage guide, so the examples cannot rot (#62).
+ * Runs every PHP snippet of the README, the usage guide, the provider guide and the profile guide, so the examples
+ * cannot rot (#62, #75).
  *
  * The snippets of one file run as one script in a separate PHP process, in document order. The real HTTP client of
  * the model examples is swapped for PseudoLocalizingVendorApi, so no snippet needs the network. A ```text block
@@ -28,6 +29,7 @@ final class DocumentationSnippetsTest extends TestCase
     private const string PRELUDE = <<<'PHP'
         $_ENV['OPENAI_API_KEY'] = 'sk-documentation-test';
         $_ENV['ANTHROPIC_API_KEY'] = 'sk-ant-documentation-test';
+        $_ENV['TOGETHER_API_KEY'] = 'documentation-test';
         $logger = new class extends \Psr\Log\AbstractLogger {
             public function log($level, \Stringable|string $message, array $context = []): void
             {
@@ -40,6 +42,9 @@ final class DocumentationSnippetsTest extends TestCase
 
     /** The HTTP client of the model examples, replaced by the offline fake. */
     private const string HTTP_CLIENT = "HttpClient::create(['timeout' => 120])";
+
+    /** The offline fake, for the substitutions. */
+    private const string FAKE_CLIENT = '\\' . PseudoLocalizingVendorApi::class . '::client()';
 
     /** The OpenAI model of the README, kept under another name: later snippets replace $model with Claude. */
     private const string OPENAI_MODEL = 'OpenAiCompatibleConfig::openAi($_ENV[\'OPENAI_API_KEY\'], \'gpt-4o-mini\'));';
@@ -54,19 +59,65 @@ final class DocumentationSnippetsTest extends TestCase
         PHP;
 
     /**
-     * @return iterable<string, array{string, array<string, string>, string}>
+     * Translates with every model the provider guide builds (OpenAI, Ollama through Guzzle-style PSR-17 factories,
+     * Anthropic, Anthropic with more retries, Ollama without retries); the substitutions keep the earlier ones.
+     */
+    private const string PROVIDERS_CHECK = <<<'PHP'
+        foreach ([$openAiModel, $ollamaModel, $anthropicModel, $patientModel, $model] as $guideModel) {
+            $guideResult = new \HtmlTranslator\HtmlTranslator(new \HtmlTranslator\Provider\Llm\LlmTranslationProvider($guideModel))
+                ->translate($html, \HtmlTranslator\Domain\Locale::fromString('pl'));
+            if (!$guideResult->isComplete()) {
+                fwrite(STDERR, sprintf("The provider example with %s left units untranslated.\n", $guideModel->modelId()));
+            }
+        }
+        PHP;
+
+    /** The profile guide translates with its profile; the pseudo-localizing provider ignores it but must finish. */
+    private const string PROFILES_CHECK = <<<'PHP'
+        if (!$result->isComplete()) {
+            fwrite(STDERR, "The profile example left units untranslated.\n");
+        }
+        PHP;
+
+    /**
+     * Per document: its file, substitutions, what it takes as given beyond the prelude, and checks run after it.
+     *
+     * @return iterable<string, array{string, array<string, string>, string, string}>
      */
     public static function documents(): iterable
     {
         yield 'README.md' => [
             'README.md',
             [
-                self::HTTP_CLIENT => '\\' . PseudoLocalizingVendorApi::class . '::client()',
+                self::HTTP_CLIENT => self::FAKE_CLIENT,
                 self::OPENAI_MODEL => self::OPENAI_MODEL . "\n" . '$openAiModel = $model;',
             ],
+            '',
             self::OPENAI_CHECK,
         ];
-        yield 'docs/usage.md' => ['docs/usage.md', [], ''];
+        yield 'docs/usage.md' => ['docs/usage.md', [], '', ''];
+        yield 'docs/providers.md' => [
+            'docs/providers.md',
+            [
+                "HttpClient::create(['timeout' => 60])" => self::FAKE_CLIENT,
+                "HttpClient::create(['timeout' => 180])" => self::FAKE_CLIENT,
+                // Guzzle is not installed here; a PSR-18 client around the fake takes its place.
+                "new GuzzleHttp\\Client(['timeout' => 60])" => 'new \\Symfony\\Component\\HttpClient\\Psr18Client(' . self::FAKE_CLIENT . ')',
+                self::OPENAI_MODEL => self::OPENAI_MODEL . "\n" . '$openAiModel = $model;',
+                "OpenAiCompatibleConfig::ollama('llama3.1'),\n);" => "OpenAiCompatibleConfig::ollama('llama3.1'),\n);\n" . '$ollamaModel = $model;',
+                '$model = new AnthropicChatModel($http, $http, $http, $config);' => '$model = new AnthropicChatModel($http, $http, $http, $config);' . "\n" . '$anthropicModel = $model;',
+                'maxDelayMilliseconds: 60_000)));' => 'maxDelayMilliseconds: 60_000)));' . "\n" . '$patientModel = $model;',
+            ],
+            '',
+            self::PROVIDERS_CHECK,
+        ];
+        // The guide refers to the usage guide for the translator.
+        yield 'docs/profiles.md' => [
+            'docs/profiles.md',
+            [],
+            '$translator = new \\HtmlTranslator\\HtmlTranslator(new \\HtmlTranslator\\Provider\\Testing\\PseudoLocalizationProvider());',
+            self::PROFILES_CHECK,
+        ];
     }
 
     /**
@@ -74,7 +125,7 @@ final class DocumentationSnippetsTest extends TestCase
      */
     #[Test]
     #[DataProvider('documents')]
-    public function it_runs_every_snippet(string $document, array $substitutions, string $postlude): void
+    public function it_runs_every_snippet(string $document, array $substitutions, string $given, string $postlude): void
     {
         $markdown = file_get_contents(self::ROOT . '/' . $document);
         self::assertIsString($markdown);
@@ -88,7 +139,7 @@ final class DocumentationSnippetsTest extends TestCase
             'Some PHP blocks would not run: indent them by nothing and fence them with ```php.',
         );
 
-        [$exitCode, $output, $errors] = $this->runScript(SnippetScript::build($snippets, self::ROOT . '/vendor/autoload.php', self::PRELUDE, $substitutions, $postlude));
+        [$exitCode, $output, $errors] = $this->runScript(SnippetScript::build($snippets, self::ROOT . '/vendor/autoload.php', self::PRELUDE . "\n" . $given, $substitutions, $postlude));
 
         self::assertSame('', $errors, 'The snippets wrote to stderr.');
         self::assertSame(0, $exitCode, 'The snippets failed.');
