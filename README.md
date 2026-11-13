@@ -155,6 +155,10 @@ exceptions implement `HtmlTranslator\Exception\TranslatorException`. See the [us
   ([Packagist](https://packagist.org/packages/mtubis/html-translator-laravel)) — providers and profiles in
   `config/html-translator.php`, the `HtmlTranslation` facade, Artisan commands, Laravel's HTTP client, cache stores
   and log channels, and `HtmlTranslation::fake()` for tests.
+- **Filament**: [`mtubis/html-translator-filament`](https://github.com/mtubis/html-translator-filament)
+  ([Packagist](https://packagist.org/packages/mtubis/html-translator-filament)) — a Filament v5 plugin built on the
+  Laravel package: record and field actions for `spatie/laravel-translatable` models, a review workflow
+  (`machine` → `reviewed`) and stale-translation detection.
 
 ## Contributing
 
