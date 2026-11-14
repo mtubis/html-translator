@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-14
+
+Supply-chain hardening of the repository; the code and the public API are unchanged.
+
 ### Added
 - A [security policy](SECURITY.md): supported versions and how to report a vulnerability privately.
 
@@ -218,7 +222,8 @@ The pipeline without any model. Not tagged.
 - Golden fixture harness and seed corpus (#9); project skeleton, architecture documentation and
   [ADR-0001](docs/adr/0001-record-architecture-decisions.md)–[ADR-0010](docs/adr/0010-public-api-of-core-0-1.md) (#1). Lenient decoding of model output is described in [ADR-0009](docs/adr/0009-lenient-decoding-of-model-output.md).
 
-[Unreleased]: https://github.com/mtubis/html-translator/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/mtubis/html-translator/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/mtubis/html-translator/releases/tag/v1.0.1
 [1.0.0]: https://github.com/mtubis/html-translator/releases/tag/v1.0.0
 [0.4.1]: https://github.com/mtubis/html-translator/releases/tag/v0.4.1
 [0.4.0]: https://github.com/mtubis/html-translator/releases/tag/v0.4.0
