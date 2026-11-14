@@ -1,0 +1,26 @@
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # Give the community time to spot a compromised release before it reaches CI.
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ['*']
+    commit-message:
+      prefix: ci
+
+  - package-ecosystem: composer
+    directory: /
+    schedule:
+      interval: weekly
+    # A library has no committed lock file: only widen a constraint when a new release falls outside it.
+    versioning-strategy: increase-if-necessary
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: build
