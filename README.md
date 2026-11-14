@@ -166,6 +166,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Design decisions are recorded in [docs/a
 Tests against real models run with `composer test:integration` (configure `.env` from `.env.dist`), and
 [tools/eval](tools/eval/README.md) compares models over the golden fixtures.
 
+## Security
+
+Please report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
+
 ## License
 
 MIT

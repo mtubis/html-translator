@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+- A [security policy](SECURITY.md): supported versions and how to report a vulnerability privately.
+
+### Changed
+- CI pins every GitHub Action to a commit SHA, and Dependabot keeps the actions and the Composer constraints up
+  to date, with a 7-day cooldown on new releases.
+
 ## [1.0.0] - 2026-11-02
 
 The API freeze, under a backward compatibility promise ([ADR-0018](docs/adr/0018-public-api-and-backward-compatibility-promise.md)); see [UPGRADE-1.0.md](UPGRADE-1.0.md).
